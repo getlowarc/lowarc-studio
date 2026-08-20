@@ -1,4 +1,5 @@
 mod dylib;
+pub mod plugin_host;
 pub mod runtime;
 
 use runtime::runtime_loader::LogLevel;
