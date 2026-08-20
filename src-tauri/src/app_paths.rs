@@ -65,17 +65,11 @@ impl AppPaths {
     pub fn plugins() -> PathBuf {
         Self::user_data().join("plugins")
     }
-    // No caller yet — the settings system and recent-projects tracking aren't built. Defined here
-    // anyway, same reasoning as AppPaths.cs listing every path up front: this module's whole job
-    // is being the one place that knows where things live, not growing new path logic wherever a
-    // future feature happens to need one.
-    #[allow(dead_code)]
     pub fn settings_file() -> PathBuf {
         Self::user_data().join("settings.json")
     }
     /// One project path per line — see the structure decision: a path list needs nothing more
     /// than that, JSON would be pure overhead.
-    #[allow(dead_code)]
     pub fn recent_projects_file() -> PathBuf {
         Self::user_data().join("recent.txt")
     }

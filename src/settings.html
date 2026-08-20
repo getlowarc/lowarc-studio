@@ -4,22 +4,122 @@
     <meta charset="utf-8" />
     <title>LowArc Studio — Settings</title>
     <link rel="stylesheet" href="style.css" />
+    <style>
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        max-width: 280px;
+        margin-bottom: 16px;
+      }
+
+      .field label {
+        font-size: 13px;
+        color: var(--fg-dim);
+      }
+
+      .field input {
+        font-family: inherit;
+        font-size: 14px;
+        background: var(--bg-raised);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        color: var(--fg);
+        padding: 7px 9px;
+      }
+
+      .field .hint {
+        font-size: 12px;
+        color: var(--fg-dim);
+      }
+
+      .page-header {
+        gap: 12px;
+      }
+
+      .header-spacer {
+        flex: 1;
+      }
+
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .status-line {
+        font-size: 13px;
+        min-height: 18px;
+      }
+
+      .status-line.error {
+        color: var(--danger);
+      }
+
+      .status-line.ok {
+        color: var(--accent);
+      }
+    </style>
   </head>
   <body>
     <div class="page">
       <div class="page-header">
         <button class="back-link" id="back">← Start</button>
         <h1>Settings</h1>
+        <div class="header-spacer"></div>
+        <div class="header-actions">
+          <div id="status" class="status-line"></div>
+          <button id="save">Save</button>
+        </div>
       </div>
       <div class="page-body">
-        <p>Settings aren't built yet — this page is a placeholder so the button on the
-        startup screen has somewhere real to go.</p>
+        <div class="field">
+          <label for="target-fps">Dev run target FPS</label>
+          <input id="target-fps" type="number" min="1" max="1000" step="1" />
+          <div class="hint">Frame rate used when running a project from the editor.</div>
+        </div>
       </div>
     </div>
     <script>
+      const { invoke } = window.__TAURI__.core;
+
+      const targetFpsInput = document.getElementById("target-fps");
+      const statusEl = document.getElementById("status");
+
+      function setStatus(message, kind) {
+        statusEl.textContent = message || "";
+        statusEl.className = "status-line" + (kind ? ` ${kind}` : "");
+      }
+
+      async function load() {
+        try {
+          const settings = await invoke("get_settings");
+          targetFpsInput.value = settings.devRunTargetFps;
+        } catch (err) {
+          setStatus(String(err), "error");
+        }
+      }
+
+      document.getElementById("save").addEventListener("click", async () => {
+        const fps = Number(targetFpsInput.value);
+        if (!Number.isInteger(fps) || fps < 1) {
+          setStatus("Target FPS must be a positive whole number.", "error");
+          return;
+        }
+
+        try {
+          await invoke("save_settings", { settings: { devRunTargetFps: fps } });
+          setStatus("Saved.", "ok");
+        } catch (err) {
+          setStatus(String(err), "error");
+        }
+      });
+
       document.getElementById("back").addEventListener("click", () => {
         window.location.href = "index.html";
       });
+
+      load();
     </script>
   </body>
 </html>

@@ -3,11 +3,13 @@ mod dylib;
 pub mod plugin_host;
 mod projects;
 pub mod runtime;
+mod settings;
 
 use app_paths::AppPaths;
 use plugin_host::protocol::PluginProcess;
 use projects::RecentProject;
 use runtime::runtime_loader::LogLevel;
+use settings::Settings;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -54,11 +56,13 @@ fn start_dev_run(app: AppHandle, state: State<'_, RunState>, entry_file: String,
         let _ = log_handle.emit("dev-run-log", serde_json::json!({"level": log_level_str(level), "message": message}));
     });
 
+    let target_fps = settings::load().dev_run_target_fps;
+
     let done_handle = app.clone();
     std::thread::spawn(move || {
-        // Real settings/target-fps sourcing doesn't exist yet — the IDE's own settings system
-        // hasn't been built. 60fps + empty settings is a deliberate placeholder, not a silent gap.
-        let result = runtime::start_run(&entry, &project, &modules, 60, serde_json::json!({}), stop_flag, log);
+        // Per-module settings (the 4th arg) aren't sourced from anywhere real yet — that's config
+        // handed to game modules at start, a separate concept from Studio's own settings.json.
+        let result = runtime::start_run(&entry, &project, &modules, target_fps, serde_json::json!({}), stop_flag, log);
 
         *done_handle.state::<RunState>().0.lock().unwrap() = None;
         let payload = match &result {
@@ -87,6 +91,16 @@ fn open_project(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn get_settings() -> Settings {
+    settings::load()
+}
+
+#[tauri::command]
+fn save_settings(settings: Settings) -> Result<(), String> {
+    settings::save(&settings)
+}
+
+#[tauri::command]
 fn stop_dev_run(state: State<'_, RunState>) -> Result<(), String> {
     match state.0.lock().unwrap().as_ref() {
         Some(flag) => {
@@ -109,7 +123,9 @@ pub fn run() {
       stop_dev_run,
       list_recent_projects,
       create_project,
-      open_project
+      open_project,
+      get_settings,
+      save_settings
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {
