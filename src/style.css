@@ -19,13 +19,12 @@
   --cyan-ink: #04191b; /* text/icon color for content sitting on a cyan fill */
 
   --yellow: #ffff00;
-  --yellow-dark: #d2b400;
+  --yellow-dark: #e8960a;
   --yellow-dim: #332b00;
   --yellow-ink: #1a1600; /* text/icon color for content sitting on a yellow fill */
 
-  --danger: #e06c75;
-  --danger-dark: #b8535b;
-  --danger-dim: #2c1315;
+  /* No dark/dim variant — danger is a single sharp red, not a tonal family like cyan/yellow. */
+  --danger: #ff3b30;
 
   --accent: var(--cyan);
 }

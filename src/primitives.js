@@ -98,6 +98,25 @@ function initNumericInputs(root = document) {
   });
 }
 
+// One selection behavior for both sidebar-tab and header-tab lists — they're the same "exactly
+// one active item" logic under different skins, driven by [data-tabs] wrapping [data-tab-value]
+// buttons.
+function initTabs(root = document) {
+  root.querySelectorAll("[data-tabs]").forEach((el) => {
+    if (el.dataset.tabsInit) return;
+    el.dataset.tabsInit = "true";
+
+    el.addEventListener("click", (e) => {
+      const tab = e.target.closest("[data-tab-value]");
+      if (!tab || !el.contains(tab)) return;
+
+      el.querySelectorAll("[data-tab-value]").forEach((t) => t.classList.remove("is-active"));
+      tab.classList.add("is-active");
+      el.dispatchEvent(new CustomEvent("tab-change", { bubbles: true, detail: { value: tab.dataset.tabValue } }));
+    });
+  });
+}
+
 // Wires a plain text input to filter `options` ({value, label}[]) into the shared dropdown-menu
 // popover. The popover only ever appears when there's something to suggest — an empty query or a
 // query with no matches keeps it closed, per "only show a dropdown when the searchbar can show
