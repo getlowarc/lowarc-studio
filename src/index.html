@@ -3,22 +3,202 @@
   <head>
     <meta charset="utf-8" />
     <title>LowArc Studio</title>
+    <link rel="stylesheet" href="style.css" />
     <style>
-      html, body {
-        margin: 0;
-        height: 100%;
-        background: #1e1e1e;
-        color: #d4d4d4;
-        font-family: system-ui, sans-serif;
+      body {
+        display: flex;
+      }
+
+      .actions {
+        width: 220px;
+        flex: none;
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        padding: 16px 12px;
+        gap: 6px;
+      }
+
+      .actions .brand {
+        font-size: 15px;
+        font-weight: 600;
+        padding: 4px 8px 16px;
+      }
+
+      .actions button {
+        text-align: left;
+        background: none;
+        border: none;
+        border-radius: 4px;
+        padding: 9px 10px;
+      }
+
+      .actions button:hover {
+        background: var(--bg-hover);
+      }
+
+      .actions .spacer {
+        flex: 1;
+      }
+
+      .actions .secondary {
+        color: var(--fg-dim);
+        font-size: 13px;
+      }
+
+      main {
+        flex: 1;
+        overflow: auto;
+        padding: 24px 32px;
+      }
+
+      main h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 16px;
+        color: var(--fg-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      .recent-list {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .recent-item {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding: 10px 12px;
+        border-radius: 4px;
+        border: 1px solid transparent;
+        cursor: pointer;
+      }
+
+      .recent-item:hover {
+        background: var(--bg-hover);
+        border-color: var(--border);
+      }
+
+      .recent-item .name {
+        font-size: 14px;
+      }
+
+      .recent-item .path {
+        font-size: 12px;
+        color: var(--fg-dim);
+      }
+
+      .recent-item.missing {
+        cursor: default;
+        opacity: 0.6;
+      }
+
+      .recent-item.missing:hover {
+        background: none;
+        border-color: transparent;
+      }
+
+      .recent-item.missing .path::after {
+        content: " — not found";
+        color: var(--danger);
+      }
+
+      .empty-state {
+        color: var(--fg-dim);
+      }
+
+      .status-line {
+        min-height: 18px;
+        margin-top: 12px;
+        font-size: 13px;
+        color: var(--danger);
+      }
+
+      /* New-project name prompt */
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
         display: flex;
         align-items: center;
         justify-content: center;
       }
+
+      .modal-backdrop.hidden {
+        display: none;
+      }
+
+      .modal {
+        background: var(--bg-raised);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 20px;
+        width: 340px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .modal h2 {
+        font-size: 14px;
+        margin: 0;
+      }
+
+      .modal input {
+        font-family: inherit;
+        font-size: 14px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        color: var(--fg);
+        padding: 7px 9px;
+      }
+
+      .modal .modal-error {
+        color: var(--danger);
+        font-size: 12px;
+        min-height: 16px;
+      }
+
+      .modal .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
     </style>
   </head>
   <body>
-    <!-- Placeholder shell — proves the Tauri toolchain end to end. The real startup
-         screen / editor layout replace this next. -->
-    <p>LowArc Studio — scaffold running.</p>
+    <nav class="actions">
+      <div class="brand">LowArc Studio</div>
+      <button id="new-project">New Project</button>
+      <button id="open-project">Open Project</button>
+      <div class="spacer"></div>
+      <button id="open-modules" class="secondary">Modules</button>
+      <button id="open-plugins" class="secondary">Plugins</button>
+      <button id="open-settings" class="secondary">Settings</button>
+      <button id="open-website" class="secondary">lowarc.com ↗</button>
+    </nav>
+    <main>
+      <h1>Recent Projects</h1>
+      <div id="recent-list" class="recent-list"></div>
+      <div id="status" class="status-line"></div>
+    </main>
+
+    <div id="new-project-modal" class="modal-backdrop hidden">
+      <div class="modal">
+        <h2>New project name</h2>
+        <input id="new-project-name" type="text" placeholder="my-game" autocomplete="off" />
+        <div id="new-project-error" class="modal-error"></div>
+        <div class="modal-actions">
+          <button id="new-project-cancel">Cancel</button>
+          <button id="new-project-create">Create</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="startup.js"></script>
   </body>
 </html>

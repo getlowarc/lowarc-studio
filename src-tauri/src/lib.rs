@@ -1,10 +1,12 @@
 mod app_paths;
 mod dylib;
 pub mod plugin_host;
+mod projects;
 pub mod runtime;
 
 use app_paths::AppPaths;
 use plugin_host::protocol::PluginProcess;
+use projects::RecentProject;
 use runtime::runtime_loader::LogLevel;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -70,6 +72,21 @@ fn start_dev_run(app: AppHandle, state: State<'_, RunState>, entry_file: String,
 }
 
 #[tauri::command]
+fn list_recent_projects() -> Vec<RecentProject> {
+    projects::list_recent()
+}
+
+#[tauri::command]
+fn create_project(parent_dir: String, name: String) -> Result<String, String> {
+    projects::create_project(&PathBuf::from(parent_dir), &name).map(|p| p.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+fn open_project(path: String) -> Result<(), String> {
+    projects::open_project(&PathBuf::from(path))
+}
+
+#[tauri::command]
 fn stop_dev_run(state: State<'_, RunState>) -> Result<(), String> {
     match state.0.lock().unwrap().as_ref() {
         Some(flag) => {
@@ -85,7 +102,15 @@ pub fn run() {
   tauri::Builder::default()
     .manage(RunState::default())
     .manage(PluginState::default())
-    .invoke_handler(tauri::generate_handler![start_dev_run, stop_dev_run])
+    .plugin(tauri_plugin_dialog::init())
+    .plugin(tauri_plugin_opener::init())
+    .invoke_handler(tauri::generate_handler![
+      start_dev_run,
+      stop_dev_run,
+      list_recent_projects,
+      create_project,
+      open_project
+    ])
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(

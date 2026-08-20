@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>LowArc Studio — Editor</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="page">
+      <div class="page-header">
+        <button class="back-link" id="back">← Start</button>
+        <h1>Editor</h1>
+      </div>
+      <div class="page-body">
+        <p>The editor for <code id="project-path"></code> isn't built yet — this page is a
+        placeholder so New/Open Project has somewhere real to land.</p>
+      </div>
+    </div>
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      document.getElementById("project-path").textContent = params.get("project") || "(unknown project)";
+      document.getElementById("back").addEventListener("click", () => {
+        window.location.href = "index.html";
+      });
+    </script>
+  </body>
+</html>
