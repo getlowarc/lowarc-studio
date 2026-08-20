@@ -1,0 +1,11 @@
+[package]
+name = "lowarc-studio-native-fixture"
+version = "0.1.0"
+edition = "2021"
+
+# A minimal native-kind module for testing NativeLoader end to end. Deliberately the same ABI as
+# lowarc/Bootstrap's own fixture (lowarc_module_start/stop) — the two projects' native-module
+# contracts are identical on purpose, so this could be the literal same source file if the two
+# repos ever wanted to share it; kept as a separate copy here since they're independent repos.
+[lib]
+crate-type = ["cdylib"]
