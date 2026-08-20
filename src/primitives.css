@@ -1,0 +1,425 @@
+/* LowArc Studio component primitives — buttons, dropdowns, searchbar, inputs, checkboxes.
+   Depends on the tokens defined in style.css's :root; load style.css first. */
+
+/* ---------- Buttons ---------- */
+/* One shape per size (.btn-sm/md/lg/xl), one color scheme per type (.btn-main/sub/outline/
+   ghost/danger). A button always gets exactly one of each. .btn-md is the standard size. */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: inherit;
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease, filter 0.12s ease;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+  filter: none !important;
+}
+
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 4px;
+}
+
+.btn-md {
+  padding: 8px 14px;
+  font-size: 14px;
+  border-radius: 6px;
+}
+
+.btn-lg {
+  padding: 10px 18px;
+  font-size: 15px;
+  border-radius: 7px;
+}
+
+.btn-xl {
+  padding: 14px 24px;
+  font-size: 17px;
+  border-radius: 8px;
+}
+
+.btn-main {
+  background: var(--cyan);
+  border-color: var(--cyan);
+  color: var(--cyan-ink);
+}
+.btn-main:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+.btn-main:active:not(:disabled) {
+  background: var(--cyan-dark);
+  border-color: var(--cyan-dark);
+  color: var(--fg);
+  filter: none;
+}
+
+.btn-sub {
+  background: var(--cyan-dark);
+  border-color: var(--cyan-dark);
+  color: var(--fg);
+}
+.btn-sub:hover:not(:disabled) {
+  filter: brightness(1.2);
+}
+.btn-sub:active:not(:disabled) {
+  filter: brightness(0.9);
+}
+
+.btn-outline {
+  background: transparent;
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+.btn-outline:hover:not(:disabled) {
+  background: var(--cyan-dim);
+}
+.btn-outline:active:not(:disabled) {
+  background: var(--cyan-dim);
+  filter: brightness(0.85);
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--fg-dim);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+.btn-ghost:active:not(:disabled) {
+  background: var(--border);
+}
+
+.btn-danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+.btn-danger:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.btn-danger:active:not(:disabled) {
+  background: var(--danger-dark);
+  border-color: var(--danger-dark);
+  filter: none;
+}
+
+/* ---------- Focus ---------- */
+
+.btn:focus-visible,
+.input:focus-visible,
+.dropdown-trigger:focus-visible,
+.checkbox-row:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+/* ---------- Text / numeric inputs ---------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-label {
+  font-size: 13px;
+  color: var(--fg-dim);
+}
+
+.field-hint {
+  font-size: 12px;
+  color: var(--fg-dim);
+}
+
+.input {
+  font-family: inherit;
+  font-size: 14px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fg);
+  padding: 8px 10px;
+  width: 100%;
+}
+
+.input:hover {
+  border-color: #555;
+}
+
+.input::placeholder {
+  color: var(--fg-dim);
+}
+
+.input:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.numeric-input {
+  display: flex;
+  align-items: stretch;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  width: fit-content;
+}
+
+.numeric-input:hover {
+  border-color: #555;
+}
+
+.numeric-input input {
+  font-family: inherit;
+  font-size: 14px;
+  background: transparent;
+  border: none;
+  color: var(--fg);
+  padding: 8px 10px;
+  width: 90px;
+  text-align: right;
+}
+
+.numeric-input input:focus-visible {
+  outline: none;
+}
+
+.numeric-steppers {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+}
+
+.numeric-steppers button {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 50%;
+  font-size: 9px;
+  line-height: 1;
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+
+.numeric-steppers button:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.numeric-steppers button:first-child {
+  border-bottom: 1px solid var(--border);
+}
+
+/* ---------- Checkbox ---------- */
+
+.checkbox-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.checkbox-box {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-raised);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkbox-row input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.checkbox-row input[type="checkbox"]:checked + .checkbox-box {
+  background: var(--cyan);
+  border-color: var(--cyan);
+}
+
+.checkbox-box svg {
+  width: 11px;
+  height: 11px;
+  opacity: 0;
+  color: var(--cyan-ink);
+}
+
+.checkbox-row input[type="checkbox"]:checked + .checkbox-box svg {
+  opacity: 1;
+}
+
+/* ---------- Dropdown ---------- */
+/* One popover engine. .dropdown-input skins the trigger to look like a text input (the "dropdown
+   input" field type). A checkbox dropdown reuses the same markup with checkbox rows in the menu
+   and stays open on selection (data-multiselect on the root). */
+
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdown-full {
+  display: block;
+}
+
+.dropdown-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: inherit;
+  font-size: 14px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fg);
+  padding: 8px 10px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.dropdown-trigger:hover {
+  border-color: #555;
+}
+
+.dropdown[data-open="true"] .dropdown-trigger {
+  border-color: var(--cyan);
+}
+
+.dropdown-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.dropdown-value.placeholder {
+  color: var(--fg-dim);
+}
+
+.dropdown-chevron {
+  flex: none;
+  color: var(--fg-dim);
+  font-size: 11px;
+  transition: transform 0.12s ease;
+}
+
+.dropdown[data-open="true"] .dropdown-chevron {
+  transform: rotate(180deg);
+}
+
+.dropdown-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  display: none;
+}
+
+.dropdown[data-open="true"] .dropdown-menu {
+  display: block;
+}
+
+.dropdown-option {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  font-size: 14px;
+  color: var(--fg);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.dropdown-option:hover,
+.dropdown-option.is-active {
+  background: var(--bg-hover);
+}
+
+.dropdown-option.is-selected {
+  color: var(--yellow);
+}
+
+.dropdown-option.is-empty {
+  color: var(--fg-dim);
+  cursor: default;
+}
+.dropdown-option.is-empty:hover {
+  background: none;
+}
+
+/* ---------- Searchbar ---------- */
+/* An input whose typed text filters into the same dropdown-menu popover — the menu only ever
+   appears when the search has known options to suggest from. */
+
+.searchbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.searchbar-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--fg-dim);
+  pointer-events: none;
+  display: flex;
+}
+
+.searchbar input {
+  padding-left: 32px;
+  padding-right: 28px;
+}
+
+.searchbar-clear {
+  all: unset;
+  position: absolute;
+  right: 8px;
+  color: var(--fg-dim);
+  cursor: pointer;
+  display: none;
+  padding: 2px;
+  border-radius: 3px;
+}
+
+.searchbar-clear:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.searchbar.has-value .searchbar-clear {
+  display: block;
+}

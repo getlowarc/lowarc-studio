@@ -7,8 +7,27 @@
   --border: #3c3c3c;
   --fg: #d4d4d4;
   --fg-dim: #8a8a8a;
-  --accent: #4fa8ff;
+
+  /* Brand: cyan is the primary action/interactive color used throughout the primitives (buttons,
+     focus rings, links). Yellow is the secondary accent, reserved for selected/active states so
+     it never competes with cyan over "what does this control do." The *-dark variants aren't a
+     flat brightness cut — each is nudged toward a neighboring hue (cyan cools toward blue, yellow
+     warms toward amber) since a naive darken of a pure primary goes muddy on a near-black page. */
+  --cyan: #00ffff;
+  --cyan-dark: #0096c8;
+  --cyan-dim: #06272c;
+  --cyan-ink: #04191b; /* text/icon color for content sitting on a cyan fill */
+
+  --yellow: #ffff00;
+  --yellow-dark: #d2b400;
+  --yellow-dim: #332b00;
+  --yellow-ink: #1a1600; /* text/icon color for content sitting on a yellow fill */
+
   --danger: #e06c75;
+  --danger-dark: #b8535b;
+  --danger-dim: #2c1315;
+
+  --accent: var(--cyan);
 }
 
 * {
