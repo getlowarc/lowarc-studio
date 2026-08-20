@@ -1,0 +1,13 @@
+# Rust build output
+target/
+src-tauri/gen/schemas/
+
+# Node, if/when a frontend build step gets added
+node_modules/
+dist/
+
+# Editors / OS
+.vs/
+.idea/
+.DS_Store
+Thumbs.db
