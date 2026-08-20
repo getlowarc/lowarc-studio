@@ -6,6 +6,14 @@ src-tauri/gen/schemas/
 node_modules/
 dist/
 
+# Per-user runtime state written by a source build (AppPaths.user_data() == the repo root when
+# running from source, same reasoning as lowarc's own AppPaths) — installed modules, plugins,
+# settings. Not source, never committed.
+/modules/
+/plugins/
+/settings.json
+/recent.txt
+
 # Editors / OS
 .vs/
 .idea/

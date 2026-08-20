@@ -1,7 +1,10 @@
+mod app_paths;
 mod dylib;
 pub mod plugin_host;
 pub mod runtime;
 
+use app_paths::AppPaths;
+use plugin_host::protocol::PluginProcess;
 use runtime::runtime_loader::LogLevel;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -14,6 +17,12 @@ use tauri::{AppHandle, Emitter, Manager, State};
 #[derive(Default)]
 struct RunState(Mutex<Option<Arc<AtomicBool>>>);
 
+/// Plugins started once at launch and kept alive for the app's whole session — wrapped in a
+/// Mutex (not stored bare) because PluginProcess holds an mpsc::Receiver, which is Send but not
+/// Sync; the Mutex supplies the synchronization Tauri's shared state needs regardless.
+#[derive(Default)]
+struct PluginState(Mutex<Vec<PluginProcess>>);
+
 fn log_level_str(level: LogLevel) -> &'static str {
     match level {
         LogLevel::Info => "info",
@@ -23,13 +32,7 @@ fn log_level_str(level: LogLevel) -> &'static str {
 }
 
 #[tauri::command]
-fn start_dev_run(
-    app: AppHandle,
-    state: State<'_, RunState>,
-    entry_file: String,
-    project_dir: String,
-    modules_dir: String,
-) -> Result<(), String> {
+fn start_dev_run(app: AppHandle, state: State<'_, RunState>, entry_file: String, project_dir: String) -> Result<(), String> {
     let stop_flag = {
         let mut guard = state.0.lock().unwrap();
         if guard.is_some() {
@@ -42,7 +45,7 @@ fn start_dev_run(
 
     let entry = PathBuf::from(entry_file);
     let project = PathBuf::from(project_dir);
-    let modules = PathBuf::from(modules_dir);
+    let modules = AppPaths::modules();
 
     let log_handle = app.clone();
     let log: Arc<dyn Fn(LogLevel, &str) + Send + Sync> = Arc::new(move |level, message| {
@@ -81,6 +84,7 @@ fn stop_dev_run(state: State<'_, RunState>) -> Result<(), String> {
 pub fn run() {
   tauri::Builder::default()
     .manage(RunState::default())
+    .manage(PluginState::default())
     .invoke_handler(tauri::generate_handler![start_dev_run, stop_dev_run])
     .setup(|app| {
       if cfg!(debug_assertions) {
@@ -90,7 +94,35 @@ pub fn run() {
             .build(),
         )?;
       }
+
+      AppPaths::ensure_directories()?;
+
+      let log_handle = app.handle().clone();
+      let log: Arc<dyn Fn(LogLevel, &str) + Send + Sync> = Arc::new(move |level, message| {
+        let _ = log_handle.emit("plugin-log", serde_json::json!({"level": log_level_str(level), "message": message}));
+      });
+      let register_handle = app.handle().clone();
+      let on_register: Arc<dyn Fn(plugin_host::protocol::PanelRegistration) + Send + Sync> = Arc::new(move |p| {
+        let _ = register_handle.emit(
+          "plugin-panel-registered",
+          serde_json::json!({"pluginId": p.plugin_id, "id": p.id, "title": p.title, "location": p.location}),
+        );
+      });
+
+      let started = plugin_host::start_all(&AppPaths::plugins(), log, on_register);
+      *app.state::<PluginState>().0.lock().unwrap() = started;
+
       Ok(())
+    })
+    .on_window_event(|window, event| {
+      // Plugins are their own processes, so nothing kills them just because the window closes —
+      // stop them explicitly, same as a dev-run's own stop_and_kill, rather than leaving orphans.
+      if let tauri::WindowEvent::Destroyed = event {
+        let plugins = window.state::<PluginState>();
+        for p in plugins.0.lock().unwrap().iter() {
+          p.stop_and_kill();
+        }
+      }
     })
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
