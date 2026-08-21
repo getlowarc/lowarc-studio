@@ -5,23 +5,381 @@
     <script src="theme.js"></script>
     <title>LowArc Studio — Editor</title>
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="primitives.css" />
+    <style>
+      html, body {
+        height: 100%;
+        overflow: hidden;
+      }
+
+      /* ---------- Grid shell ---------- */
+      /* Activity bar / left panel / right panel run the full height (menu row down to status
+         bar) — the console sits only under the center column, same as VS Code: the side bars
+         flank the editor+panel combo rather than the panel spanning under them too. */
+      .shell {
+        height: 100%;
+        display: grid;
+        grid-template-columns: 44px 240px 1fr 260px;
+        grid-template-rows: auto auto 1fr 220px auto;
+        grid-template-areas:
+          "menu     menu   menu    menu"
+          "trans    trans  trans   trans"
+          "activity left   center  right"
+          "activity left   console right"
+          "status   status status  status";
+      }
+
+      /* ---------- Menu row ---------- */
+      .menu-row {
+        grid-area: menu;
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        padding: 4px 8px;
+        border-bottom: 1px solid var(--border);
+        flex: none;
+      }
+
+      .menu-row .back-link {
+        margin-right: 8px;
+      }
+
+      .menu-item {
+        all: unset;
+        font-size: 13px;
+        color: var(--fg-dim);
+        padding: 5px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+
+      .menu-item:hover {
+        background: var(--bg-hover);
+        color: var(--fg);
+      }
+
+      .menu-row .project-name {
+        margin-left: auto;
+        font-size: 12px;
+        color: var(--fg-dim);
+        padding: 0 8px;
+      }
+
+      /* ---------- Transport row ---------- */
+      .transport-row {
+        grid-area: trans;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        border-bottom: 1px solid var(--border);
+        flex: none;
+      }
+
+      .transport-controls {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .transport-spacer {
+        flex: 1;
+      }
+
+      .plugin-buttons {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--fg-dim);
+      }
+
+      /* ---------- Activity bar ---------- */
+      .activity-bar {
+        grid-area: activity;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 8px 0;
+        border-right: 1px solid var(--border);
+        background: var(--bg-raised);
+      }
+
+      .activity-item {
+        all: unset;
+        box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        border-left: 2px solid transparent;
+        color: var(--fg-dim);
+        cursor: pointer;
+      }
+
+      .activity-item svg {
+        width: 18px;
+        height: 18px;
+      }
+
+      .activity-item:hover {
+        color: var(--fg);
+      }
+
+      .activity-item.is-active {
+        color: var(--cyan);
+        background: var(--cyan-dim);
+      }
+
+      /* ---------- Left / right panels ---------- */
+      .side-panel {
+        overflow: auto;
+        padding: 14px;
+      }
+
+      .left-panel {
+        grid-area: left;
+        border-right: 1px solid var(--border);
+      }
+
+      .right-panel {
+        grid-area: right;
+        border-left: 1px solid var(--border);
+      }
+
+      .side-panel h2 {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--fg-dim);
+        margin: 0 0 10px;
+      }
+
+      .placeholder-note {
+        font-size: 12px;
+        color: var(--fg-dim);
+        line-height: 1.5;
+      }
+
+      /* ---------- Center viewport ---------- */
+      .center-viewport {
+        grid-area: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: auto;
+        color: var(--fg-dim);
+        font-size: 13px;
+        text-align: center;
+        padding: 24px;
+      }
+
+      /* ---------- Console ---------- */
+      .console-panel {
+        grid-area: console;
+        display: flex;
+        flex-direction: column;
+        border-top: 1px solid var(--border);
+        min-height: 0;
+      }
+
+      .console-tabs {
+        display: flex;
+        gap: 4px;
+        padding: 0 8px;
+        border-bottom: 1px solid var(--border);
+        flex: none;
+      }
+
+      .console-tab {
+        all: unset;
+        box-sizing: border-box;
+        position: relative;
+        top: 1px;
+        padding: 7px 2px;
+        margin: 0 8px;
+        font-size: 12px;
+        color: var(--fg-dim);
+        border-bottom: 2px solid transparent;
+        cursor: pointer;
+      }
+
+      .console-tab:first-child {
+        margin-left: 0;
+      }
+
+      .console-tab:hover {
+        color: var(--fg);
+      }
+
+      .console-tab.is-active {
+        color: var(--fg);
+        border-bottom-color: var(--cyan);
+      }
+
+      .console-body {
+        flex: 1;
+        min-height: 0;
+        overflow: auto;
+        padding: 8px 12px;
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        font-size: 12px;
+        color: var(--fg-dim);
+      }
+
+      /* ---------- Status bar ---------- */
+      .status-bar {
+        grid-area: status;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 3px 12px;
+        border-top: 1px solid var(--border);
+        background: var(--bg-raised);
+        font-size: 11px;
+        color: var(--fg-dim);
+        flex: none;
+      }
+
+      .status-bar .status-spacer {
+        flex: 1;
+      }
+    </style>
   </head>
   <body>
-    <div class="page">
-      <div class="page-header">
-        <button class="back-link" id="back">← Start</button>
-        <h1>Editor</h1>
+    <div class="shell">
+      <div class="menu-row">
+        <button type="button" class="back-link" id="back" aria-label="Back to Start"><svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+        <button type="button" class="menu-item">File</button>
+        <button type="button" class="menu-item">Edit</button>
+        <button type="button" class="menu-item">View</button>
+        <button type="button" class="menu-item">Help</button>
+        <span class="project-name" id="project-name"></span>
       </div>
-      <div class="page-body">
-        <p>The editor for <code id="project-path"></code> isn't built yet — this page is a
-        placeholder so New/Open Project has somewhere real to land.</p>
+
+      <div class="transport-row">
+        <div class="transport-controls">
+          <button type="button" class="btn btn-icon-only btn-sm btn-main" aria-label="Run" id="run-btn">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M5 3.5l8 4.5-8 4.5v-9z" fill="currentColor" /></svg>
+          </button>
+          <button type="button" class="btn btn-icon-only btn-sm btn-ghost" aria-label="Pause" disabled>
+            <svg viewBox="0 0 16 16" fill="none"><rect x="4" y="3.5" width="3" height="9" rx="0.5" fill="currentColor" /><rect x="9" y="3.5" width="3" height="9" rx="0.5" fill="currentColor" /></svg>
+          </button>
+          <button type="button" class="btn btn-icon-only btn-sm btn-ghost" aria-label="Stop" disabled>
+            <svg viewBox="0 0 16 16" fill="none"><rect x="4" y="4" width="8" height="8" rx="1" fill="currentColor" /></svg>
+          </button>
+        </div>
+        <div class="transport-spacer"></div>
+        <div class="plugin-buttons">Plugin buttons go here</div>
+      </div>
+
+      <nav class="activity-bar" data-tabs id="activity-bar">
+        <button type="button" class="activity-item is-active" data-tab-value="explorer" aria-label="Explorer" title="Explorer">
+          <svg viewBox="0 0 16 16" fill="none"><path d="M2 5a1 1 0 011-1h3l1.5 1.5H13a1 1 0 011 1V12a1 1 0 01-1 1H3a1 1 0 01-1-1V5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" /></svg>
+        </button>
+        <button type="button" class="activity-item" data-tab-value="search" aria-label="Search" title="Search">
+          <svg viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.6" /><path d="M11 11L14.5 14.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
+        </button>
+        <button type="button" class="activity-item" data-tab-value="plugins" aria-label="Plugins" title="Plugins">
+          <svg viewBox="0 0 16 16" fill="none"><path d="M6 2v3M10 2v3M4.5 5h7v3a3.5 3.5 0 01-7 0V5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" /><path d="M8 11.5v2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" /></svg>
+        </button>
+      </nav>
+
+      <div class="side-panel left-panel" id="left-panel">
+        <h2>Explorer</h2>
+        <p class="placeholder-note">File tree isn't built yet. The activity bar above already switches this panel's content — try Search or Plugins.</p>
+      </div>
+
+      <div class="center-viewport" id="center-viewport">
+        <div>
+          <p class="placeholder-note">Editor / scene viewport isn't built yet — this is where Monaco or a 2D/3D preview will render, depending on the open file.</p>
+        </div>
+      </div>
+
+      <div class="side-panel right-panel">
+        <h2>Inspector</h2>
+        <p class="placeholder-note">Not built yet — this will show the editable values defined in whichever file is open, provided by that file type's interpreter module.</p>
+      </div>
+
+      <div class="console-panel">
+        <div class="console-tabs" data-tabs id="console-tabs">
+          <button type="button" class="console-tab is-active" data-tab-value="console">Console</button>
+          <button type="button" class="console-tab" data-tab-value="module-logs">Module Logs</button>
+          <button type="button" class="console-tab" data-tab-value="code-logs">Code Logs</button>
+          <button type="button" class="console-tab" data-tab-value="errors">Errors</button>
+        </div>
+        <div class="console-body" id="console-body">Nothing here yet — run the project to see output.</div>
+      </div>
+
+      <div class="status-bar">
+        <span id="status-project">No project</span>
+        <div class="status-spacer"></div>
+        <span>LowArc Studio</span>
       </div>
     </div>
+
+    <script src="primitives.js"></script>
     <script>
       const params = new URLSearchParams(window.location.search);
-      document.getElementById("project-path").textContent = params.get("project") || "(unknown project)";
+      const projectPath = params.get("project") || "(unknown project)";
+      const projectName = projectPath.split(/[\\/]/).pop() || projectPath;
+      document.getElementById("project-name").textContent = projectName;
+      document.getElementById("status-project").textContent = projectName;
+
       document.getElementById("back").addEventListener("click", () => {
         window.location.href = "index.html";
+      });
+
+      initTabs();
+
+      const LEFT_PANEL_CONTENT = {
+        explorer: {
+          title: "Explorer",
+          note: "File tree isn't built yet. The activity bar above already switches this panel's content — try Search or Plugins.",
+        },
+        search: {
+          title: "Search",
+          note: "Project-wide search isn't built yet.",
+        },
+        plugins: {
+          title: "Plugins",
+          note: "Installed plugins that contribute a panel will list here.",
+        },
+      };
+
+      document.getElementById("activity-bar").addEventListener("tab-change", (e) => {
+        const content = LEFT_PANEL_CONTENT[e.detail.value];
+        if (!content) return;
+        const panel = document.getElementById("left-panel");
+        panel.innerHTML = "";
+        const h2 = document.createElement("h2");
+        h2.textContent = content.title;
+        const note = document.createElement("p");
+        note.className = "placeholder-note";
+        note.textContent = content.note;
+        panel.appendChild(h2);
+        panel.appendChild(note);
+      });
+
+      const CONSOLE_CONTENT = {
+        console: "Nothing here yet — run the project to see output.",
+        "module-logs": "Nothing here yet — logs from loaded modules will appear here.",
+        "code-logs": "Nothing here yet — logs from the running UC code will appear here.",
+        errors: "No errors.",
+      };
+
+      document.getElementById("console-tabs").addEventListener("tab-change", (e) => {
+        const text = CONSOLE_CONTENT[e.detail.value];
+        if (text === undefined) return;
+        document.getElementById("console-body").textContent = text;
+      });
+
+      document.getElementById("run-btn").addEventListener("click", () => {
+        showToast({ variant: "info", message: "Dev-run isn't wired up to this screen yet." });
       });
     </script>
   </body>
