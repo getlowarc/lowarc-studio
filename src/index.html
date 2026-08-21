@@ -50,9 +50,45 @@
       }
 
       main {
+        position: relative;
         flex: 1;
         overflow: auto;
         padding: 24px 32px;
+      }
+
+      /* Watermark: the bolt silhouette recolored via a CSS mask, always a flat neutral gray. A
+         fixed black overlay rather than a foreground token on purpose — semi-transparent black
+         always reads as a shade darker than whatever's under it, in either theme, without needing
+         separate light/dark logic (a token like --fg-dim is deliberately lighter than the dark
+         page so text stays readable, which is exactly backwards for a shadow-style watermark).
+         Centered in main's own box, not bled past the edge, so it can't trigger main's own
+         overflow:auto scrollbar. */
+      main::before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 320px;
+        height: 420px;
+        background-color: #000;
+        opacity: 0.16;
+        -webkit-mask-image: url("la-logo-mono.svg");
+        mask-image: url("la-logo-mono.svg");
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      main h1,
+      main .recent-list {
+        position: relative;
+        z-index: 1;
       }
 
       main h1 {
