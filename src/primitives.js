@@ -1,7 +1,8 @@
-// Behavior for the dropdown / checkbox-dropdown / searchbar / numeric-input primitives.
-// Dropdowns and checkbox-dropdowns are driven entirely by data attributes, so any page can drop
-// in the markup from primitives.css with no per-instance wiring. A searchbar needs a real data
-// source to filter against, so it's exposed as a function (initSearchbar) instead of auto-init.
+// Behavior for the dropdown / checkbox-dropdown / searchbar / numeric-input / toast / popup
+// primitives. Dropdowns, checkbox-dropdowns, and popups are driven entirely by data attributes,
+// so any page can drop in the markup from primitives.css with no per-instance wiring. A searchbar
+// needs a real data source to filter against, so it's exposed as a function (initSearchbar)
+// instead of auto-init, and a toast has no fixed markup to init — it's created on demand.
 
 function closeAllDropdowns(except) {
   document.querySelectorAll('[data-dropdown][data-open="true"]').forEach((el) => {
@@ -165,3 +166,100 @@ function initSearchbar(el, { options, onSelect } = {}) {
     if (!e.target.closest(".searchbar")) el.dataset.open = "false";
   });
 }
+
+// ---------- Toast ----------
+
+const TOAST_ICON_PATHS = {
+  info: '<circle cx="8" cy="8" r="6.4" stroke="currentColor" stroke-width="1.4" /><path d="M8 7.3v4M8 5.1v.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />',
+  warning:
+    '<path d="M8 2.4l6.3 11.2H1.7L8 2.4z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" /><path d="M8 6.7v3.1M8 11.4v.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />',
+  success:
+    '<circle cx="8" cy="8" r="6.4" stroke="currentColor" stroke-width="1.4" /><path d="M5.3 8.2l1.8 1.8 3.6-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />',
+  error:
+    '<circle cx="8" cy="8" r="6.4" stroke="currentColor" stroke-width="1.4" /><path d="M5.8 5.8l4.4 4.4M10.2 5.8l-4.4 4.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />',
+};
+
+function getToastStack() {
+  let stack = document.querySelector(".toast-stack");
+  if (!stack) {
+    stack = document.createElement("div");
+    stack.className = "toast-stack";
+    document.body.appendChild(stack);
+  }
+  return stack;
+}
+
+// variant: "info" | "warning" | "success" | "error". duration is ms before auto-dismiss, or 0 to
+// require a manual close. Returns a dismiss() function so the caller can close it early (e.g. once
+// a longer operation the toast was reporting on has moved past what it said).
+function showToast({ variant = "info", message, duration = 4000 } = {}) {
+  const stack = getToastStack();
+
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${variant}`;
+  toast.innerHTML = `
+    <span class="toast-icon"><svg viewBox="0 0 16 16" fill="none">${TOAST_ICON_PATHS[variant] || TOAST_ICON_PATHS.info}</svg></span>
+    <span class="toast-body"></span>
+    <button type="button" class="toast-close" aria-label="Dismiss"><svg viewBox="0 0 16 16" width="12" height="12" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg></button>
+  `;
+  // Set via textContent, not innerHTML, so a message containing user-provided text (a project
+  // name, a file path) can't be interpreted as markup.
+  toast.querySelector(".toast-body").textContent = message;
+
+  let dismissed = false;
+  const dismiss = () => {
+    if (dismissed) return;
+    dismissed = true;
+    toast.classList.add("is-leaving");
+    toast.addEventListener("transitionend", () => toast.remove(), { once: true });
+    setTimeout(() => toast.remove(), 300);
+  };
+
+  toast.querySelector(".toast-close").addEventListener("click", dismiss);
+  stack.appendChild(toast);
+
+  if (duration > 0) {
+    setTimeout(dismiss, duration);
+  }
+
+  return dismiss;
+}
+
+// ---------- Popup ----------
+
+function openPopup(idOrEl) {
+  const el = typeof idOrEl === "string" ? document.getElementById(idOrEl) : idOrEl;
+  if (!el) return;
+  el.classList.add("is-open");
+  const focusable = el.querySelector("input, textarea, select, button, [tabindex]");
+  if (focusable) focusable.focus();
+}
+
+function closePopup(idOrEl) {
+  const el = typeof idOrEl === "string" ? document.getElementById(idOrEl) : idOrEl;
+  if (!el) return;
+  el.classList.remove("is-open");
+}
+
+// Wires every [data-popup] backdrop found under root: clicking the backdrop itself (not its
+// contents) closes it, and any [data-popup-close] inside (a header's X, a Cancel button) does too.
+function initPopups(root = document) {
+  root.querySelectorAll("[data-popup]").forEach((el) => {
+    if (el.dataset.popupInit) return;
+    el.dataset.popupInit = "true";
+
+    el.addEventListener("click", (e) => {
+      if (e.target === el) closePopup(el);
+    });
+
+    el.querySelectorAll("[data-popup-close]").forEach((btn) => {
+      btn.addEventListener("click", () => closePopup(el));
+    });
+  });
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  const open = document.querySelector(".popup-backdrop.is-open");
+  if (open) closePopup(open);
+});

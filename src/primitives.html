@@ -98,6 +98,10 @@
               <div class="swatch-color" style="background: var(--danger)"></div>
               <div class="swatch-label">danger</div>
             </div>
+            <div class="swatch">
+              <div class="swatch-color" style="background: var(--success)"></div>
+              <div class="swatch-label">success</div>
+            </div>
           </div>
         </div>
 
@@ -140,6 +144,12 @@
             <button class="btn btn-lg btn-danger">Button</button>
             <button class="btn btn-xl btn-danger">Button</button>
 
+            <div class="row-label">Confirm</div>
+            <button class="btn btn-sm btn-confirm">Button</button>
+            <button class="btn btn-md btn-confirm">Button</button>
+            <button class="btn btn-lg btn-confirm">Button</button>
+            <button class="btn btn-xl btn-confirm">Button</button>
+
             <div class="row-label">Disabled</div>
             <button class="btn btn-sm btn-main" disabled>Button</button>
             <button class="btn btn-md btn-outline" disabled>Button</button>
@@ -178,12 +188,19 @@
             <button class="btn btn-icon-only btn-md btn-danger" aria-label="Delete"><svg viewBox="0 0 16 16" fill="none"><path d="M3 5h10M6.5 5V3.5h3V5M4.5 5l.5 8a1 1 0 001 1h4a1 1 0 001-1l.5-8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
             <button class="btn btn-icon-only btn-lg btn-danger" aria-label="Delete"><svg viewBox="0 0 16 16" fill="none"><path d="M3 5h10M6.5 5V3.5h3V5M4.5 5l.5 8a1 1 0 001 1h4a1 1 0 001-1l.5-8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
             <button class="btn btn-icon-only btn-xl btn-danger" aria-label="Delete"><svg viewBox="0 0 16 16" fill="none"><path d="M3 5h10M6.5 5V3.5h3V5M4.5 5l.5 8a1 1 0 001 1h4a1 1 0 001-1l.5-8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+
+            <div class="row-label">Confirm</div>
+            <button class="btn btn-icon-only btn-sm btn-confirm" aria-label="Confirm"><svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+            <button class="btn btn-icon-only btn-md btn-confirm" aria-label="Confirm"><svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+            <button class="btn btn-icon-only btn-lg btn-confirm" aria-label="Confirm"><svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+            <button class="btn btn-icon-only btn-xl btn-confirm" aria-label="Confirm"><svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
           </div>
 
           <div class="subhead">Icon + label</div>
           <div style="display: flex; gap: 12px; flex-wrap: wrap">
             <button class="btn btn-md btn-main"><svg viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>New project</button>
             <button class="btn btn-md btn-outline"><svg viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.6" /><path d="M11 11L14.5 14.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>Find module</button>
+            <button class="btn btn-md btn-confirm"><svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>Save changes</button>
             <button class="btn btn-md btn-danger"><svg viewBox="0 0 16 16" fill="none"><path d="M3 5h10M6.5 5V3.5h3V5M4.5 5l.5 8a1 1 0 001 1h4a1 1 0 001-1l.5-8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /></svg>Delete project</button>
           </div>
         </div>
@@ -216,6 +233,27 @@
                 <button type="button" class="header-tab" data-tab-value="output">Output</button>
               </div>
             </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Toast</h2>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap">
+            <button type="button" class="btn btn-md btn-outline" id="toast-info">Show info</button>
+            <button type="button" class="btn btn-md btn-outline" id="toast-warning">Show warning</button>
+            <button type="button" class="btn btn-md btn-confirm" id="toast-success">Show success</button>
+            <button type="button" class="btn btn-md btn-danger" id="toast-error">Show error</button>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Popup</h2>
+          <p style="color: var(--fg-dim); font-size: 13px; margin: 0 0 12px">No named sizes — width is set per popup with a plain <code>style="width: …"</code> on <code>.popup</code>, the same way its title, body, and buttons are already set per instance. Always centered; when the body content runs taller than the viewport, only the body scrolls — the header and buttons stay put.</p>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap">
+            <button type="button" class="btn btn-md btn-outline" onclick="openPopup('popup-sm-example')">Open confirm (320px)</button>
+            <button type="button" class="btn btn-md btn-outline" onclick="openPopup('popup-md-example')">Open form (default)</button>
+            <button type="button" class="btn btn-md btn-outline" onclick="openPopup('popup-lg-example')">Open details (600px)</button>
+            <button type="button" class="btn btn-md btn-outline" onclick="openPopup('popup-xl-example')">Open changelog (tall + scrolling)</button>
           </div>
         </div>
 
@@ -317,6 +355,78 @@
           </div>
         </div>
       </div>
+
+      <!-- Popup backdrops live outside .page-body's .section flow on purpose: they're fixed-
+           position overlays, not document content, and .section h2's gallery-heading style
+           (uppercase, underlined) would otherwise leak onto a popup's real title if nested inside
+           one. -->
+      <div class="popup-backdrop" data-popup id="popup-sm-example">
+        <div class="popup" style="width: 320px">
+          <div class="popup-header">
+            <h2>Delete module?</h2>
+            <button type="button" class="popup-close" data-popup-close aria-label="Close"><svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg></button>
+          </div>
+          <div class="popup-body">This removes Physics from the project. This can't be undone.</div>
+          <div class="popup-actions">
+            <button type="button" class="btn btn-md btn-ghost" data-popup-close>Cancel</button>
+            <button type="button" class="btn btn-md btn-danger" data-popup-close>Delete</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="popup-backdrop" data-popup id="popup-md-example">
+        <div class="popup">
+          <div class="popup-header">
+            <h2>New project name</h2>
+            <button type="button" class="popup-close" data-popup-close aria-label="Close"><svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg></button>
+          </div>
+          <div class="popup-body">
+            <div class="field">
+              <input class="input" type="text" placeholder="my-game" autocomplete="off" />
+            </div>
+          </div>
+          <div class="popup-actions">
+            <button type="button" class="btn btn-md btn-ghost" data-popup-close>Cancel</button>
+            <button type="button" class="btn btn-md btn-confirm" data-popup-close>Create</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="popup-backdrop" data-popup id="popup-lg-example">
+        <div class="popup" style="width: 600px">
+          <div class="popup-header">
+            <h2>Module details</h2>
+            <button type="button" class="popup-close" data-popup-close aria-label="Close"><svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg></button>
+          </div>
+          <div class="popup-body">
+            <p style="margin-top: 0">Physics — a 2D rigid-body solver with collision detection, joints, and a fixed-timestep integrator. Depends on nothing else in the module store.</p>
+            <p style="margin-bottom: 0">This is a wider popup — the kind of size a details or settings panel needs instead of a short prompt.</p>
+          </div>
+          <div class="popup-actions">
+            <button type="button" class="btn btn-md btn-ghost" data-popup-close>Close</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="popup-backdrop" data-popup id="popup-xl-example">
+        <div class="popup" style="width: 720px">
+          <div class="popup-header">
+            <h2>Changelog</h2>
+            <button type="button" class="popup-close" data-popup-close aria-label="Close"><svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg></button>
+          </div>
+          <div class="popup-body">
+            <p style="margin-top: 0">Width is a plain inline style here (720px) — there's no named size this popup is picking from, same as its title and buttons are just set directly for this instance.</p>
+            <p><strong>0.4.0</strong> — Added the checkbox-dropdown multiselect. Searchbar now closes on outside click. Fixed the numeric input stepper not respecting its max.</p>
+            <p><strong>0.3.0</strong> — Sidebar tab and header tab navigation primitives. Icon support on all button types.</p>
+            <p><strong>0.2.0</strong> — Toast system with four semantic variants. Popup system with header/body/actions.</p>
+            <p><strong>0.1.0</strong> — First pass at buttons, dropdowns, inputs, and checkboxes.</p>
+            <p style="margin-bottom: 0">This entry list is long enough to run past the popup's height — notice the header above and the Close button below stay put while only this body scrolls.</p>
+          </div>
+          <div class="popup-actions">
+            <button type="button" class="btn btn-md btn-ghost" data-popup-close>Close</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script src="primitives.js"></script>
@@ -324,6 +434,7 @@
       initDropdowns();
       initNumericInputs();
       initTabs();
+      initPopups();
       initSearchbar(document.getElementById("module-search"), {
         options: [
           { value: "physics", label: "Physics" },
@@ -333,6 +444,19 @@
           { value: "input", label: "Input" },
           { value: "ui", label: "UI Toolkit" },
         ],
+      });
+
+      document.getElementById("toast-info").addEventListener("click", () => {
+        showToast({ variant: "info", message: "Dev run started on port 5173." });
+      });
+      document.getElementById("toast-warning").addEventListener("click", () => {
+        showToast({ variant: "warning", message: "Physics and Rendering both declare a Transform type." });
+      });
+      document.getElementById("toast-success").addEventListener("click", () => {
+        showToast({ variant: "success", message: "Project created." });
+      });
+      document.getElementById("toast-error").addEventListener("click", () => {
+        showToast({ variant: "error", message: "Build failed: missing module.json in Audio." });
       });
 
       document.getElementById("back").addEventListener("click", () => {

@@ -23,8 +23,12 @@
   --yellow-dim: #332b00;
   --yellow-ink: #1a1600; /* text/icon color for content sitting on a yellow fill */
 
-  /* No dark/dim variant — danger is a single sharp red, not a tonal family like cyan/yellow. */
+  /* Single sharp colors, not tonal families like cyan/yellow — same reasoning for both: a status
+     color reads one way, it doesn't need a lighter/darker self to pair with. Green's hue sits at
+     150° specifically to keep clear water between it and cyan's 180° — too close and a success
+     accent next to an idle cyan control gets hard to tell apart at a glance. */
   --danger: #ff3b30;
+  --success: #00e676;
 
   --accent: var(--cyan);
 }
