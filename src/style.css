@@ -108,3 +108,36 @@ a {
   color: var(--fg);
   background: var(--bg-hover);
 }
+
+/* ---------- Scrollbar ---------- */
+/* Global, not scoped to one container — the WebView2 host is Chromium, so ::-webkit-scrollbar is
+   what actually renders there; scrollbar-width/scrollbar-color is the standard (Firefox) fallback
+   for the same thin, borderless look. No hover-only reveal — a scrollbar that only appears on
+   hover reads as "is this scrollable at all," which is worse than a visible slim one. */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #555;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
