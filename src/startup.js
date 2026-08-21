@@ -1,16 +1,16 @@
 // Startup screen — new/open project, recents, and links out to the other top-level pages.
-// Talks to the Rust side purely through the commands registered in lib.rs; no state lives here
-// beyond what's needed to drive the "new project" name prompt.
+// Talks to the Rust side purely through the commands registered in lib.rs. Load order matters:
+// primitives.js must load before this file since it defines openPopup/closePopup/showToast/
+// initPopups, all used below.
 
 const { invoke } = window.__TAURI__.core;
 const { open: openDialog } = window.__TAURI__.dialog;
 const { openUrl } = window.__TAURI__.opener;
 
-const statusEl = document.getElementById("status");
 const recentListEl = document.getElementById("recent-list");
 
-function setStatus(message) {
-  statusEl.textContent = message || "";
+function reportError(err) {
+  showToast({ variant: "error", message: String(err) });
 }
 
 function openEditor(projectPath) {
@@ -46,12 +46,11 @@ async function loadRecents() {
 
     if (project.exists) {
       item.addEventListener("click", async () => {
-        setStatus("");
         try {
           await invoke("open_project", { path: project.path });
           openEditor(project.path);
         } catch (err) {
-          setStatus(String(err));
+          reportError(err);
         }
       });
     }
@@ -60,52 +59,35 @@ async function loadRecents() {
   }
 }
 
+initPopups();
+
 document.getElementById("new-project").addEventListener("click", async () => {
-  setStatus("");
   const parentDir = await openDialog({ directory: true, title: "Choose a folder for the new project" });
   if (!parentDir) return;
 
-  const modal = document.getElementById("new-project-modal");
   const nameInput = document.getElementById("new-project-name");
   const errorEl = document.getElementById("new-project-error");
   nameInput.value = "";
   errorEl.textContent = "";
-  modal.classList.remove("hidden");
-  nameInput.focus();
+  openPopup("new-project-popup");
 
-  const cleanup = () => {
-    modal.classList.add("hidden");
-    createBtn.removeEventListener("click", onCreate);
-    cancelBtn.removeEventListener("click", onCancel);
-    nameInput.removeEventListener("keydown", onKeydown);
-  };
-
-  const onCancel = () => cleanup();
-
-  const onCreate = async () => {
+  const create = async () => {
     try {
       const projectPath = await invoke("create_project", { parentDir, name: nameInput.value });
-      cleanup();
+      closePopup("new-project-popup");
       openEditor(projectPath);
     } catch (err) {
       errorEl.textContent = String(err);
     }
   };
 
-  const onKeydown = (e) => {
-    if (e.key === "Enter") onCreate();
-    if (e.key === "Escape") onCancel();
+  document.getElementById("new-project-create").onclick = create;
+  nameInput.onkeydown = (e) => {
+    if (e.key === "Enter") create();
   };
-
-  const createBtn = document.getElementById("new-project-create");
-  const cancelBtn = document.getElementById("new-project-cancel");
-  createBtn.addEventListener("click", onCreate);
-  cancelBtn.addEventListener("click", onCancel);
-  nameInput.addEventListener("keydown", onKeydown);
 });
 
 document.getElementById("open-project").addEventListener("click", async () => {
-  setStatus("");
   const path = await openDialog({ directory: true, title: "Open a LowArc Studio project" });
   if (!path) return;
 
@@ -113,7 +95,7 @@ document.getElementById("open-project").addEventListener("click", async () => {
     await invoke("open_project", { path });
     openEditor(path);
   } catch (err) {
-    setStatus(String(err));
+    reportError(err);
   }
 });
 
@@ -133,4 +115,4 @@ document.getElementById("open-website").addEventListener("click", () => {
   openUrl("https://lowarc.com");
 });
 
-loadRecents().catch((err) => setStatus(String(err)));
+loadRecents().catch(reportError);

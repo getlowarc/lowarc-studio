@@ -4,35 +4,8 @@
     <meta charset="utf-8" />
     <title>LowArc Studio — Settings</title>
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="primitives.css" />
     <style>
-      .field {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-        max-width: 280px;
-        margin-bottom: 16px;
-      }
-
-      .field label {
-        font-size: 13px;
-        color: var(--fg-dim);
-      }
-
-      .field input {
-        font-family: inherit;
-        font-size: 14px;
-        background: var(--bg-raised);
-        border: 1px solid var(--border);
-        border-radius: 4px;
-        color: var(--fg);
-        padding: 7px 9px;
-      }
-
-      .field .hint {
-        font-size: 12px;
-        color: var(--fg-dim);
-      }
-
       .page-header {
         gap: 12px;
       }
@@ -41,23 +14,8 @@
         flex: 1;
       }
 
-      .header-actions {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-
-      .status-line {
-        font-size: 13px;
-        min-height: 18px;
-      }
-
-      .status-line.error {
-        color: var(--danger);
-      }
-
-      .status-line.ok {
-        color: var(--accent);
+      .settings-field {
+        max-width: 280px;
       }
     </style>
   </head>
@@ -67,51 +25,50 @@
         <button class="back-link" id="back">← Start</button>
         <h1>Settings</h1>
         <div class="header-spacer"></div>
-        <div class="header-actions">
-          <div id="status" class="status-line"></div>
-          <button id="save">Save</button>
-        </div>
+        <button type="button" class="btn btn-md btn-confirm" id="save">Save</button>
       </div>
       <div class="page-body">
-        <div class="field">
-          <label for="target-fps">Dev run target FPS</label>
-          <input id="target-fps" type="number" min="1" max="1000" step="1" />
-          <div class="hint">Frame rate used when running a project from the editor.</div>
+        <div class="field settings-field">
+          <label class="field-label" for="target-fps">Dev run target FPS</label>
+          <div class="numeric-input">
+            <input id="target-fps" type="text" inputmode="numeric" min="1" max="1000" step="1" />
+            <div class="numeric-steppers">
+              <button type="button" class="stepper-up" aria-label="Increase">▲</button>
+              <button type="button" class="stepper-down" aria-label="Decrease">▼</button>
+            </div>
+          </div>
+          <div class="field-hint">Frame rate used when running a project from the editor.</div>
         </div>
       </div>
     </div>
+
+    <script src="primitives.js"></script>
     <script>
       const { invoke } = window.__TAURI__.core;
 
       const targetFpsInput = document.getElementById("target-fps");
-      const statusEl = document.getElementById("status");
-
-      function setStatus(message, kind) {
-        statusEl.textContent = message || "";
-        statusEl.className = "status-line" + (kind ? ` ${kind}` : "");
-      }
 
       async function load() {
         try {
           const settings = await invoke("get_settings");
           targetFpsInput.value = settings.devRunTargetFps;
         } catch (err) {
-          setStatus(String(err), "error");
+          showToast({ variant: "error", message: String(err) });
         }
       }
 
       document.getElementById("save").addEventListener("click", async () => {
         const fps = Number(targetFpsInput.value);
         if (!Number.isInteger(fps) || fps < 1) {
-          setStatus("Target FPS must be a positive whole number.", "error");
+          showToast({ variant: "error", message: "Target FPS must be a positive whole number." });
           return;
         }
 
         try {
           await invoke("save_settings", { settings: { devRunTargetFps: fps } });
-          setStatus("Saved.", "ok");
+          showToast({ variant: "success", message: "Settings saved." });
         } catch (err) {
-          setStatus(String(err), "error");
+          showToast({ variant: "error", message: String(err) });
         }
       });
 
@@ -119,6 +76,7 @@
         window.location.href = "index.html";
       });
 
+      initNumericInputs();
       load();
     </script>
   </body>
