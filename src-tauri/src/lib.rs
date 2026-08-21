@@ -4,12 +4,14 @@ pub mod plugin_host;
 mod projects;
 pub mod runtime;
 mod settings;
+mod theme;
 
 use app_paths::AppPaths;
 use plugin_host::protocol::PluginProcess;
 use projects::RecentProject;
 use runtime::runtime_loader::LogLevel;
 use settings::Settings;
+use theme::ThemePreset;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -101,6 +103,21 @@ fn save_settings(settings: Settings) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn list_theme_presets() -> Vec<ThemePreset> {
+    theme::list_presets()
+}
+
+#[tauri::command]
+fn save_theme_preset(preset: ThemePreset) -> Result<(), String> {
+    theme::save_preset(&preset)
+}
+
+#[tauri::command]
+fn delete_theme_preset(name: String) -> Result<(), String> {
+    theme::delete_preset(&name)
+}
+
+#[tauri::command]
 fn stop_dev_run(state: State<'_, RunState>) -> Result<(), String> {
     match state.0.lock().unwrap().as_ref() {
         Some(flag) => {
@@ -125,7 +142,10 @@ pub fn run() {
       create_project,
       open_project,
       get_settings,
-      save_settings
+      save_settings,
+      list_theme_presets,
+      save_theme_preset,
+      delete_theme_preset
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

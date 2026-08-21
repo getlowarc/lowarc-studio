@@ -11,15 +11,25 @@ use std::path::Path;
 pub struct Settings {
     #[serde(default = "default_target_fps")]
     pub dev_run_target_fps: u32,
+    /// "system" | "light" | "dark" | the name of a saved custom theme (see theme.rs). Not an enum
+    /// on the Rust side — the frontend is the one place that needs to interpret this value (resolve
+    /// "system" against the OS, look up a custom name in the saved presets), so Rust just carries
+    /// it through opaquely.
+    #[serde(default = "default_theme_mode")]
+    pub theme_mode: String,
 }
 
 fn default_target_fps() -> u32 {
     60
 }
 
+fn default_theme_mode() -> String {
+    "system".to_string()
+}
+
 impl Default for Settings {
     fn default() -> Self {
-        Settings { dev_run_target_fps: default_target_fps() }
+        Settings { dev_run_target_fps: default_target_fps(), theme_mode: default_theme_mode() }
     }
 }
 
@@ -64,8 +74,10 @@ mod tests {
     #[test]
     fn round_trips_through_save_and_load() {
         let path = temp_file("roundtrip");
-        save_to(&path, &Settings { dev_run_target_fps: 30 }).unwrap();
-        assert_eq!(load_from(&path).dev_run_target_fps, 30);
+        save_to(&path, &Settings { dev_run_target_fps: 30, theme_mode: "light".to_string() }).unwrap();
+        let loaded = load_from(&path);
+        assert_eq!(loaded.dev_run_target_fps, 30);
+        assert_eq!(loaded.theme_mode, "light");
     }
 
     #[test]

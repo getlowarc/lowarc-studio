@@ -73,10 +73,16 @@ impl AppPaths {
     pub fn recent_projects_file() -> PathBuf {
         Self::user_data().join("recent.txt")
     }
+    /// One JSON file per user-saved custom color theme, named after the preset. Built-in Light/
+    /// Dark aren't here — they ship baked into the frontend, since every install always has them.
+    pub fn themes() -> PathBuf {
+        Self::user_data().join("themes")
+    }
 
     pub fn ensure_directories() -> std::io::Result<()> {
         std::fs::create_dir_all(Self::modules())?;
         std::fs::create_dir_all(Self::plugins())?;
+        std::fs::create_dir_all(Self::themes())?;
         Ok(())
     }
 }

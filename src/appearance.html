@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <script src="theme.js"></script>
+    <title>LowArc Studio — Appearance</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="primitives.css" />
+    <style>
+      .page-header {
+        gap: 12px;
+      }
+
+      .section {
+        margin-bottom: 32px;
+      }
+
+      .section h2 {
+        font-size: 13px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--fg-dim);
+        margin: 0 0 12px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .theme-picker {
+        max-width: 320px;
+      }
+
+      .theme-picker .field-hint {
+        margin-top: 6px;
+      }
+
+      .color-group {
+        margin-bottom: 22px;
+      }
+
+      .color-group h3 {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--fg-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        margin: 0 0 10px;
+      }
+
+      .color-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 14px;
+      }
+
+      .color-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .color-field .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .color-field input[type="color"] {
+        width: 36px;
+        height: 36px;
+        flex: none;
+        padding: 0;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: none;
+        cursor: pointer;
+      }
+
+      .color-field input.input {
+        flex: 1;
+        font-family: var(--font-mono, monospace);
+        text-transform: uppercase;
+      }
+
+      .save-row {
+        display: flex;
+        gap: 10px;
+        align-items: flex-end;
+        flex-wrap: wrap;
+      }
+
+      .save-row .field {
+        flex: 1;
+        min-width: 200px;
+      }
+
+      .theme-divider {
+        height: 1px;
+        background: var(--border);
+        margin: 4px 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="page-header">
+        <button class="back-link" id="back">← Settings</button>
+        <h1>Appearance</h1>
+      </div>
+      <div class="page-body">
+        <div class="section">
+          <h2>Theme</h2>
+          <div class="field theme-picker">
+            <label class="field-label">Active theme</label>
+            <div class="dropdown dropdown-full" data-dropdown data-open="false" id="theme-dropdown">
+              <button type="button" class="dropdown-trigger" data-dropdown-trigger>
+                <span class="dropdown-value" data-dropdown-value>System</span>
+                <span class="dropdown-chevron">▾</span>
+              </button>
+              <div class="dropdown-menu" data-dropdown-menu id="theme-dropdown-menu"></div>
+            </div>
+            <div class="field-hint">System follows your OS's light/dark setting. Editing colors below previews a new theme without changing this until you save it as a preset.</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Colors</h2>
+          <div id="color-groups"></div>
+        </div>
+
+        <div class="section">
+          <h2>Save as preset</h2>
+          <div class="save-row">
+            <div class="field">
+              <label class="field-label" for="preset-name">Preset name</label>
+              <input id="preset-name" class="input" type="text" placeholder="My theme" autocomplete="off" />
+            </div>
+            <button type="button" class="btn btn-md btn-confirm" id="save-preset">Save preset</button>
+            <button type="button" class="btn btn-md btn-danger" id="delete-preset" style="display: none">Delete preset</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="popup-backdrop" data-popup id="delete-preset-popup">
+      <div class="popup" style="width: 340px">
+        <div class="popup-header">
+          <h2>Delete theme?</h2>
+          <button type="button" class="popup-close" data-popup-close aria-label="Close"><svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg></button>
+        </div>
+        <div class="popup-body" id="delete-preset-body">This can't be undone.</div>
+        <div class="popup-actions">
+          <button type="button" class="btn btn-md btn-ghost" data-popup-close>Cancel</button>
+          <button type="button" class="btn btn-md btn-danger" id="confirm-delete-preset">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="primitives.js"></script>
+    <script>
+      const { invoke } = window.__TAURI__.core;
+
+      let currentColors = { ...DARK_THEME };
+      let activePresetName = null;
+
+      function makeOption(value, label) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "dropdown-option";
+        btn.setAttribute("data-dropdown-option", "");
+        btn.dataset.value = value;
+        btn.dataset.label = label;
+        btn.textContent = label;
+        return btn;
+      }
+
+      async function refreshThemeDropdown(selectedMode) {
+        const presets = await invoke("list_theme_presets");
+        const menu = document.getElementById("theme-dropdown-menu");
+        menu.innerHTML = "";
+
+        [
+          { value: "system", label: "System" },
+          { value: "light", label: "Light" },
+          { value: "dark", label: "Dark" },
+        ].forEach((opt) => menu.appendChild(makeOption(opt.value, opt.label)));
+
+        if (presets.length > 0) {
+          const divider = document.createElement("div");
+          divider.className = "theme-divider";
+          menu.appendChild(divider);
+          presets.forEach((preset) => menu.appendChild(makeOption(preset.name, preset.name)));
+        }
+
+        const dropdownEl = document.getElementById("theme-dropdown");
+        const valueEl = dropdownEl.querySelector("[data-dropdown-value]");
+        const options = Array.from(menu.querySelectorAll("[data-dropdown-option]"));
+        const matched = options.find((o) => o.dataset.value === selectedMode);
+
+        valueEl.textContent = matched ? matched.dataset.label : selectedMode;
+        options.forEach((o) => o.classList.toggle("is-selected", o === matched));
+        dropdownEl.dataset.value = selectedMode;
+
+        return presets;
+      }
+
+      function colorsForBuiltIn(mode) {
+        if (mode === "light") return LIGHT_THEME;
+        if (mode === "dark") return DARK_THEME;
+        return systemPrefersDark() ? DARK_THEME : LIGHT_THEME;
+      }
+
+      function renderColorGrid(colors) {
+        const container = document.getElementById("color-groups");
+        container.innerHTML = "";
+
+        const groups = [...new Set(THEME_TOKENS.map((t) => t.group))];
+        for (const group of groups) {
+          const groupEl = document.createElement("div");
+          groupEl.className = "color-group";
+
+          const heading = document.createElement("h3");
+          heading.textContent = group;
+          groupEl.appendChild(heading);
+
+          const grid = document.createElement("div");
+          grid.className = "color-grid";
+          groupEl.appendChild(grid);
+
+          for (const token of THEME_TOKENS.filter((t) => t.group === group)) {
+            const field = document.createElement("div");
+            field.className = "color-field";
+
+            const label = document.createElement("label");
+            label.className = "field-label";
+            label.textContent = token.label;
+
+            const row = document.createElement("div");
+            row.className = "row";
+
+            const swatch = document.createElement("input");
+            swatch.type = "color";
+            swatch.value = colors[token.key];
+
+            const hex = document.createElement("input");
+            hex.type = "text";
+            hex.className = "input";
+            hex.value = colors[token.key];
+            hex.spellcheck = false;
+
+            const commit = (value) => {
+              currentColors[token.key] = value;
+              applyThemeColors(currentColors);
+            };
+
+            swatch.addEventListener("input", () => {
+              hex.value = swatch.value;
+              commit(swatch.value);
+            });
+
+            hex.addEventListener("change", () => {
+              const value = hex.value.trim();
+              if (/^#[0-9a-fA-F]{6}$/.test(value)) {
+                swatch.value = value;
+                commit(value);
+              } else {
+                hex.value = currentColors[token.key];
+              }
+            });
+
+            row.appendChild(swatch);
+            row.appendChild(hex);
+            field.appendChild(label);
+            field.appendChild(row);
+            grid.appendChild(field);
+          }
+
+          container.appendChild(groupEl);
+        }
+      }
+
+      function setActivePreset(name) {
+        activePresetName = name;
+        document.getElementById("preset-name").value = name || "";
+        document.getElementById("delete-preset").style.display = name ? "" : "none";
+      }
+
+      async function persistThemeMode(mode) {
+        const settings = await invoke("get_settings");
+        settings.themeMode = mode;
+        await invoke("save_settings", { settings });
+      }
+
+      async function switchToMode(mode) {
+        let colors;
+        if (mode === "system" || mode === "light" || mode === "dark") {
+          colors = colorsForBuiltIn(mode);
+          setActivePreset(null);
+        } else {
+          const presets = await invoke("list_theme_presets");
+          const preset = presets.find((p) => p.name === mode);
+          colors = preset ? preset.colors : colorsForBuiltIn("system");
+          setActivePreset(preset ? preset.name : null);
+        }
+
+        currentColors = { ...colors };
+        applyThemeColors(currentColors);
+        renderColorGrid(currentColors);
+
+        try {
+          await persistThemeMode(mode);
+        } catch (err) {
+          showToast({ variant: "error", message: String(err) });
+        }
+      }
+
+      document.getElementById("theme-dropdown").addEventListener("dropdown-change", () => {
+        switchToMode(document.getElementById("theme-dropdown").dataset.value);
+      });
+
+      document.getElementById("save-preset").addEventListener("click", async () => {
+        const name = document.getElementById("preset-name").value.trim();
+        if (!name) {
+          showToast({ variant: "error", message: "Give the preset a name first." });
+          return;
+        }
+
+        try {
+          await invoke("save_theme_preset", { preset: { name, colors: currentColors } });
+          await persistThemeMode(name);
+          setActivePreset(name);
+          await refreshThemeDropdown(name);
+          showToast({ variant: "success", message: `Saved "${name}".` });
+        } catch (err) {
+          showToast({ variant: "error", message: String(err) });
+        }
+      });
+
+      document.getElementById("delete-preset").addEventListener("click", () => {
+        if (!activePresetName) return;
+        document.getElementById("delete-preset-body").textContent =
+          `This removes "${activePresetName}" — anything using it switches to System. This can't be undone.`;
+        openPopup("delete-preset-popup");
+      });
+
+      document.getElementById("confirm-delete-preset").addEventListener("click", async () => {
+        const name = activePresetName;
+        if (!name) return;
+
+        try {
+          await invoke("delete_theme_preset", { name });
+          closePopup("delete-preset-popup");
+          showToast({ variant: "success", message: `Deleted "${name}".` });
+          await switchToMode("system");
+          await refreshThemeDropdown("system");
+        } catch (err) {
+          showToast({ variant: "error", message: String(err) });
+        }
+      });
+
+      document.getElementById("back").addEventListener("click", () => {
+        window.location.href = "settings.html";
+      });
+
+      (async () => {
+        initPopups();
+
+        let mode = "system";
+        try {
+          mode = (await invoke("get_settings")).themeMode || "system";
+        } catch (err) {
+          showToast({ variant: "error", message: String(err) });
+        }
+
+        const presets = await refreshThemeDropdown(mode);
+        initDropdowns();
+
+        if (mode === "system" || mode === "light" || mode === "dark") {
+          currentColors = { ...colorsForBuiltIn(mode) };
+          setActivePreset(null);
+        } else {
+          const preset = presets.find((p) => p.name === mode);
+          currentColors = { ...(preset ? preset.colors : colorsForBuiltIn("system")) };
+          setActivePreset(preset ? preset.name : null);
+        }
+        renderColorGrid(currentColors);
+      })();
+    </script>
+  </body>
+</html>

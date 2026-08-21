@@ -11,6 +11,7 @@ dist/
 # settings. Not source, never committed.
 /modules/
 /plugins/
+/themes/
 /settings.json
 /recent.txt
 

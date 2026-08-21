@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <script src="theme.js"></script>
     <title>LowArc Studio — Settings</title>
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="primitives.css" />
@@ -39,6 +40,12 @@
           </div>
           <div class="field-hint">Frame rate used when running a project from the editor.</div>
         </div>
+
+        <div class="section" style="margin-top: 28px">
+          <h2 style="font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--fg-dim); margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border)">Appearance</h2>
+          <p style="color: var(--fg-dim); font-size: 13px; margin: 0 0 12px; max-width: 460px">Switch between light, dark, or system, or build your own color theme.</p>
+          <button type="button" class="btn btn-md btn-outline" id="open-appearance">Open Appearance →</button>
+        </div>
       </div>
     </div>
 
@@ -47,11 +54,12 @@
       const { invoke } = window.__TAURI__.core;
 
       const targetFpsInput = document.getElementById("target-fps");
+      let loadedSettings = null;
 
       async function load() {
         try {
-          const settings = await invoke("get_settings");
-          targetFpsInput.value = settings.devRunTargetFps;
+          loadedSettings = await invoke("get_settings");
+          targetFpsInput.value = loadedSettings.devRunTargetFps;
         } catch (err) {
           showToast({ variant: "error", message: String(err) });
         }
@@ -65,11 +73,20 @@
         }
 
         try {
-          await invoke("save_settings", { settings: { devRunTargetFps: fps } });
+          // Preserve every other field (themeMode especially) — save_settings replaces the whole
+          // Settings object, so sending just { devRunTargetFps } would silently reset the rest to
+          // their defaults.
+          const settings = { ...(loadedSettings || (await invoke("get_settings"))), devRunTargetFps: fps };
+          await invoke("save_settings", { settings });
+          loadedSettings = settings;
           showToast({ variant: "success", message: "Settings saved." });
         } catch (err) {
           showToast({ variant: "error", message: String(err) });
         }
+      });
+
+      document.getElementById("open-appearance").addEventListener("click", () => {
+        window.location.href = "appearance.html";
       });
 
       document.getElementById("back").addEventListener("click", () => {
