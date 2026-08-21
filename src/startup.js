@@ -60,6 +60,7 @@ async function loadRecents() {
 }
 
 initPopups();
+initTooltips();
 
 document.getElementById("new-project").addEventListener("click", async () => {
   const parentDir = await openDialog({ directory: true, title: "Choose a folder for the new project" });

@@ -263,3 +263,49 @@ document.addEventListener("keydown", (e) => {
   const open = document.querySelector(".popup-backdrop.is-open");
   if (open) closePopup(open);
 });
+
+// ---------- Tooltip ----------
+// Any element with data-tooltip="..." gets a small delayed popup on hover, positioned to its
+// right by default (falls back to the left if there's no room). One shared popup element for the
+// whole page rather than one per trigger.
+
+function initTooltips(root = document) {
+  let tooltipEl = document.querySelector(".tooltip-popup");
+  if (!tooltipEl) {
+    tooltipEl = document.createElement("div");
+    tooltipEl.className = "tooltip-popup";
+    document.body.appendChild(tooltipEl);
+  }
+
+  let showTimer = null;
+
+  root.querySelectorAll("[data-tooltip]").forEach((el) => {
+    if (el.dataset.tooltipInit) return;
+    el.dataset.tooltipInit = "true";
+
+    el.addEventListener("mouseenter", () => {
+      clearTimeout(showTimer);
+      showTimer = setTimeout(() => {
+        tooltipEl.textContent = el.dataset.tooltip;
+        tooltipEl.classList.add("is-visible");
+
+        const rect = el.getBoundingClientRect();
+        const tipRect = tooltipEl.getBoundingClientRect();
+        const fitsRight = rect.right + 8 + tipRect.width <= window.innerWidth;
+
+        tooltipEl.style.top = `${rect.top + rect.height / 2 - tipRect.height / 2}px`;
+        tooltipEl.style.left = fitsRight ? `${rect.right + 8}px` : `${rect.left - tipRect.width - 8}px`;
+      }, 400);
+    });
+
+    el.addEventListener("mouseleave", () => {
+      clearTimeout(showTimer);
+      tooltipEl.classList.remove("is-visible");
+    });
+
+    el.addEventListener("click", () => {
+      clearTimeout(showTimer);
+      tooltipEl.classList.remove("is-visible");
+    });
+  });
+}
