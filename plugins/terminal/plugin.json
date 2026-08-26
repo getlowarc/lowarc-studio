@@ -1,0 +1,13 @@
+{
+  "command": "terminal_backend",
+  "args": [],
+  "session": true,
+  "name": "Terminal",
+  "version": "0.1.0",
+  "description": "An integrated shell, in a real PTY (cross-platform — ConPTY on Windows, a native pty everywhere else). Vendors @xterm/xterm, see XTERM_LICENSE.",
+  "contributes": {
+    "consoleTabs": [
+      { "id": "main", "title": "Terminal", "entry": "index.html" }
+    ]
+  }
+}

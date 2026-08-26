@@ -1,0 +1,12 @@
+{
+  "command": "file_explorer_backend",
+  "args": [],
+  "name": "File Explorer",
+  "version": "0.1.0",
+  "description": "Browse, create, rename, move, and delete the project's files.",
+  "contributes": {
+    "panels": [
+      { "id": "main", "title": "Explorer", "location": "sidebar", "entry": "index.html", "railIcon": "icon.svg" }
+    ]
+  }
+}

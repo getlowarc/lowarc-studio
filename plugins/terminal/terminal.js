@@ -1,0 +1,176 @@
+// Multi-instance: this one iframe owns every open terminal tab, each a separate session (its own
+// PTY/shell process — see plugin_session.rs) identified by a sessionId this file mints itself
+// (crypto.randomUUID()). The host never knows "Terminal has instances" — it only knows session
+// ids as opaque strings and relays lowarc:sessionOutput/lowarc:newTerminal by pluginId, same as
+// any other emit. All the instance bookkeeping (the sidebar, which one's visible, numbering) is
+// entirely this plugin's own business.
+
+const DELETE_SVG = '<svg viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>';
+
+const sessions = new Map(); // sessionId -> { term, fitAddon, container, sidebarItem, label }
+let activeSessionId = null;
+let instanceCounter = 0;
+
+// Not just crypto.randomUUID() directly — this only needs to be unique within one running app
+// instance, not cryptographically unguessable, and a sandboxed iframe without allow-same-origin
+// is an untested enough environment for the Web Crypto API that a fallback is worth having rather
+// than finding out live that instance creation silently breaks.
+function makeSessionId() {
+  if (window.crypto && typeof window.crypto.randomUUID === "function") {
+    try {
+      return window.crypto.randomUUID();
+    } catch (err) {
+      // fall through
+    }
+  }
+  return `s-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+const mainEl = document.getElementById("terminal-main");
+const sidebarEl = document.getElementById("terminal-sidebar");
+const emptyEl = document.getElementById("terminal-empty");
+
+function updateEmptyState() {
+  emptyEl.classList.toggle("is-visible", sessions.size === 0);
+}
+
+function renderSidebar() {
+  sidebarEl.innerHTML = "";
+  for (const [sessionId, instance] of sessions) {
+    const item = document.createElement("div");
+    item.className = "terminal-sidebar-item" + (sessionId === activeSessionId ? " is-active" : "");
+
+    const label = document.createElement("span");
+    label.className = "terminal-sidebar-item-label";
+    label.textContent = instance.label;
+    item.appendChild(label);
+
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "terminal-sidebar-item-delete";
+    del.innerHTML = DELETE_SVG;
+    del.setAttribute("aria-label", `Close ${instance.label}`);
+    del.addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeInstance(sessionId);
+    });
+    item.appendChild(del);
+
+    item.addEventListener("click", () => switchTo(sessionId));
+    instance.sidebarItem = item;
+    sidebarEl.appendChild(item);
+  }
+}
+
+function sendResize(sessionId) {
+  const instance = sessions.get(sessionId);
+  if (instance) window.lowarc.sendSession(sessionId, { type: "resize", cols: instance.term.cols, rows: instance.term.rows });
+}
+
+// A single rAF after making a container visible/creating a terminal wasn't always enough —
+// confirmed live: xterm's own renderer sometimes hasn't settled real font-metric measurements
+// that fast, so fit() would occasionally compute a much-too-narrow size (the classic symptom:
+// text wrapping every 7-8 characters despite a wide container). Re-fitting again a beat later
+// catches that case; it's a harmless no-op the rest of the time since fitting an
+// already-correctly-sized terminal just proposes the same dimensions again.
+function refit(sessionId) {
+  const instance = sessions.get(sessionId);
+  if (!instance) return;
+  instance.fitAddon.fit();
+  sendResize(sessionId);
+}
+
+function switchTo(sessionId) {
+  if (!sessions.has(sessionId) || sessionId === activeSessionId) {
+    if (sessions.has(sessionId)) {
+      refit(sessionId);
+      sessions.get(sessionId).term.focus();
+    }
+    return;
+  }
+  if (activeSessionId && sessions.has(activeSessionId)) {
+    sessions.get(activeSessionId).container.classList.remove("is-active");
+  }
+  activeSessionId = sessionId;
+  const instance = sessions.get(sessionId);
+  instance.container.classList.add("is-active");
+  renderSidebar();
+  // The newly-shown container was display:none, so its size was never measurable until now.
+  requestAnimationFrame(() => {
+    refit(sessionId);
+    instance.term.focus();
+    setTimeout(() => refit(sessionId), 80);
+  });
+}
+
+function createInstance(shell) {
+  const sessionId = makeSessionId();
+  instanceCounter += 1;
+
+  const container = document.createElement("div");
+  container.className = "terminal-instance";
+  mainEl.appendChild(container);
+
+  const term = new Terminal({
+    convertEol: true,
+    cursorBlink: true,
+    fontSize: 13,
+    fontFamily: "Consolas, 'Cascadia Mono', Menlo, monospace",
+    theme: { background: "#1e1e1e", foreground: "#d4d4d4" },
+  });
+  const fitAddon = new FitAddon.FitAddon();
+  term.loadAddon(fitAddon);
+  term.open(container);
+
+  term.onData((data) => window.lowarc.sendSession(sessionId, { type: "input", data }));
+
+  sessions.set(sessionId, { term, fitAddon, container, sidebarItem: null, label: `${instanceCounter}: ${shell || "Default"}` });
+  updateEmptyState();
+  window.lowarc.startSession(sessionId, shell);
+  switchTo(sessionId);
+}
+
+function closeInstance(sessionId) {
+  const instance = sessions.get(sessionId);
+  if (!instance) return;
+  window.lowarc.stopSession(sessionId);
+  instance.term.dispose();
+  instance.container.remove();
+  sessions.delete(sessionId);
+  updateEmptyState();
+
+  if (activeSessionId === sessionId) {
+    activeSessionId = null;
+    const next = sessions.keys().next().value;
+    if (next) switchTo(next);
+    else renderSidebar();
+  } else {
+    renderSidebar();
+  }
+}
+
+window.lowarc.on("lowarc:sessionOutput", (payload) => {
+  if (!payload || typeof payload.sessionId !== "string") return;
+  const instance = sessions.get(payload.sessionId);
+  if (!instance) return;
+  if (payload.type === "output" && typeof payload.data === "string") {
+    instance.term.write(payload.data);
+  } else if (payload.type === "exit") {
+    // Matches VS Code's default: a terminal whose shell exited on its own (the user typed
+    // "exit", or the process just ended) closes its tab rather than sitting there inert.
+    closeInstance(payload.sessionId);
+  }
+});
+
+// The host's console-header "+"/"..." controls (see editor.html) — this is the only way a new
+// instance ever gets created, including the very first one below, so there's exactly one code
+// path for "open a terminal" regardless of whether it's the first or the fifth.
+window.lowarc.on("lowarc:newTerminal", (payload) => {
+  createInstance(payload && payload.shell ? payload.shell : null);
+});
+
+new ResizeObserver(() => {
+  if (activeSessionId) refit(activeSessionId);
+}).observe(mainEl);
+
+createInstance(null);

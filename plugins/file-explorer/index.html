@@ -1,0 +1,158 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    font-size: 13px;
+    color: #d4d4d4;
+    background: #1e1e1e;
+    user-select: none;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .header-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 6px 6px 12px;
+    flex: none;
+  }
+
+  .header {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .toolbar { display: flex; align-items: center; gap: 2px; flex: none; }
+  .toolbar button {
+    all: unset;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: #ababab;
+  }
+  .toolbar button:hover { background: #2a2d2e; color: #fff; }
+  .toolbar svg { width: 15px; height: 15px; }
+
+  .banner {
+    display: none;
+    flex: none;
+    padding: 6px 10px;
+    font-size: 12px;
+    line-height: 1.4;
+    gap: 8px;
+    align-items: center;
+  }
+  .banner.is-error { display: flex; background: #5a1d1d; color: #f2b8b8; }
+  .banner.is-confirm { display: flex; background: #3c2f00; color: #ecd88f; flex-wrap: wrap; }
+  .banner-actions { display: flex; gap: 6px; margin-left: auto; }
+  .banner button {
+    all: unset;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.1);
+  }
+  .banner button:hover { background: rgba(255, 255, 255, 0.2); }
+  .banner button.danger { background: #a1260d; color: #fff; }
+  .banner button.danger:hover { background: #c0341a; }
+
+  .tree { flex: 1; min-height: 0; overflow: auto; padding-bottom: 8px; }
+  .empty-hint { padding: 10px 12px; font-size: 12px; color: #888; }
+
+  .footer {
+    flex: none;
+    padding: 4px 12px;
+    font-size: 11px;
+    color: #888;
+    border-top: 1px solid #2d2d2d;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .footer:empty { display: none; }
+
+  .row {
+    display: flex;
+    align-items: center;
+    height: 22px;
+    padding-right: 6px;
+    white-space: nowrap;
+    cursor: pointer;
+    gap: 4px;
+  }
+  .row:hover { background: #2a2d2e; }
+  .row.selected { background: #37373d; }
+  .row.drop-target { outline: 1px solid #007acc; outline-offset: -2px; }
+
+  .chevron { width: 14px; height: 14px; flex: none; display: flex; align-items: center; justify-content: center; color: #ababab; transform: rotate(0deg); transition: transform 0.08s ease; }
+  .chevron.expanded { transform: rotate(90deg); }
+  .chevron.hidden { visibility: hidden; }
+  .chevron svg { width: 10px; height: 10px; }
+
+  .row-icon { width: 15px; height: 15px; flex: none; color: #c5c5c5; }
+  .row-icon svg { width: 100%; height: 100%; }
+
+  /* Same colors as the host's tab bar status underline (--yellow/--danger in the host's own
+     style.css) — hardcoded here since this document has no access to the host's CSS variables. */
+  .row-status-dot { width: 6px; height: 6px; border-radius: 50%; flex: none; margin-left: auto; }
+  .row-status-dot.status-dirty { background: #ffff00; }
+  .row-status-dot.status-error { background: #ff3b30; }
+
+  .row-name { overflow: hidden; text-overflow: ellipsis; flex: 1; }
+  .row-name input {
+    all: unset;
+    width: 100%;
+    background: #3c3c3c;
+    outline: 1px solid #007acc;
+    outline-offset: -1px;
+    padding: 0 2px;
+    color: #fff;
+    font: inherit;
+  }
+</style>
+</head>
+<body>
+  <script src="__lowarc.js"></script>
+
+  <div class="header-row">
+    <div class="header" id="header">Explorer</div>
+    <div class="toolbar">
+      <button type="button" id="new-file-btn" title="New File" aria-label="New File">
+        <svg viewBox="0 0 16 16" fill="none"><path d="M4 2h5l3 3v9H4V2Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M9 2v3h3" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M8 8.5v4M6 10.5h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      </button>
+      <button type="button" id="new-folder-btn" title="New Folder" aria-label="New Folder">
+        <svg viewBox="0 0 16 16" fill="none"><path d="M2 4.5C2 3.67 2.67 3 3.5 3H6.5L8 4.5H12.5C13.33 4.5 14 5.17 14 6V11.5C14 12.33 13.33 13 12.5 13H3.5C2.67 13 2 12.33 2 11.5V4.5Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M8 7.5v3M6.5 9h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      </button>
+      <button type="button" id="refresh-btn" title="Refresh" aria-label="Refresh">
+        <svg viewBox="0 0 16 16" fill="none"><path d="M13 8A5 5 0 1 1 11.5 4.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M13 2.5V5.5H10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="banner" id="banner"></div>
+  <div class="tree" id="tree"></div>
+  <div class="footer" id="footer"></div>
+
+  <script src="explorer.js"></script>
+</body>
+</html>

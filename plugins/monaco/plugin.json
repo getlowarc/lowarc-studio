@@ -1,0 +1,28 @@
+{
+  "name": "Monaco Editor",
+  "version": "0.1.0",
+  "description": "Code editor for opened files, powered by Monaco (vendored from the monaco-editor npm package, see MONACO_LICENSE).",
+  "contributes": {
+    "viewers": [
+      {
+        "id": "main",
+        "title": "Monaco",
+        "entry": "index.html",
+        "extensions": [
+          ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx",
+          ".json", ".jsonc",
+          ".html", ".htm", ".css", ".scss", ".less",
+          ".md", ".markdown",
+          ".py", ".rs", ".go", ".java",
+          ".c", ".h", ".cpp", ".hpp", ".cc", ".cs",
+          ".php", ".rb", ".sh", ".bash",
+          ".yml", ".yaml", ".xml", ".sql",
+          ".lua", ".swift", ".kt", ".dart",
+          ".ps1", ".bat", ".ini",
+          ".uc",
+          ".txt"
+        ]
+      }
+    ]
+  }
+}

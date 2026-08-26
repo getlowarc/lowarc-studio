@@ -445,6 +445,14 @@ pub fn run() {
       }
 
       AppPaths::ensure_directories()?;
+      // Non-fatal on purpose, unlike ensure_directories() above — a failed copy here (e.g. the
+      // binary is locked by another running instance) should still let the app start with
+      // whatever plugin binary was already in place, not crash outright; the affected plugin
+      // just surfaces its own "couldn't start" error later, the same as any other missing/broken
+      // plugin already does, rather than taking the whole app down over it.
+      if let Err(err) = AppPaths::ensure_builtin_plugin_binaries() {
+        log::warn!("couldn't refresh a built-in plugin's backend binary: {err}");
+      }
 
       Ok(())
     })

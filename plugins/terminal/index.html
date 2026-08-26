@@ -1,0 +1,84 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="vendor/xterm.css" />
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #1e1e1e; overflow: hidden; }
+
+  .layout { display: flex; height: 100%; }
+
+  .terminal-main { position: relative; flex: 1; min-width: 0; }
+  .terminal-instance { position: absolute; inset: 4px; display: none; }
+  .terminal-instance.is-active { display: block; }
+  .terminal-empty {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    color: #888;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    font-size: 13px;
+  }
+  .terminal-empty.is-visible { display: flex; }
+
+  /* The "+"/"..." new-instance controls live in the host's own console header, not here — this
+     sidebar is only the instance list, per the same VS Code-style split Nolan asked for. */
+  .terminal-sidebar {
+    flex: none;
+    width: 160px;
+    border-left: 1px solid #2d2d2d;
+    overflow-y: auto;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    font-size: 12px;
+    color: #d4d4d4;
+  }
+
+  .terminal-sidebar-item {
+    display: flex;
+    align-items: center;
+    height: 26px;
+    padding: 0 4px 0 10px;
+    gap: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .terminal-sidebar-item:hover { background: #2a2d2e; }
+  .terminal-sidebar-item.is-active { background: #37373d; }
+
+  .terminal-sidebar-item-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+
+  .terminal-sidebar-item-delete {
+    all: unset;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    flex: none;
+    border-radius: 4px;
+    color: #ababab;
+    cursor: pointer;
+  }
+  .terminal-sidebar-item-delete:hover { background: #3c3c3c; color: #fff; }
+  .terminal-sidebar-item-delete svg { width: 11px; height: 11px; }
+</style>
+</head>
+<body>
+  <script src="__lowarc.js"></script>
+
+  <div class="layout">
+    <div class="terminal-main" id="terminal-main">
+      <div class="terminal-empty" id="terminal-empty">No terminal open</div>
+    </div>
+    <div class="terminal-sidebar" id="terminal-sidebar"></div>
+  </div>
+
+  <script src="vendor/xterm.js"></script>
+  <script src="vendor/addon-fit.js"></script>
+  <script src="terminal.js"></script>
+</body>
+</html>

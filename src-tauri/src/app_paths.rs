@@ -85,6 +85,49 @@ impl AppPaths {
         std::fs::create_dir_all(Self::themes())?;
         Ok(())
     }
+
+    /// A source checkout's own plugin backend binaries (file_explorer_backend.exe,
+    /// terminal_backend.exe) are build OUTPUT, not source — Cargo already compiles them as a side
+    /// effect of building this same workspace (src/bin/*.rs is picked up automatically, no [[bin]]
+    /// needed in Cargo.toml), landing them right next to this very executable. All that was missing
+    /// was copying them into the plugin folder the app actually loads plugins from — this does that,
+    /// so a fresh clone works with nothing beyond `cargo build`/`cargo run`, no separate manual step
+    /// it would have no way to know about. Only runs for a source build; an installed copy gets its
+    /// plugins a different way (bundled resources / the normal install flow), not this. Skips a
+    /// binary that isn't built yet (e.g. `cargo test`'s own exe lives elsewhere) rather than erroring
+    /// — plugin binaries genuinely not existing yet is a normal state, not a failure.
+    pub fn ensure_builtin_plugin_binaries() -> std::io::Result<()> {
+        if Self::dev_root().is_none() {
+            return Ok(());
+        }
+        for (plugin_dir, bin_name) in BUILTIN_PLUGIN_BACKENDS {
+            let file_name = format!("{bin_name}{}", std::env::consts::EXE_SUFFIX);
+            let src = Self::install().join(&file_name);
+            if !src.is_file() {
+                continue;
+            }
+            let dest_dir = Self::plugins().join(plugin_dir);
+            std::fs::create_dir_all(&dest_dir)?;
+            let dest = dest_dir.join(&file_name);
+            if needs_copy(&src, &dest)? {
+                std::fs::copy(&src, &dest)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+const BUILTIN_PLUGIN_BACKENDS: &[(&str, &str)] = &[("file-explorer", "file_explorer_backend"), ("terminal", "terminal_backend")];
+
+/// True if `dest` doesn't exist yet, or `src` was modified more recently than it — split out from
+/// ensure_builtin_plugin_binaries() so it's directly testable with real temp files rather than
+/// needing to fake AppPaths' own exe-location walk.
+fn needs_copy(src: &Path, dest: &Path) -> std::io::Result<bool> {
+    let src_modified = std::fs::metadata(src)?.modified()?;
+    match std::fs::metadata(dest).and_then(|m| m.modified()) {
+        Ok(dest_modified) => Ok(src_modified > dest_modified),
+        Err(_) => Ok(true), // dest missing (or its mtime unreadable) — copy unconditionally
+    }
 }
 
 #[cfg(windows)]
@@ -142,5 +185,26 @@ mod tests {
         if let Some(dev_root) = AppPaths::dev_root() {
             assert_ne!(installed, dev_root, "installed UserData must never collide with a dev checkout's own root");
         }
+    }
+
+    #[test]
+    fn needs_copy_is_true_when_dest_is_missing_or_older() {
+        let dir = std::env::temp_dir().join(format!("lowarc_studio_needs_copy_test_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let src = dir.join("src.bin");
+        let dest = dir.join("dest.bin");
+
+        std::fs::write(&src, b"v1").unwrap();
+        assert!(needs_copy(&src, &dest).unwrap(), "dest doesn't exist yet");
+
+        std::fs::write(&dest, b"v1").unwrap();
+        assert!(!needs_copy(&src, &dest).unwrap(), "dest is already at least as new as src");
+
+        // Force a real, filesystem-visible mtime gap — some filesystems only have 1-2s resolution,
+        // so a same-tick write here wouldn't reliably register as "newer" otherwise.
+        std::thread::sleep(std::time::Duration::from_millis(1100));
+        std::fs::write(&src, b"v2").unwrap();
+        assert!(needs_copy(&src, &dest).unwrap(), "src was modified after dest");
     }
 }
