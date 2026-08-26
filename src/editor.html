@@ -7,27 +7,24 @@
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="primitives.css" />
     <style>
-      html, body {
-        height: 100%;
-        overflow: hidden;
-      }
-
       /* ---------- Grid shell ---------- */
-      /* Vocabulary: "Menu Bar" = the topmost bar (File/Edit/View/Help). "Sidebar" = the Rail
-         (icon strip) + the left panel together. "Tab Bar" = the center panel's own local header
-         (file/view tabs + run/pause/stop + plugin buttons) — NOT a shell-wide row; VS Code keeps
-         its transport controls scoped to the editor group, not the app chrome, so this does too.
-         Rail/left panel/right panel run the full height (Menu Bar down to status bar); the console
-         sits only under the center column. Panel sizes are CSS vars so JS can drive both dragging
-         and open/close without rewriting the template; divider tracks are real grid cells (not
-         overlaid elements) so they can't drift out of sync with what they're resizing. */
+      /* Vocabulary: "Menu Bar" = the topmost bar (File/Edit/View/Help) — the window runs with
+         decorations:false, so this row doubles as the OS caption bar too: app icon and menu on
+         the left, transport controls + panel toggles on the right, then the minimize/maximize/
+         close buttons, with a draggable strip in between. "Sidebar" = the Rail (icon strip) + the
+         left panel together. "Tab Bar" = the center panel's own local header — file tabs only now
+         that transport/toggles live in the Menu Bar. Rail/left panel/right panel run the full
+         height (Menu Bar down to status bar); the console sits only under the center column. Panel
+         sizes are CSS vars so JS can drive both dragging and open/close without rewriting the
+         template; divider tracks are real grid cells (not overlaid elements) so they can't drift
+         out of sync with what they're resizing. */
       .shell {
         height: 100%;
         display: grid;
         --sidebar-width: 240px;
         --right-width: 260px;
         --console-height: 220px;
-        grid-template-columns: 44px var(--sidebar-width) 4px 1fr 4px var(--right-width);
+        grid-template-columns: 36px var(--sidebar-width) 4px 1fr 4px var(--right-width);
         grid-template-rows: auto 1fr 4px var(--console-height) auto;
         grid-template-areas:
           "menu    menu    menu    menu    menu    menu"
@@ -47,19 +44,31 @@
         --console-height: 0px;
       }
 
-      /* ---------- Menu Bar ---------- */
+      /* ---------- Menu Bar (also the window's caption row — see the grid-shell note above) ---- */
       .menu-bar {
         grid-area: menu;
         display: flex;
+        align-items: stretch;
+        height: 34px;
+        padding-left: 6px;
+        border-bottom: 1px solid var(--border);
+        flex: none;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+
+      .menu-bar-left {
+        display: flex;
         align-items: center;
         gap: 2px;
-        padding: 4px 8px;
-        border-bottom: 1px solid var(--border);
         flex: none;
       }
 
-      .menu-bar .back-link {
-        margin-right: 8px;
+      .menu-bar-app-icon {
+        height: 15px;
+        width: auto;
+        display: block;
+        margin: 0 6px 0 2px;
       }
 
       .menu-item {
@@ -76,11 +85,87 @@
         color: var(--fg);
       }
 
-      .menu-bar .project-name {
-        margin-left: auto;
-        font-size: 12px;
+      /* Every top-level item is a real dropdown (.menu-dropdown/.menu-dropdown-list/etc. are the
+         shared primitive in primitives.css). Items the app can't actually do yet (Edit's
+         clipboard/undo commands, anything needing a plugin surface that doesn't exist) render
+         disabled rather than being omitted — same placeholder-over-omission approach as the rest
+         of the shell. */
+
+      .menu-bar-drag {
+        flex: 1;
+      }
+
+      /* A button, not a real input — VS Code's Command Center isn't typable in place either, it
+         opens a separate overlay. Flanked by two flex:1 drag regions so it centers in whatever
+         room is left between the menu and the right-side controls, and empty space on either
+         side of it stays draggable. No explicit height — .menu-bar's own align-items:stretch
+         fills the full row height, matching every other control in this bar instead of sitting
+         inset like a smaller inline widget would. */
+      .menu-bar-command-center {
+        all: unset;
+        box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        flex: 0 1 280px;
+        min-width: 32px;
+        max-width: 40%;
+        padding: 0 10px;
+        border-radius: 5px;
+        background: var(--bg);
         color: var(--fg-dim);
-        padding: 0 8px;
+        font-size: 12px;
+        cursor: pointer;
+        overflow: hidden;
+      }
+
+      .menu-bar-command-center:hover {
+        background: var(--bg-hover);
+        color: var(--fg);
+      }
+
+      .menu-bar-command-center svg {
+        width: 13px;
+        height: 13px;
+        flex: none;
+      }
+
+      .menu-bar-command-center span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      /* Below this, there isn't room for a labeled pill without crowding the menu/transport
+         controls on either side — drop to an icon-only button, same idea as VS Code's own Command
+         Center collapsing at narrow widths. */
+      @media (max-width: 700px) {
+        .menu-bar-command-center {
+          flex: 0 0 auto;
+          min-width: 0;
+          padding: 0 8px;
+        }
+        .menu-bar-command-center span {
+          display: none;
+        }
+      }
+
+      .menu-bar-right {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        flex: none;
+        padding-right: 6px;
+      }
+
+      .menu-bar-right .transport-controls {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding-right: 6px;
+        margin-right: 2px;
+        border-right: 1px solid var(--border);
       }
 
       .menu-bar-icon {
@@ -101,10 +186,19 @@
         height: 15px;
       }
 
-      .menu-bar-icon:hover,
-      .menu-bar-icon.is-active {
+      /* Every current .menu-bar-icon is a "change the IDE's own layout" control (split/console/
+         inspector toggles) — info-blue on hover, same semantic the console header's .btn-ghost-info
+         buttons use. .is-active (currently toggled open) reuses the app's one accent color for
+         "this is on" everywhere else, deliberately not the hover color — see the .btn-ghost-*
+         primitives in primitives.css for the fuller reasoning. */
+      .menu-bar-icon:hover {
         background: var(--bg-hover);
-        color: var(--fg);
+        color: var(--info);
+      }
+
+      .menu-bar-icon.is-active {
+        background: var(--cyan-dim);
+        color: var(--cyan);
       }
 
       /* ---------- Rail ---------- */
@@ -122,6 +216,7 @@
       .rail-item {
         all: unset;
         box-sizing: border-box;
+        position: relative;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -137,14 +232,126 @@
         height: 18px;
       }
 
+      /* All three current .rail-item buttons (bell/account/settings) open a floating panel of some
+         kind — yellow on hover, the "opens a menu" semantic. (No .is-active rule here any more:
+         that was left over from before the panel-switching rail icons moved to the shared
+         .sidebar-tab primitive — see renderTabStrip's "sidebar" slot below — and nothing has
+         toggled .is-active on a .rail-item since.) */
       .rail-item:hover {
-        color: var(--fg);
+        color: var(--yellow);
       }
 
-      .rail-item.is-active {
-        color: var(--cyan);
-        background: var(--cyan-dim);
+      /* Unread-notification dot on the bell — position:relative on .rail-item above is what this
+         anchors against. */
+      .rail-badge {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--danger);
+        border: 1.5px solid var(--bg-raised);
       }
+
+      /* ---------- Notification bell panel ---------- */
+      /* Renders inside the same shared #floating-menu-list every action menu uses (see
+         showFloatingOverlay) — wider and taller than that default, since this is a scrollable
+         history list, not a handful of one-line action buttons. */
+      .notif-panel-list {
+        width: 300px;
+        max-height: 420px;
+        overflow-y: auto;
+        padding: 0;
+      }
+
+      .notif-panel-header {
+        position: sticky;
+        top: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 10px;
+        background: var(--bg-raised);
+        border-bottom: 1px solid var(--border);
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--fg-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+
+      .notif-panel-clear {
+        all: unset;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: none;
+        letter-spacing: normal;
+        color: var(--fg-dim);
+        cursor: pointer;
+        padding: 2px 4px;
+        border-radius: 3px;
+      }
+
+      .notif-panel-clear:hover {
+        background: var(--bg-hover);
+        color: var(--danger);
+      }
+
+      .notif-panel-empty {
+        padding: 20px 12px;
+        text-align: center;
+        font-size: 13px;
+        color: var(--fg-dim);
+      }
+
+      .notif-row {
+        display: flex;
+        gap: 8px;
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .notif-row:last-child {
+        border-bottom: none;
+      }
+
+      .notif-row-body {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+      }
+
+      .notif-row-message {
+        font-size: 12px;
+        line-height: 1.4;
+        color: var(--fg);
+        word-break: break-word;
+      }
+
+      .notif-row-meta {
+        font-size: 11px;
+        color: var(--fg-dim);
+      }
+
+      /* .sidebar-tab (primitives.css) is shared with the Modules/Plugins pages' wider, labelled
+         list — this narrows *only* the rail's own icon-only usage of it, rather than shrinking
+         the shared primitive itself and affecting those other, unrelated places too. */
+      #rail-tabs.sidebar-nav {
+        gap: 2px;
+      }
+      #rail-tabs .sidebar-tab {
+        padding: 7px 7px 7px 8px;
+        border-radius: 0 4px 4px 0;
+      }
+
+      .rail-spacer {
+        flex: 1;
+      }
+
+      /* Account/settings triggers open through .floating-menu (see openMenuFromTrigger in the
+         script below), not a local .menu-dropdown — no positioning override needed here any more. */
 
       /* ---------- Left / right panels ---------- */
       /* Darker than the center panel on purpose — see the background-shade section below. */
@@ -185,37 +392,11 @@
         margin: 0;
       }
 
-      .icon-close {
-        all: unset;
-        display: flex;
-        color: var(--fg-dim);
-        padding: 3px;
-        border-radius: 4px;
-        cursor: pointer;
-      }
-
-      .icon-close:hover {
-        background: var(--bg-hover);
-        color: var(--fg);
-      }
-
-      .icon-close svg {
-        width: 12px;
-        height: 12px;
-      }
-
       .side-panel-body {
         flex: 1;
         min-height: 0;
         overflow: auto;
         padding: 14px;
-      }
-
-      .placeholder-note {
-        font-size: 12px;
-        color: var(--fg-dim);
-        line-height: 1.5;
-        margin: 0;
       }
 
       /* ---------- Dividers ---------- */
@@ -257,21 +438,60 @@
         bottom: -2px;
       }
 
-      /* ---------- Center panel (Tab Bar + viewport) ---------- */
-      /* Brightest of the panels — it's the focus. One background on the wrapper so the Tab Bar
-         and the viewport read as one continuous surface instead of needing the shade set twice. */
+      /* ---------- Center panel (Tab Bar + viewport, optionally split into two groups) ---------- */
+      /* Brightest of the panels — it's the focus. One background on the wrapper so every group's
+         Tab Bar and viewport read as one continuous surface instead of needing the shade set per
+         group. .center-panel itself is now just a flex row hosting one or two .editor-group
+         columns (each the old .center-panel content verbatim) plus the divider between them — the
+         outer grid's "center" cell/area is unchanged, split lives entirely inside it. */
       .center-panel {
         grid-area: center;
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
         min-width: 0;
         overflow: hidden;
         background: var(--bg-raised);
       }
 
+      .editor-group {
+        flex: 1 1 0;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      /* Off by default — split is a deliberate opt-in (see toggle-split), not a second pane that
+         exists but happens to be empty. */
+      .editor-group[data-group="1"] {
+        display: none;
+      }
+      .center-panel.is-split .editor-group[data-group="1"] {
+        display: flex;
+      }
+
+      /* The subtle cue for "new files open here" — otherwise nothing on screen distinguishes which
+         of the two groups is the active drop target once both exist. */
+      .editor-group.is-active-group .tab-bar {
+        background: var(--bg-hover);
+      }
+
+      /* Reuses .divider's own hover/hit-region styling (see the Dividers section below) via a
+         second class rather than duplicating it — this one just isn't grid-area-positioned, since
+         it sits inside the flex-row .center-panel, not as its own grid track. */
+      .editor-group-divider {
+        flex: none;
+        width: 4px;
+        display: none;
+      }
+      .center-panel.is-split .editor-group-divider {
+        display: block;
+      }
+
       .tab-bar {
         display: flex;
-        align-items: center;
+        align-items: stretch;
+        min-height: 34px;
         padding: 0 6px;
         border-bottom: 1px solid var(--border);
         flex: none;
@@ -279,47 +499,112 @@
 
       .tab-bar-tabs {
         display: flex;
-        align-items: center;
+        align-items: stretch;
         flex: 1;
         min-width: 0;
-        padding: 8px 8px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        white-space: nowrap;
+        scrollbar-width: thin;
+      }
+
+      .tab-bar-empty {
+        display: flex;
+        align-items: center;
+        padding: 0 8px;
         font-size: 12px;
         color: var(--fg-dim);
       }
 
-      .tab-bar-actions {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        flex: none;
-      }
-
-      .tab-bar-actions .transport-controls {
+      /* One tab per open file. A div (not a button) because it hosts a real <button> of its own
+         (the close control) — buttons can't nest, and a div with role="button" is the correct
+         substitute rather than reaching for a click handler on something semantically wrong.
+         Status (clean/dirty/missing) is shown as the underline's color, the same "line, not a
+         dot" language as the header-tab/console-tab primitives' active-state underline. Unlike
+         those two, a clean tab's line only shows when it's also the active one — matching
+         header-tab/console-tab's own rule that an unselected tab shows no line at all, transparent
+         at rest (Nolan: "tabs, sidebar or header, shouldn't have that border line if they aren't
+         selected... if it is not blue and not selected, don't show a line"). Dirty/missing are
+         real status signals worth seeing on a background tab too, so those two keep showing
+         unconditionally regardless of which tab is active — only "selected and otherwise
+         unremarkable" needs the active check. border-box so the border itself doesn't add to the
+         tab's height. */
+      .file-tab {
+        box-sizing: border-box;
         display: flex;
         align-items: center;
         gap: 6px;
-        padding-right: 6px;
-        margin-right: 6px;
-        border-right: 1px solid var(--border);
-      }
-
-      .plugin-buttons-note {
-        font-size: 11px;
+        padding: 0 6px 0 10px;
+        font-size: 12px;
         color: var(--fg-dim);
-        padding: 0 8px 0 2px;
+        border-right: 1px solid var(--border);
+        border-bottom: 2px solid transparent;
+        cursor: pointer;
+        flex: none;
+        user-select: none;
       }
 
-      .center-viewport {
-        flex: 1;
-        min-height: 0;
+      .file-tab.is-active.status-clean {
+        border-bottom-color: var(--cyan);
+      }
+
+      .file-tab.status-dirty {
+        border-bottom-color: var(--yellow);
+      }
+
+      .file-tab.status-missing {
+        border-bottom-color: var(--danger);
+      }
+
+      .file-tab:hover {
+        color: var(--fg);
+      }
+
+      .file-tab.is-active {
+        color: var(--fg);
+        background: var(--bg-hover);
+      }
+
+      .file-tab:focus-visible {
+        outline: 1px solid var(--cyan);
+        outline-offset: -1px;
+      }
+
+      /* Always present and laid out (never swapped for something a different size) so hovering a
+         tab never shifts its width — just invisible and inert until the tab is hovered or active. */
+      .file-tab-close {
+        display: flex;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .file-tab:hover .file-tab-close,
+      .file-tab.is-active .file-tab-close {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .center-viewport-empty {
         display: flex;
         align-items: center;
         justify-content: center;
-        overflow: auto;
+        width: 100%;
+        height: 100%;
         color: var(--fg-dim);
         font-size: 13px;
         text-align: center;
         padding: 24px;
+        box-sizing: border-box;
+      }
+
+      /* Always hosts either .center-viewport-empty or one iframe per open file (see the tab-bar/
+         open-files JS below) — never bare text of its own any more, so this stays a plain block
+         container; whichever child is actually showing manages its own sizing/centering. */
+      .center-viewport {
+        flex: 1;
+        min-height: 0;
+        display: block;
+        overflow: hidden;
       }
 
       /* ---------- Console ---------- */
@@ -344,6 +629,30 @@
         flex: none;
       }
 
+      .console-tabs-spacer {
+        flex: 1;
+      }
+
+      .console-session-controls {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+      }
+
+      .console-header-divider {
+        width: 1px;
+        height: 18px;
+        margin: 0 6px;
+        background: var(--border);
+        flex: none;
+      }
+
+      /* "New Terminal With…" opens through .floating-menu (see openMenuFromTrigger in the script
+         below), not a local .menu-dropdown — no positioning override needed here any more. */
+
+
+      /* Reinstated for plugin-contributed console tabs (see PanelContribution.location ==
+         "console") — same underline pattern as .header-tab, tuned for the console's smaller row. */
       .console-tab {
         all: unset;
         box-sizing: border-box;
@@ -370,18 +679,174 @@
         border-bottom-color: var(--cyan);
       }
 
-      .console-tabs-spacer {
+      .plugin-panel-frame {
+        width: 100%;
+        height: 100%;
+        border: 0;
+        display: none;
+      }
+
+      .plugin-panel-frame.is-active {
+        display: block;
+      }
+
+      /* Same slot/show-hide convention as .plugin-panel-frame — the per-tab wrapper showSlotTab()
+         creates for every "sidebar"/"inspector"/"console" contribution, host or plugin alike (see
+         primitives.js's contribute()/getSlot() and renderTabStrip/showSlotTab below). Flex column,
+         not block, so a host panel's toolbar-above-a-list layout works; a plugin's plain iframe
+         just becomes that column's sole child and fills it the same way. */
+      .host-panel-frame {
+        width: 100%;
+        height: 100%;
+        min-width: 0;
+        display: none;
+        flex-direction: column;
+      }
+
+      .host-panel-frame.is-active {
+        display: flex;
+      }
+
+      /* ---------- In-editor plugin manager ---------- */
+      /* Single-column accordion, not the wide two-pane .manage-list/.manage-detail layout the
+         standalone Plugins page uses — the sidebar defaults to 240px, the same width .manage-list
+         alone takes on that page, nowhere near enough room for a detail pane beside it too. Each
+         row expands in place instead of navigating to a separate detail view. */
+      .plugin-manager-toolbar {
+        flex: none;
+        padding: 8px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .plugin-manager-list {
         flex: 1;
+        min-height: 0;
+        min-width: 0;
+        overflow-y: auto;
+      }
+
+      .plugin-manager-empty {
+        padding: 16px 12px;
+        font-size: 13px;
+        color: var(--fg-dim);
+      }
+
+      .plugin-manager-row {
+        border-bottom: 1px solid var(--border);
+      }
+
+      .plugin-manager-row-header {
+        all: unset;
+        box-sizing: border-box;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        cursor: pointer;
+      }
+
+      .plugin-manager-row-header:hover {
+        background: var(--bg-hover);
+      }
+
+      .plugin-manager-row-name {
+        flex: 1;
+        min-width: 0;
+        font-size: 13px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .plugin-manager-row-chevron {
+        flex: none;
+        display: flex;
+        color: var(--fg-dim);
+        transform: rotate(0deg);
+        transition: transform 0.08s ease;
+      }
+
+      .plugin-manager-row-chevron.expanded {
+        transform: rotate(90deg);
+      }
+
+      .plugin-manager-row-chevron svg {
+        width: 10px;
+        height: 10px;
+      }
+
+      .plugin-manager-row-body {
+        padding: 0 10px 12px 26px;
+        min-width: 0;
+      }
+
+      .plugin-manager-row-sub {
+        font-size: 11px;
+        color: var(--fg-dim);
+        margin-bottom: 6px;
+      }
+
+      .plugin-manager-row-desc {
+        font-size: 12px;
+        line-height: 1.4;
+        margin-bottom: 10px;
+      }
+
+      /* flex-wrap, not a fixed side-by-side layout — the checkbox label plus the Remove button
+         don't reliably both fit on one line at the sidebar's narrower widths (confirmed live: they
+         were forcing the whole panel wider than the sidebar, spawning a horizontal scrollbar).
+         Wrapping the button to its own line costs nothing when there IS room (it still sits on the
+         same line then) and just avoids the overflow entirely when there isn't. */
+      .plugin-manager-row-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px 8px;
+      }
+
+      /* Zeroes the placeholder-era padding/centering once the inspector actually hosts a plugin
+         panel — a value editor shouldn't sit inset behind decorative padding. .center-viewport
+         doesn't need this toggle any more; it stays padding:0 permanently now that it always
+         hosts either .center-viewport-empty or an open file's iframe, same reasoning as
+         .console-body below staying padding:0 permanently for the same kind of always-hosts-
+         something reason. */
+      .side-panel-body.hosts-plugin {
+        padding: 0;
+        overflow: hidden;
+        display: block;
       }
 
       .console-body {
         flex: 1;
         min-height: 0;
         overflow: auto;
+      }
+
+      /* The one console tab that isn't plugin-contributed — dev-run and plugin log output. Always
+         present, since it's core functionality rather than something a plugin supplies (see the
+         "__run" contribute("console", ...) call, order:-10 so it always sorts first). Its own
+         is-active never toggles again once set — see showSlotTab()'s per-tab .host-panel-frame
+         wrapper, which is what actually governs whether this is visible. */
+      #console-run-panel {
+        display: none;
+        height: 100%;
+        overflow: auto;
         padding: 8px 12px;
         font-family: ui-monospace, "SF Mono", Menlo, monospace;
         font-size: 12px;
         color: var(--fg-dim);
+        white-space: pre-wrap;
+        box-sizing: border-box;
+      }
+
+      #console-run-panel.is-active {
+        display: block;
+      }
+
+      #console-run-panel .line + .line {
+        margin-top: 2px;
       }
 
       /* ---------- Status bar ---------- */
@@ -404,68 +869,195 @@
     </style>
   </head>
   <body>
-    <div class="shell" id="shell" data-sidebar-open="true" data-right-open="true" data-console-open="true">
+    <div class="shell" id="shell" data-sidebar-open="false" data-right-open="false" data-console-open="false">
       <div class="menu-bar">
-        <button type="button" class="back-link" id="back" data-tooltip="Back to Start" aria-label="Back to Start">
-          <svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        <div class="menu-bar-left">
+          <img src="la-logo.svg" alt="" class="menu-bar-app-icon" />
+          <div class="menu-dropdown" id="file-menu">
+            <button type="button" class="menu-item" id="file-menu-trigger" aria-haspopup="true" aria-expanded="false">File</button>
+            <div class="menu-dropdown-list">
+              <button type="button" class="menu-dropdown-item" id="new-project-item">New Project…</button>
+              <button type="button" class="menu-dropdown-item" id="open-project-item">Open Project…</button>
+              <div class="menu-dropdown-divider"></div>
+              <button type="button" class="menu-dropdown-item" id="open-file-item">Open File…</button>
+              <button type="button" class="menu-dropdown-item" disabled>Save</button>
+              <button type="button" class="menu-dropdown-item" disabled>Save As…</button>
+              <div class="menu-dropdown-divider"></div>
+              <button type="button" class="menu-dropdown-item" id="file-modules-item">Modules…</button>
+              <button type="button" class="menu-dropdown-item" id="file-plugins-item">Plugins…</button>
+              <div class="menu-dropdown-divider"></div>
+              <button type="button" class="menu-dropdown-item" id="back-to-start">Back to Start</button>
+              <div class="menu-dropdown-divider"></div>
+              <button type="button" class="menu-dropdown-item" id="exit-item">Exit</button>
+            </div>
+          </div>
+
+          <div class="menu-dropdown" id="edit-menu">
+            <button type="button" class="menu-item" id="edit-menu-trigger" aria-haspopup="true" aria-expanded="false">Edit</button>
+            <div class="menu-dropdown-list">
+              <button type="button" class="menu-dropdown-item" disabled>Undo</button>
+              <button type="button" class="menu-dropdown-item" disabled>Redo</button>
+              <div class="menu-dropdown-divider"></div>
+              <button type="button" class="menu-dropdown-item" disabled>Cut</button>
+              <button type="button" class="menu-dropdown-item" disabled>Copy</button>
+              <button type="button" class="menu-dropdown-item" disabled>Paste</button>
+              <div class="menu-dropdown-divider"></div>
+              <button type="button" class="menu-dropdown-item" disabled>Find</button>
+              <button type="button" class="menu-dropdown-item" disabled>Replace</button>
+            </div>
+          </div>
+
+          <div class="menu-dropdown" id="view-menu">
+            <button type="button" class="menu-item" id="view-menu-trigger" aria-haspopup="true" aria-expanded="false">View</button>
+            <div class="menu-dropdown-list">
+              <button type="button" class="menu-dropdown-item" disabled>Command Palette…</button>
+              <div class="menu-dropdown-divider"></div>
+              <button type="button" class="menu-dropdown-item" id="view-toggle-sidebar">Toggle Sidebar</button>
+              <button type="button" class="menu-dropdown-item" id="view-toggle-console">Toggle Console</button>
+              <button type="button" class="menu-dropdown-item" id="view-toggle-right">Toggle Inspector</button>
+              <button type="button" class="menu-dropdown-item" id="view-toggle-split">Split Editor</button>
+              <div class="menu-dropdown-divider"></div>
+              <button type="button" class="menu-dropdown-item" id="view-appearance-item">Appearance…</button>
+              <div class="menu-dropdown-divider"></div>
+              <button type="button" class="menu-dropdown-item" id="view-reload-item">Reload</button>
+              <button type="button" class="menu-dropdown-item" id="view-fullscreen-item">Toggle Full Screen</button>
+            </div>
+          </div>
+
+          <div class="menu-dropdown" id="run-menu">
+            <button type="button" class="menu-item" id="run-menu-trigger" aria-haspopup="true" aria-expanded="false">Run</button>
+            <div class="menu-dropdown-list">
+              <button type="button" class="menu-dropdown-item" id="run-menu-run">Run</button>
+              <button type="button" class="menu-dropdown-item" disabled>Pause</button>
+              <button type="button" class="menu-dropdown-item" disabled>Stop</button>
+              <div class="menu-dropdown-divider"></div>
+              <button type="button" class="menu-dropdown-item" disabled>Restart</button>
+              <div class="menu-dropdown-divider"></div>
+              <button type="button" class="menu-dropdown-item" id="run-menu-set-entry">Set Entry File…</button>
+              <button type="button" class="menu-dropdown-item" disabled>Run Configuration…</button>
+              <button type="button" class="menu-dropdown-item" id="dev-run-settings-item">Dev Run Settings…</button>
+            </div>
+          </div>
+
+          <div class="menu-dropdown" id="help-menu">
+            <button type="button" class="menu-item" id="help-menu-trigger" aria-haspopup="true" aria-expanded="false">Help</button>
+            <div class="menu-dropdown-list">
+              <button type="button" class="menu-dropdown-item" id="help-docs-item">Documentation</button>
+              <button type="button" class="menu-dropdown-item" disabled>Keyboard Shortcuts</button>
+              <div class="menu-dropdown-divider"></div>
+              <button type="button" class="menu-dropdown-item" disabled>Report an Issue</button>
+              <div class="menu-dropdown-divider"></div>
+              <button type="button" class="menu-dropdown-item" disabled>Check for Updates</button>
+              <button type="button" class="menu-dropdown-item" id="help-about-item">About LowArc Studio</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="menu-bar-drag" data-tauri-drag-region></div>
+
+        <button type="button" class="menu-bar-command-center" id="command-center-btn" data-tooltip="Search">
+          <svg viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.6" /><path d="M11 11L14.5 14.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
+          <span>Search</span>
         </button>
-        <button type="button" class="menu-item">File</button>
-        <button type="button" class="menu-item">Edit</button>
-        <button type="button" class="menu-item">View</button>
-        <button type="button" class="menu-item">Help</button>
-        <span class="project-name" id="project-name"></span>
-        <button type="button" class="menu-bar-icon is-active" id="toggle-console" data-tooltip="Toggle console">
-          <svg viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.3" /><path d="M2 10h12" stroke="currentColor" stroke-width="1.3" /></svg>
-        </button>
-        <button type="button" class="menu-bar-icon is-active" id="toggle-right" data-tooltip="Toggle inspector">
-          <svg viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.3" /><path d="M10 3v10" stroke="currentColor" stroke-width="1.3" /></svg>
-        </button>
+
+        <div class="menu-bar-drag" data-tauri-drag-region></div>
+
+        <div class="menu-bar-right">
+          <div class="transport-controls">
+            <button type="button" class="btn btn-icon-only btn-sm btn-main" data-tooltip="Run" aria-label="Run" id="run-btn">
+              <svg viewBox="0 0 16 16" fill="none"><path d="M5 3.5l8 4.5-8 4.5v-9z" fill="currentColor" /></svg>
+            </button>
+            <button type="button" class="btn btn-icon-only btn-sm btn-ghost" data-tooltip="Pause" aria-label="Pause" id="pause-btn">
+              <svg viewBox="0 0 16 16" fill="none"><rect x="4" y="3.5" width="3" height="9" rx="0.5" fill="currentColor" /><rect x="9" y="3.5" width="3" height="9" rx="0.5" fill="currentColor" /></svg>
+            </button>
+            <button type="button" class="btn btn-icon-only btn-sm btn-ghost" data-tooltip="Stop" aria-label="Stop" id="stop-btn">
+              <svg viewBox="0 0 16 16" fill="none"><rect x="4" y="4" width="8" height="8" rx="1" fill="currentColor" /></svg>
+            </button>
+          </div>
+          <button type="button" class="menu-bar-icon" id="toggle-split" data-tooltip="Split editor">
+            <svg viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.3" /><path d="M8 3v10" stroke="currentColor" stroke-width="1.3" /></svg>
+          </button>
+          <button type="button" class="menu-bar-icon" id="toggle-console" data-tooltip="Toggle console">
+            <svg viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.3" /><path d="M2 10h12" stroke="currentColor" stroke-width="1.3" /></svg>
+          </button>
+          <button type="button" class="menu-bar-icon" id="toggle-right" data-tooltip="Toggle inspector">
+            <svg viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.3" /><path d="M10 3v10" stroke="currentColor" stroke-width="1.3" /></svg>
+          </button>
+        </div>
+
+        <div class="titlebar-controls">
+          <button type="button" class="titlebar-btn" id="win-minimize" data-tooltip="Minimize" aria-label="Minimize">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" /></svg>
+          </button>
+          <button type="button" class="titlebar-btn" id="win-maximize" data-tooltip="Maximize" aria-label="Maximize">
+            <svg viewBox="0 0 16 16" fill="none"><rect x="3.5" y="3.5" width="9" height="9" rx="0.5" stroke="currentColor" stroke-width="1.3" /></svg>
+          </button>
+          <button type="button" class="titlebar-btn titlebar-btn-close" id="win-close" data-tooltip="Close" aria-label="Close">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
+          </button>
+        </div>
       </div>
 
       <nav class="rail" id="rail">
-        <button type="button" class="rail-item is-active" data-panel="explorer" data-tooltip="Explorer" aria-label="Explorer">
-          <svg viewBox="0 0 16 16" fill="none"><path d="M2 5a1 1 0 011-1h3l1.5 1.5H13a1 1 0 011 1V12a1 1 0 01-1 1H3a1 1 0 01-1-1V5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" /></svg>
+        <!-- Panel-switching icons — the shared sidebar-nav/sidebar-tab primitive (see
+             primitives.css), same one the Modules/Plugins pages use, not the bespoke .rail-item
+             look. Account/settings stay plain .rail-item buttons below: they open flyouts, not
+             switch a panel, so they're deliberately not part of this [data-tabs] list.
+             Every button here — the two in-editor managers (Modules, Plugins) included — is built
+             by renderTabStrip() from the "sidebar" slot registry (see contribute()/getSlot() in
+             primitives.js), not hand-authored HTML; this container starts empty and fills once the
+             script below runs. The managers are host-owned chrome, not plugin-contributed panels,
+             specifically so they can call real Tauri commands (list_installed_plugins/set_plugin_
+             enabled/remove_plugin, and the module equivalents) a sandboxed plugin never gets
+             access to — see the contribute("sidebar", ...) calls near createManagerPanel(). -->
+        <div class="sidebar-nav" data-tabs data-reorderable id="rail-tabs"></div>
+        <div class="rail-spacer"></div>
+
+        <!-- Host-owned, not a plugin (Nolan: "the bell shouldn't be a plugin... other plugins are
+             going to want to get a slice of the notif-pie") — sits above Account/Settings, per his
+             explicit placement. Opens through the shared .floating-menu overlay too (see
+             openNotificationPanel below), same as the two triggers under it. -->
+        <button type="button" class="rail-item" id="bell-trigger" data-tooltip="Notifications" aria-label="Notifications">
+          <svg viewBox="0 0 16 16" fill="none"><path d="M8 1.8c-2 0-3.5 1.6-3.5 3.6v2.1c0 .5-.2 1-.6 1.4l-.7.7c-.5.5-.1 1.4.6 1.4h8.4c.7 0 1.1-.9.6-1.4l-.7-.7c-.4-.4-.6-.9-.6-1.4V5.4c0-2-1.5-3.6-3.5-3.6Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" /><path d="M6.5 13.2a1.5 1.5 0 0 0 3 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" /></svg>
+          <span class="rail-badge" id="bell-badge" style="display: none"></span>
         </button>
-        <button type="button" class="rail-item" data-panel="search" data-tooltip="Search" aria-label="Search">
-          <svg viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.6" /><path d="M11 11L14.5 14.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
+
+        <!-- Flyouts for both of these render through the shared .floating-menu overlay (see
+             openMenuFromTrigger in the script below) rather than a local .menu-dropdown-list — the
+             rail sits at the window's far-left edge, exactly the kind of trigger position that used
+             to need a bespoke "open rightward, bottom-anchored" CSS override to avoid running off
+             the window; the overlay clamps to the real viewport instead, so no override is needed. -->
+        <button type="button" class="rail-item" id="account-menu-trigger" data-tooltip="Account" aria-label="Account" aria-haspopup="true" aria-expanded="false">
+          <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.3" /><circle cx="8" cy="6.4" r="2" stroke="currentColor" stroke-width="1.3" /><path d="M3.9 12.3c.7-1.9 2.3-2.9 4.1-2.9s3.4 1 4.1 2.9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" /></svg>
         </button>
-        <button type="button" class="rail-item" data-panel="plugins" data-tooltip="Plugins" aria-label="Plugins">
-          <svg viewBox="0 0 16 16" fill="none"><path d="M6 2v3M10 2v3M4.5 5h7v3a3.5 3.5 0 01-7 0V5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" /><path d="M8 11.5v2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" /></svg>
+
+        <button type="button" class="rail-item" id="settings-menu-trigger" data-tooltip="Settings" aria-label="Settings" aria-haspopup="true" aria-expanded="false">
+          <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1.3" /><path d="M8 1.6v1.6M8 12.8v1.6M14.4 8h-1.6M3.2 8H1.6M12.4 3.6l-1.1 1.1M4.7 11.3l-1.1 1.1M12.4 12.4l-1.1-1.1M4.7 4.7L3.6 3.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" /></svg>
         </button>
       </nav>
 
       <div class="side-panel left-panel">
-        <div class="side-panel-header">
-          <h2 id="left-panel-title">Explorer</h2>
-        </div>
-        <div class="side-panel-body" id="left-panel-body">
-          <p class="placeholder-note">File tree isn't built yet — and won't be built here at all. Every rail icon and everything it shows is a plugin's panel; the app only hosts them.</p>
-        </div>
+        <div class="side-panel-body" id="left-panel-body"></div>
       </div>
 
       <div class="divider divider-col divider-left" data-resize="sidebar"></div>
 
-      <div class="center-panel">
-        <div class="tab-bar">
-          <div class="tab-bar-tabs">No files open</div>
-          <div class="tab-bar-actions">
-            <div class="transport-controls">
-              <button type="button" class="btn btn-icon-only btn-sm btn-main" data-tooltip="Run" aria-label="Run" id="run-btn">
-                <svg viewBox="0 0 16 16" fill="none"><path d="M5 3.5l8 4.5-8 4.5v-9z" fill="currentColor" /></svg>
-              </button>
-              <button type="button" class="btn btn-icon-only btn-sm btn-ghost" data-tooltip="Pause" aria-label="Pause" disabled>
-                <svg viewBox="0 0 16 16" fill="none"><rect x="4" y="3.5" width="3" height="9" rx="0.5" fill="currentColor" /><rect x="9" y="3.5" width="3" height="9" rx="0.5" fill="currentColor" /></svg>
-              </button>
-              <button type="button" class="btn btn-icon-only btn-sm btn-ghost" data-tooltip="Stop" aria-label="Stop" disabled>
-                <svg viewBox="0 0 16 16" fill="none"><rect x="4" y="4" width="8" height="8" rx="1" fill="currentColor" /></svg>
-              </button>
-            </div>
-            <span class="plugin-buttons-note">Plugin buttons go here</span>
+      <div class="center-panel" id="center-panel">
+        <div class="editor-group is-active-group" id="editor-group-0" data-group="0">
+          <div class="tab-bar">
+            <div class="tab-bar-tabs" id="tab-bar-tabs-0" data-tabs data-reorderable></div>
+          </div>
+          <div class="center-viewport" id="center-viewport-0">
+            <div class="center-viewport-empty" id="center-viewport-empty-0">No files open</div>
           </div>
         </div>
-        <div class="center-viewport" id="center-viewport">
-          <div>
-            <p class="placeholder-note">The editor viewport (Monaco, a 2D/3D preview, whatever the open file needs) is a plugin's job too — the app just hosts whichever plugin owns the open file's type.</p>
+        <div class="divider divider-col editor-group-divider" id="editor-group-divider"></div>
+        <div class="editor-group" id="editor-group-1" data-group="1">
+          <div class="tab-bar">
+            <div class="tab-bar-tabs" id="tab-bar-tabs-1" data-tabs data-reorderable></div>
+          </div>
+          <div class="center-viewport" id="center-viewport-1">
+            <div class="center-viewport-empty" id="center-viewport-empty-1">No files open</div>
           </div>
         </div>
       </div>
@@ -475,27 +1067,52 @@
       <div class="side-panel right-panel">
         <div class="side-panel-header">
           <h2>Inspector</h2>
-          <button type="button" class="icon-close" id="right-panel-close" data-tooltip="Close" aria-label="Close panel">
+          <button type="button" class="btn btn-icon-only btn-xs btn-ghost-danger" id="right-panel-close" data-tooltip="Close" aria-label="Close panel">
             <svg viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
           </button>
         </div>
-        <div class="side-panel-body">
-          <p class="placeholder-note">Not built here — this will show whatever editable values the open file's interpreter plugin exposes.</p>
-        </div>
+        <div class="side-panel-body" id="right-panel-body"></div>
       </div>
 
       <div class="divider divider-row divider-console" data-resize="console"></div>
 
       <div class="console-panel">
-        <div class="console-tabs" data-tabs id="console-tabs">
-          <button type="button" class="console-tab is-active" data-tab-value="console">Console</button>
-          <button type="button" class="console-tab" data-tab-value="terminal">Terminal</button>
+        <!-- Every tab here — Run included — is built by renderTabStrip() from the "console" slot
+             registry (see contribute()/getSlot() in primitives.js), same as the rail's
+             sidebar-tabs; this container starts with just its trailing controls, no tab buttons,
+             and fills once the script below runs. -->
+        <div class="console-tabs" id="console-tabs" data-tabs data-reorderable>
           <div class="console-tabs-spacer"></div>
-          <button type="button" class="icon-close" id="console-close" data-tooltip="Close" aria-label="Close console">
+
+          <!-- Only shown while a "session": true plugin's tab (Terminal) is active — see
+               activateConsoleTab(). New instance (default shell) and "new instance with a specific
+               shell" are two different actions, not one dropdown-with-a-default, since the common
+               case (default shell) should be a single click, not open-menu-then-pick. -->
+          <div class="console-session-controls" id="console-session-controls" style="display: none">
+            <button type="button" class="btn btn-icon-only btn-xs btn-ghost-confirm" id="console-new-session" data-tooltip="New Terminal" aria-label="New Terminal">
+              <svg viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" /></svg>
+            </button>
+            <!-- Renders through .floating-menu (see openMenuFromTrigger) — the console sits at the
+                 bottom of the window, another edge that used to need a bespoke "open upward"
+                 override; the overlay clamps automatically instead. -->
+            <button type="button" class="btn btn-icon-only btn-xs btn-ghost-warning" id="console-session-menu-trigger" data-tooltip="New Terminal With…" aria-label="New Terminal With…" aria-haspopup="true" aria-expanded="false">
+              <svg viewBox="0 0 16 16" fill="none"><circle cx="3.2" cy="8" r="1.2" fill="currentColor" /><circle cx="8" cy="8" r="1.2" fill="currentColor" /><circle cx="12.8" cy="8" r="1.2" fill="currentColor" /></svg>
+            </button>
+          </div>
+
+          <div class="console-header-divider"></div>
+
+          <!-- Permanent, like Close — not scoped to any one console tab. -->
+          <button type="button" class="btn btn-icon-only btn-xs btn-ghost-info" id="console-expand" data-tooltip="Maximize Console" aria-label="Maximize console">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          </button>
+          <button type="button" class="btn btn-icon-only btn-xs btn-ghost-danger" id="console-close" data-tooltip="Close" aria-label="Close console">
             <svg viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
           </button>
         </div>
-        <div class="console-body" id="console-body">Nothing here yet — and what runs here is also plugin territory (module logs, code logs, a real terminal). The app just hosts the tab strip and the panel.</div>
+        <div class="console-body" id="console-body">
+          <div id="console-run-panel" class="is-active"></div>
+        </div>
       </div>
 
       <div class="status-bar">
@@ -505,66 +1122,850 @@
       </div>
     </div>
 
+    <!-- A sibling of .shell, not nested inside it — see openMenuOverlay()'s comment for why that
+         matters (nothing inside .shell can clip or contain this). -->
+    <div class="floating-menu" id="floating-menu">
+      <div class="floating-menu-list" id="floating-menu-list"></div>
+    </div>
+
+    <!-- Popup Base's stack — a sibling of .shell/.floating-menu for the same reason (nothing can
+         clip it). Empty by default; showPopup() (see the script below) creates and removes each
+         instance's own .popup-backdrop/.popup on demand, rather than static markup toggled by
+         class like the three popups this replaced. -->
+    <div class="popup-stack" id="popup-stack"></div>
+
     <script src="primitives.js"></script>
     <script>
       const params = new URLSearchParams(window.location.search);
       const projectPath = params.get("project") || "(unknown project)";
       const projectName = projectPath.split(/[\\/]/).pop() || projectPath;
-      document.getElementById("project-name").textContent = projectName;
       document.getElementById("status-project").textContent = projectName;
 
-      document.getElementById("back").addEventListener("click", () => {
+      const { invoke } = window.__TAURI__.core;
+      const { open: openDialog } = window.__TAURI__.dialog;
+      const { openUrl } = window.__TAURI__.opener;
+
+      // Plugin panel/viewer content is hosted on a real loopback HTTP origin, not a Tauri custom
+      // URI scheme — on Windows/WebView2, a sub-frame (iframe) navigation to a custom scheme
+      // silently never loads at all (confirmed directly: the Rust-side handler was never even
+      // invoked). A plain http://127.0.0.1:<port> origin has none of that baggage. The port is
+      // ephemeral (OS-assigned at app startup), fetched once here and cached.
+      let pluginAssetPortPromise = null;
+      function pluginAssetPort() {
+        if (!pluginAssetPortPromise) pluginAssetPortPromise = invoke("plugin_asset_port");
+        return pluginAssetPortPromise;
+      }
+      async function pluginAssetUrl(pluginId, relPath, fragment) {
+        const port = await pluginAssetPort();
+        return `http://127.0.0.1:${port}/${pluginId}/${relPath}${fragment ? `#${fragment}` : ""}`;
+      }
+
+      function openEditor(path) {
+        window.location.href = `editor.html?project=${encodeURIComponent(path)}`;
+      }
+
+      // ---------- Menu bar ----------
+      // Every top-bar dropdown shares the same open/close mechanics: click a trigger to open it
+      // (closing any other open menu first), click outside/Escape/pick an item to close it, and
+      // hovering a different trigger while one is already open switches to it (how a real menu bar
+      // behaves) rather than requiring a fresh click. The rail's account/settings flyouts and the
+      // console's "New Terminal With…" used to be part of this same MENU_IDS-driven list (each its
+      // own local .menu-dropdown) — they've moved to the shared .floating-menu overlay instead (see
+      // openMenuFromTrigger below), since all three sit near a window edge that a locally-anchored
+      // dropdown could run off of.
+      const MENU_IDS = ["file-menu", "edit-menu", "view-menu", "run-menu", "help-menu"];
+
+      function closeAllMenus() {
+        MENU_IDS.forEach((id) => {
+          document.getElementById(id).classList.remove("is-open");
+          document.getElementById(`${id}-trigger`).setAttribute("aria-expanded", "false");
+        });
+      }
+
+      MENU_IDS.forEach((id) => {
+        const menu = document.getElementById(id);
+        const trigger = document.getElementById(`${id}-trigger`);
+
+        trigger.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const opening = !menu.classList.contains("is-open");
+          closeAllMenus();
+          if (opening) {
+            menu.classList.add("is-open");
+            trigger.setAttribute("aria-expanded", "true");
+          }
+        });
+
+        trigger.addEventListener("mouseenter", () => {
+          const anyOpen = MENU_IDS.some((mid) => document.getElementById(mid).classList.contains("is-open"));
+          if (anyOpen && !menu.classList.contains("is-open")) {
+            closeAllMenus();
+            menu.classList.add("is-open");
+            trigger.setAttribute("aria-expanded", "true");
+          }
+        });
+      });
+
+      document.addEventListener("click", closeAllMenus);
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          closeAllMenus();
+          closeFloatingMenu();
+        }
+      });
+
+      document.querySelectorAll(".menu-dropdown-item:not(:disabled)").forEach((btn) => {
+        btn.addEventListener("click", closeAllMenus);
+      });
+
+      // ---------- Floating menu (shared overlay — see .floating-menu in primitives.css) ----------
+      // A menu rendered here is a sibling of every panel and every iframe (see the HTML above,
+      // right after .shell closes), so nothing can clip it and it isn't bound to any one trigger's
+      // local DOM position the way .menu-dropdown-list is — it's positioned and clamped to the real
+      // window on every open instead. Everything that used to be a local .menu-dropdown near a
+      // window edge (the rail's account/settings flyouts, the console's "New Terminal With…") now
+      // opens through this; a plugin's own content can ask for one too, via window.lowarc.showMenu
+      // (see the "showMenu" branch in the message listener below).
+      let floatingMenuResolve = null;
+
+      function closeFloatingMenu(result) {
+        if (!floatingMenuResolve) return;
+        const resolve = floatingMenuResolve;
+        floatingMenuResolve = null;
+        document.getElementById("floating-menu").classList.remove("is-open");
+        resolve(result === undefined ? null : result);
+      }
+
+      // Low-level: positions the shared #floating-menu-list at `anchor` ({x, y} in viewport
+      // coordinates, the corner it tries to open from — below-right by default, matching where
+      // .menu-dropdown-list used to open) and shows the overlay. Callers fill the list's content
+      // themselves first — shared by openMenuOverlay (action-menu items) and the notification
+      // bell's read-only history panel below, since the actual position/clamp/show mechanics are
+      // identical for both; only what's inside, and what happens on close, differs.
+      function showFloatingOverlay(anchor) {
+        const overlay = document.getElementById("floating-menu");
+        const list = document.getElementById("floating-menu-list");
+
+        // Positioned at the naive anchor first, then measured and clamped — the list has to
+        // actually exist in the DOM with real content before its own rendered size is knowable.
+        list.style.left = `${anchor.x}px`;
+        list.style.top = `${anchor.y}px`;
+        overlay.classList.add("is-open");
+
+        requestAnimationFrame(() => {
+          const rect = list.getBoundingClientRect();
+          const margin = 6;
+          let left = anchor.x;
+          let top = anchor.y;
+          if (left + rect.width > window.innerWidth - margin) left = Math.max(margin, window.innerWidth - margin - rect.width);
+          if (top + rect.height > window.innerHeight - margin) top = Math.max(margin, anchor.y - rect.height - (anchor.gap || 0));
+          if (left < margin) left = margin;
+          if (top < margin) top = margin;
+          list.style.left = `${left}px`;
+          list.style.top = `${top}px`;
+        });
+      }
+
+      // items: [{label, value, disabled}], a divider is {divider: true}. Returns a Promise
+      // resolving to the chosen item's value, or null if the menu was dismissed without a choice.
+      function openMenuOverlay(items, anchor) {
+        closeFloatingMenu();
+        return new Promise((resolve) => {
+          const list = document.getElementById("floating-menu-list");
+          list.innerHTML = "";
+          list.classList.remove("notif-panel-list");
+
+          for (const item of items) {
+            if (item.divider) {
+              const div = document.createElement("div");
+              div.className = "menu-dropdown-divider";
+              list.appendChild(div);
+              continue;
+            }
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "menu-dropdown-item";
+            btn.textContent = item.label;
+            btn.disabled = Boolean(item.disabled);
+            btn.addEventListener("click", (e) => {
+              e.stopPropagation();
+              closeFloatingMenu(item.value ?? null);
+            });
+            list.appendChild(btn);
+          }
+
+          floatingMenuResolve = resolve;
+          showFloatingOverlay(anchor);
+        });
+      }
+
+      // Convenience for a real trigger element — opens just below it, same default corner
+      // .menu-dropdown-list used to, minus the per-trigger CSS overrides that used to be needed
+      // for triggers near an edge (openMenuOverlay's own clamping replaces those).
+      function openMenuFromTrigger(triggerEl, items) {
+        const rect = triggerEl.getBoundingClientRect();
+        return openMenuOverlay(items, { x: rect.left, y: rect.bottom + 2, gap: rect.height + 4 });
+      }
+
+      // ---------- Popup (Base) ----------
+      // A "popups" slot in the shared registry (see primitives.js's contribute()/getSlot()), but
+      // unlike a persistent region (sidebar/inspector/console) it's a STACK, not a single mounted
+      // slot: showing one doesn't replace another, a popup can open a second one on top of it, and
+      // nothing about it persists — it exists only while shown. contribute("popups", {...}) just
+      // registers WHAT a popup is; showPopup(id, target) is what actually opens an instance, fresh,
+      // every call — never cached the way mountPanelIframe caches a region's iframe, since a popup
+      // has no reason to stay in the DOM once closed and a nested open of the same id needs its own
+      // independent instance.
+      //
+      // Deliberately reuses .popup-backdrop/.popup/.popup-header/.popup-body/.popup-actions from
+      // primitives.css as-is, but WITHOUT ever adding the "is-open" class primitives.js's own
+      // openPopup()/closePopup() toggle — primitives.js also has a document-level Escape listener
+      // keyed on ".popup-backdrop.is-open" (for the old, still-live-elsewhere-in-the-app static
+      // popup system), and this stack has its own Escape handling below; adding "is-open" here
+      // would make that old listener match these instances too and fight over closing them.
+      // Visibility here is a plain inline style.display instead.
+      const popupStack = [];
+      const POPUP_Z_FLOOR = 200; // above floating-menu (60) / toast-stack (100), below tooltip (300)
+
+      function topPopup() {
+        return popupStack.length ? popupStack[popupStack.length - 1] : null;
+      }
+
+      // contribution: { id, sourceType: "host" | "plugin", pluginId, title (string, or
+      // (target) => string for a title that depends on what showPopup() was called with), size (px
+      // width — omit for .popup's own CSS default), closeOnBackdrop (default true), closeOnEscape
+      // (default true), mount(container, ctx) }. mount receives the .popup element itself — already
+      // containing the header/title/X, the Base's own chrome — and appends whatever .popup-body/
+      // .popup-actions markup it needs, the same split every popup already used before this existed,
+      // just no longer hand-copied per instance. ctx = { close(result), target }.
+      //
+      // A plugin's own content is already safe if its mount() (really just its declared existence —
+      // no plugin contributes a popup yet) misbehaves, since nothing here calls INTO a plugin's
+      // iframe directly; a HOST contribution's mount() runs in this same script, though, so it's
+      // wrapped in try/catch below — the same reasoning already applied to markMounting a host
+      // sidebar panel, just newly relevant here since Popup didn't exist before.
+      function showPopup(id, target) {
+        const contribution = getSlot("popups").find((c) => c.id === id);
+        if (!contribution) return Promise.reject(new Error(`showPopup(): no popup contributed with id "${id}"`));
+
+        return new Promise((resolve) => {
+          const depth = popupStack.length;
+          const backdrop = document.createElement("div");
+          backdrop.className = "popup-backdrop";
+          backdrop.style.display = "flex";
+          backdrop.style.zIndex = String(POPUP_Z_FLOOR + depth * 10);
+
+          const box = document.createElement("div");
+          box.className = "popup";
+          if (contribution.size) box.style.width = `${contribution.size}px`;
+
+          const header = document.createElement("div");
+          header.className = "popup-header";
+          const h2 = document.createElement("h2");
+          h2.textContent = typeof contribution.title === "function" ? contribution.title(target) : contribution.title || "";
+          const closeBtn = document.createElement("button");
+          closeBtn.type = "button";
+          closeBtn.className = "popup-close";
+          closeBtn.dataset.tooltip = "Close";
+          closeBtn.setAttribute("aria-label", "Close");
+          closeBtn.innerHTML =
+            '<svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>';
+          header.appendChild(h2);
+          header.appendChild(closeBtn);
+          box.appendChild(header);
+          backdrop.appendChild(box);
+
+          const instance = { closeOnBackdrop: contribution.closeOnBackdrop !== false, closeOnEscape: contribution.closeOnEscape !== false };
+          let closed = false;
+          const close = (result) => {
+            if (closed) return;
+            closed = true;
+            const idx = popupStack.indexOf(instance);
+            if (idx !== -1) popupStack.splice(idx, 1);
+            backdrop.remove();
+            resolve(result === undefined ? null : result);
+          };
+          instance.close = close;
+
+          closeBtn.addEventListener("click", () => close(null));
+          backdrop.addEventListener("click", (e) => {
+            if (e.target === backdrop && instance.closeOnBackdrop) close(null);
+          });
+
+          try {
+            contribution.mount(box, { close, target });
+          } catch (err) {
+            const errorBody = document.createElement("div");
+            errorBody.className = "popup-body";
+            errorBody.style.color = "var(--danger)";
+            errorBody.textContent = `This popup failed to load: ${err}`;
+            box.appendChild(errorBody);
+            showToast({ variant: "error", message: `Popup "${id}" failed to render: ${err}`, source: contribution.pluginId || null });
+          }
+
+          document.getElementById("popup-stack").appendChild(backdrop);
+          popupStack.push(instance);
+          initTooltips(box);
+
+          const focusable = box.querySelector("input, textarea, select, button, [tabindex]");
+          if (focusable) focusable.focus();
+        });
+      }
+
+      // Only the TOP popup reacts to Escape — closeOnBackdrop/closeOnEscape are read independently
+      // per contribution rather than coupled, so a dialog that disables backdrop-click doesn't also
+      // lose its only other way out.
+      document.addEventListener("keydown", (e) => {
+        if (e.key !== "Escape") return;
+        const top = topPopup();
+        if (top && top.closeOnEscape) top.close(null);
+      });
+
+      // ---------- Popup contributions (host) ----------
+      // The three popups editor.html used to hand-author as static HTML + openPopup(id)/
+      // closePopup(id) (primitives.js's simple element-toggle pair — still used as-is by
+      // modules.html/plugins.html's own remove-confirm popups, out of scope for this migration).
+
+      contribute("popups", {
+        id: "new-project",
+        sourceType: "host",
+        title: "New project name",
+        size: 360,
+        mount(container, ctx) {
+          const body = document.createElement("div");
+          body.className = "popup-body";
+          const field = document.createElement("div");
+          field.className = "field";
+          const nameInput = document.createElement("input");
+          nameInput.className = "input";
+          nameInput.type = "text";
+          nameInput.placeholder = "my-game";
+          nameInput.autocomplete = "off";
+          field.appendChild(nameInput);
+          body.appendChild(field);
+          const errorEl = document.createElement("div");
+          errorEl.className = "field-hint";
+          errorEl.style.color = "var(--danger)";
+          errorEl.style.minHeight = "16px";
+          errorEl.style.marginTop = "6px";
+          body.appendChild(errorEl);
+          container.appendChild(body);
+
+          const actions = document.createElement("div");
+          actions.className = "popup-actions";
+          const cancelBtn = document.createElement("button");
+          cancelBtn.type = "button";
+          cancelBtn.className = "btn btn-md btn-ghost";
+          cancelBtn.textContent = "Cancel";
+          cancelBtn.addEventListener("click", () => ctx.close(null));
+          const createBtn = document.createElement("button");
+          createBtn.type = "button";
+          createBtn.className = "btn btn-md btn-confirm";
+          createBtn.textContent = "Create";
+          actions.appendChild(cancelBtn);
+          actions.appendChild(createBtn);
+          container.appendChild(actions);
+
+          const create = async () => {
+            try {
+              const path = await invoke("create_project", { parentDir: ctx.target.parentDir, name: nameInput.value });
+              ctx.close(path);
+            } catch (err) {
+              errorEl.textContent = String(err);
+            }
+          };
+          createBtn.addEventListener("click", create);
+          nameInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") create();
+          });
+        },
+      });
+
+      contribute("popups", {
+        id: "about",
+        sourceType: "host",
+        title: "About",
+        size: 320,
+        mount(container, ctx) {
+          const body = document.createElement("div");
+          body.className = "popup-body";
+          body.style.textAlign = "center";
+          body.style.padding = "8px 16px 20px";
+          const img = document.createElement("img");
+          img.src = "la-logo.svg";
+          img.alt = "";
+          img.style.height = "48px";
+          img.style.marginBottom = "12px";
+          body.appendChild(img);
+          const name = document.createElement("div");
+          name.style.fontSize = "15px";
+          name.style.fontWeight = "600";
+          name.textContent = "LowArc Studio";
+          body.appendChild(name);
+          const version = document.createElement("div");
+          version.className = "field-hint";
+          version.style.marginTop = "4px";
+          version.textContent = (ctx.target && ctx.target.version) || "";
+          body.appendChild(version);
+          container.appendChild(body);
+        },
+      });
+
+      // Shared by both in-editor managers (plugin, module) — only one is ever open at a time, and
+      // each call just passes its own nounSingular/name as target, so there's no reason for two
+      // near-identical contributions.
+      contribute("popups", {
+        id: "manager-remove",
+        sourceType: "host",
+        title: (target) => `Remove ${target.nounSingular}?`,
+        size: 340,
+        mount(container, ctx) {
+          const body = document.createElement("div");
+          body.className = "popup-body";
+          body.textContent = `This deletes "${ctx.target.name}" from disk. This can't be undone.`;
+          container.appendChild(body);
+
+          const actions = document.createElement("div");
+          actions.className = "popup-actions";
+          const cancelBtn = document.createElement("button");
+          cancelBtn.type = "button";
+          cancelBtn.className = "btn btn-md btn-ghost";
+          cancelBtn.textContent = "Cancel";
+          cancelBtn.addEventListener("click", () => ctx.close(false));
+          const removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.className = "btn btn-md btn-danger";
+          removeBtn.textContent = "Remove";
+          removeBtn.addEventListener("click", () => ctx.close(true));
+          actions.appendChild(cancelBtn);
+          actions.appendChild(removeBtn);
+          container.appendChild(actions);
+        },
+      });
+
+      // Gates closeFile() (see the tab-bar/open-files section below) on a real confirmation
+      // whenever the file being closed is dirty — target is just { title }, resolves true/false
+      // like manager-remove above.
+      contribute("popups", {
+        id: "confirm-close-dirty",
+        sourceType: "host",
+        title: "Unsaved changes",
+        size: 360,
+        mount(container, ctx) {
+          const body = document.createElement("div");
+          body.className = "popup-body";
+          body.textContent = `"${ctx.target.title}" has unsaved changes. Close it anyway?`;
+          container.appendChild(body);
+
+          const actions = document.createElement("div");
+          actions.className = "popup-actions";
+          const cancelBtn = document.createElement("button");
+          cancelBtn.type = "button";
+          cancelBtn.className = "btn btn-md btn-ghost";
+          cancelBtn.textContent = "Cancel";
+          cancelBtn.addEventListener("click", () => ctx.close(false));
+          const discardBtn = document.createElement("button");
+          discardBtn.type = "button";
+          discardBtn.className = "btn btn-md btn-danger";
+          discardBtn.textContent = "Close Anyway";
+          discardBtn.addEventListener("click", () => ctx.close(true));
+          actions.appendChild(cancelBtn);
+          actions.appendChild(discardBtn);
+          container.appendChild(actions);
+        },
+      });
+
+      // ---------- Notification bell ----------
+      // Reads the exact same history every showToast() call (host chrome's own, and any plugin's
+      // via window.lowarc.notify()) already feeds — see primitives.js's toast/notification-history
+      // section. This panel is read-only history, not an action menu, so it bypasses
+      // openMenuOverlay's items/resolve-a-value shape entirely and builds #floating-menu-list's
+      // content by hand instead, reusing only the low-level positioning (showFloatingOverlay).
+      let unreadNotifications = 0;
+
+      function updateBellBadge() {
+        document.getElementById("bell-badge").style.display = unreadNotifications > 0 ? "block" : "none";
+      }
+
+      function formatNotificationTime(ms) {
+        const diff = Date.now() - ms;
+        if (diff < 60000) return "just now";
+        if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+        if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+        return new Date(ms).toLocaleDateString();
+      }
+
+      function renderNotificationList(list) {
+        list.innerHTML = "";
+        const history = getNotificationHistory();
+
+        const header = document.createElement("div");
+        header.className = "notif-panel-header";
+        const title = document.createElement("span");
+        title.textContent = "Notifications";
+        header.appendChild(title);
+        if (history.length) {
+          const clearBtn = document.createElement("button");
+          clearBtn.type = "button";
+          clearBtn.className = "notif-panel-clear";
+          clearBtn.textContent = "Clear";
+          clearBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            clearNotificationHistory();
+            renderNotificationList(list);
+          });
+          header.appendChild(clearBtn);
+        }
+        list.appendChild(header);
+
+        if (!history.length) {
+          const empty = document.createElement("div");
+          empty.className = "notif-panel-empty";
+          empty.textContent = "No notifications yet.";
+          list.appendChild(empty);
+          return;
+        }
+
+        for (const entry of history) {
+          const row = document.createElement("div");
+          row.className = `notif-row toast-${entry.variant}`;
+
+          const icon = document.createElement("span");
+          icon.className = "toast-icon";
+          icon.innerHTML = `<svg viewBox="0 0 16 16" fill="none">${TOAST_ICON_PATHS[entry.variant] || TOAST_ICON_PATHS.info}</svg>`;
+          row.appendChild(icon);
+
+          const body = document.createElement("span");
+          body.className = "notif-row-body";
+          const message = document.createElement("span");
+          message.className = "notif-row-message";
+          message.textContent = entry.message;
+          body.appendChild(message);
+          const meta = document.createElement("span");
+          meta.className = "notif-row-meta";
+          meta.textContent = formatNotificationTime(entry.time) + (entry.source ? ` · ${entry.source}` : "");
+          body.appendChild(meta);
+          row.appendChild(body);
+
+          list.appendChild(row);
+        }
+      }
+
+      function openNotificationPanel(triggerEl) {
+        closeFloatingMenu();
+        const list = document.getElementById("floating-menu-list");
+        list.classList.add("notif-panel-list");
+        renderNotificationList(list);
+        floatingMenuResolve = () => {}; // nothing to resolve — dismissal alone is the only outcome
+
+        unreadNotifications = 0;
+        updateBellBadge();
+
+        const rect = triggerEl.getBoundingClientRect();
+        showFloatingOverlay({ x: rect.left, y: rect.bottom + 2, gap: rect.height + 4 });
+      }
+
+      onNotification(() => {
+        unreadNotifications++;
+        updateBellBadge();
+      });
+
+      document.getElementById("bell-trigger").addEventListener("click", (e) => {
+        e.stopPropagation();
+        openNotificationPanel(e.currentTarget);
+      });
+
+      document.getElementById("floating-menu").addEventListener("click", (e) => {
+        if (e.target.id === "floating-menu") closeFloatingMenu();
+      });
+
+      // Finds the <iframe> a given window belongs to — lets showMenu() (see the message listener
+      // below) translate a plugin's own local click coordinates into host/screen coordinates. Every
+      // plugin-hosted iframe (sidebar/inspector/console-tab panels AND open-file viewers, in either
+      // editor group) carries this same class, so one query covers all of them without a second map
+      // to keep in sync with mountPanelIframe/openFile/closeFile.
+      function iframeForWindow(win) {
+        for (const iframe of document.querySelectorAll("iframe.plugin-panel-frame")) {
+          if (iframe.contentWindow === win) return iframe;
+        }
+        return null;
+      }
+
+      document.getElementById("account-menu-trigger").addEventListener("click", (e) => {
+        e.stopPropagation();
+        openMenuFromTrigger(e.currentTarget, [
+          { label: "Not Signed In", disabled: true },
+          { divider: true },
+          { label: "Sign In…", disabled: true },
+        ]);
+      });
+
+      document.getElementById("settings-menu-trigger").addEventListener("click", (e) => {
+        e.stopPropagation();
+        openMenuFromTrigger(e.currentTarget, [
+          { label: "Settings", value: "settings" },
+          { label: "Appearance…", value: "appearance" },
+          { divider: true },
+          { label: "Check for Updates", disabled: true },
+        ]).then((value) => {
+          if (value === "settings") window.location.href = "settings.html";
+          else if (value === "appearance") window.location.href = "settings.html?tab=appearance";
+        });
+      });
+
+      // ---------- File menu ----------
+      document.getElementById("back-to-start").addEventListener("click", () => {
         window.location.href = "index.html";
       });
 
+      document.getElementById("file-modules-item").addEventListener("click", () => {
+        window.location.href = "modules.html";
+      });
+
+      document.getElementById("file-plugins-item").addEventListener("click", () => {
+        window.location.href = "plugins.html";
+      });
+
+      document.getElementById("exit-item").addEventListener("click", () => {
+        window.__TAURI__.window.getCurrentWindow().close();
+      });
+
+      document.getElementById("open-project-item").addEventListener("click", async () => {
+        const path = await openDialog({ directory: true, title: "Open a LowArc Studio project" });
+        if (!path) return;
+        try {
+          await invoke("open_project", { path });
+          openEditor(path);
+        } catch (err) {
+          showToast({ variant: "error", message: String(err) });
+        }
+      });
+
+      document.getElementById("new-project-item").addEventListener("click", async () => {
+        const parentDir = await openDialog({ directory: true, title: "Choose a folder for the new project" });
+        if (!parentDir) return;
+        const path = await showPopup("new-project", { parentDir });
+        if (path) openEditor(path);
+      });
+
+      // ---------- Edit menu ---------- (every item is disabled — nothing to route to yet)
+
+      // ---------- View menu ----------
+      document.getElementById("view-toggle-sidebar").addEventListener("click", () => togglePanel("sidebar"));
+      document.getElementById("view-toggle-console").addEventListener("click", () => togglePanel("console"));
+      document.getElementById("view-toggle-right").addEventListener("click", () => togglePanel("right"));
+
+      document.getElementById("view-appearance-item").addEventListener("click", () => {
+        window.location.href = "settings.html?tab=appearance";
+      });
+
+      document.getElementById("view-reload-item").addEventListener("click", () => {
+        window.location.reload();
+      });
+
+      document.getElementById("view-fullscreen-item").addEventListener("click", async () => {
+        const appWindow = window.__TAURI__.window.getCurrentWindow();
+        const isFullscreen = await appWindow.isFullscreen();
+        await appWindow.setFullscreen(!isFullscreen);
+      });
+
+      // ---------- Run menu ----------
+      document.getElementById("run-menu-run").addEventListener("click", startRun);
+      document.getElementById("run-menu-set-entry").addEventListener("click", pickAndSetEntry);
+
+      document.getElementById("dev-run-settings-item").addEventListener("click", () => {
+        window.location.href = "settings.html";
+      });
+
+      // ---------- Help menu ----------
+      document.getElementById("help-docs-item").addEventListener("click", () => {
+        openUrl("https://lowarc.com");
+      });
+
+      // Looks like a searchbar, isn't one — same as VS Code's own Command Center, it's a button
+      // that opens a separate overlay rather than something you type into in place. Nothing to
+      // search yet (no open files, no registered commands), so there's no overlay to open either.
+      document.getElementById("command-center-btn").addEventListener("click", () => {
+        showToast({ variant: "info", message: "Command palette isn't wired up yet." });
+      });
+
+      document.getElementById("help-about-item").addEventListener("click", async () => {
+        let version = "";
+        try {
+          version = `Version ${await window.__TAURI__.app.getVersion()}`;
+        } catch (err) {
+          version = "";
+        }
+        showPopup("about", { version });
+      });
+
       initTooltips();
+      initWindowControls();
+      initTabs();
 
-      // ---------- Panel content (placeholder only — real content is 100% plugin territory) ----------
+      // Drag-to-reorder — see initReorderable() in primitives.js. Only these four strips opt in
+      // (data-reorderable, set on each one's own markup); everything else (the top menu bar, a
+      // standalone page's view tabs) is untouched. Safe to call before any of their items exist —
+      // the listeners are delegated on the container itself, not attached per-item.
+      initReorderable(document.getElementById("rail-tabs"), { axis: "y", onReorder: (order) => saveTabOrder("rail-tabs", order) });
+      // Each group names the OTHER as its crossContainer, so a file tab can be dragged freely
+      // between them — see initReorderable's crossContainer/onMoveAcross in primitives.js.
+      // moveFileToGroup isn't defined yet at this point in the script, but neither closure below
+      // calls it until an actual cross-drag completes, by which point it is (function declarations
+      // are hoisted, and this only ever fires from later user interaction, never synchronously here).
+      initReorderable(document.getElementById("tab-bar-tabs-0"), {
+        axis: "x",
+        crossContainer: document.getElementById("tab-bar-tabs-1"),
+        crossZone: document.getElementById("editor-group-1"),
+        onReorder: (order) => saveTabOrder("tab-bar-tabs-0", order),
+        onMoveAcross: (path) => moveFileToGroup(path, 1),
+      });
+      initReorderable(document.getElementById("tab-bar-tabs-1"), {
+        axis: "x",
+        crossContainer: document.getElementById("tab-bar-tabs-0"),
+        crossZone: document.getElementById("editor-group-0"),
+        onReorder: (order) => saveTabOrder("tab-bar-tabs-1", order),
+        onMoveAcross: (path) => moveFileToGroup(path, 0),
+      });
+      initReorderable(document.getElementById("console-tabs"), { axis: "x", onReorder: (order) => saveTabOrder("console-tabs", order) });
 
-      const LEFT_PANEL_CONTENT = {
-        explorer: { title: "Explorer", note: "File tree isn't built yet — and won't be built here at all. Every rail icon and everything it shows is a plugin's panel; the app only hosts them." },
-        search: { title: "Search", note: "A plugin's job, not the app's." },
-        plugins: { title: "Plugins", note: "Installed plugins that contribute a rail icon will list here." },
-      };
+      // ---------- Transport controls (Run/Pause/Stop) ----------
+      // Real now: Run calls start_dev_run, Stop calls stop_dev_run, and dev-run-log/dev-run-ended
+      // (see lib.rs) feed the console's Run tab. isRunning is authoritative from dev-run-ended,
+      // not just set optimistically on click — a run can end on its own, not only via Stop.
+      // Pause has no backend counterpart at all (the runtime has no pause concept, just
+      // start/frame/stop) so it stays a toast — there's nothing dishonest to wire it to.
+      let isRunning = false;
 
-      function showLeftPanelContent(key) {
-        const content = LEFT_PANEL_CONTENT[key];
-        if (!content) return;
-        document.getElementById("left-panel-title").textContent = content.title;
-        document.getElementById("left-panel-body").innerHTML = "";
-        const note = document.createElement("p");
-        note.className = "placeholder-note";
-        note.textContent = content.note;
-        document.getElementById("left-panel-body").appendChild(note);
+      function updateTransportButtons() {
+        const runBtn = document.getElementById("run-btn");
+        const pauseBtn = document.getElementById("pause-btn");
+        const stopBtn = document.getElementById("stop-btn");
+
+        runBtn.classList.toggle("btn-main", !isRunning);
+        runBtn.classList.toggle("btn-ghost", isRunning);
+        runBtn.disabled = isRunning;
+
+        pauseBtn.classList.toggle("btn-warning", isRunning);
+        pauseBtn.classList.toggle("btn-ghost", !isRunning);
+        pauseBtn.disabled = !isRunning;
+
+        stopBtn.classList.toggle("btn-danger", isRunning);
+        stopBtn.classList.toggle("btn-ghost", !isRunning);
+        stopBtn.disabled = !isRunning;
       }
 
-      const CONSOLE_CONTENT = {
-        console: "Nothing here yet — and what runs here is also plugin territory (module logs, code logs, a real terminal). The app just hosts the tab strip and the panel.",
-        terminal: "A real terminal will host here eventually — what runs inside it is plugin territory too.",
-      };
+      // Opens the native file picker for the project's entry file and persists whatever gets
+      // picked. Shared by the menu item (change it any time) and ensureEntrySet (prompt only when
+      // Run actually needs one) — both just need "ask, save, tell the user", nothing else differs.
+      async function pickAndSetEntry() {
+        const picked = await openDialog({ title: "Choose the project's entry file", defaultPath: projectPath });
+        if (!picked) return null;
+        try {
+          const entry = await invoke("set_project_entry", { projectDir: projectPath, absoluteEntryPath: picked });
+          showToast({ variant: "success", message: `Entry file set to ${entry}.` });
+          return entry;
+        } catch (err) {
+          showToast({ variant: "error", message: String(err) });
+          return null;
+        }
+      }
 
-      document.getElementById("console-tabs").addEventListener("tab-change", (e) => {
-        const text = CONSOLE_CONTENT[e.detail.value];
-        if (text === undefined) return;
-        document.getElementById("console-body").textContent = text;
+      // Returns a project-relative entry path that's actually there on disk, prompting the picker
+      // if none is set yet or if the one that was set has since moved/been deleted — same dialog
+      // either way, since from the user's side "never set" and "no longer valid" look identical.
+      async function ensureEntrySet(preset) {
+        let entry = preset.entry && preset.entry.trim() ? preset.entry.trim() : null;
+        if (entry && !(await invoke("entry_file_exists", { projectDir: projectPath, entry }))) {
+          entry = null;
+        }
+        return entry || pickAndSetEntry();
+      }
+
+      async function startRun() {
+        if (isRunning) return;
+
+        let preset;
+        try {
+          preset = await invoke("get_project_preset", { projectDir: projectPath });
+        } catch (err) {
+          showToast({ variant: "error", message: String(err) });
+          return;
+        }
+
+        const entry = await ensureEntrySet(preset);
+        if (!entry) return; // picker was cancelled, or setting it failed (already toasted)
+
+        try {
+          await invoke("start_dev_run", { entryFile: entry, projectDir: projectPath });
+        } catch (err) {
+          showToast({ variant: "error", message: String(err) });
+          return;
+        }
+
+        isRunning = true;
+        updateTransportButtons();
+        appendConsoleLine("info", `Run started (entry: ${entry}).`);
+        activateConsoleTab("__run");
+        setPanelOpen("console", true);
+      }
+
+      function stopRun() {
+        invoke("stop_dev_run").catch((err) => showToast({ variant: "error", message: String(err) }));
+      }
+
+      document.getElementById("run-btn").addEventListener("click", startRun);
+      document.getElementById("stop-btn").addEventListener("click", stopRun);
+      document.getElementById("pause-btn").addEventListener("click", () => {
+        showToast({ variant: "info", message: "Pausing isn't something the runtime can do — it only has start/stop." });
       });
 
-      document.getElementById("run-btn").addEventListener("click", () => {
-        showToast({ variant: "info", message: "Dev-run isn't wired up to this screen yet." });
+      window.__TAURI__.event.listen("dev-run-log", (event) => {
+        appendConsoleLine(event.payload.level, event.payload.message);
       });
+
+      window.__TAURI__.event.listen("dev-run-ended", (event) => {
+        isRunning = false;
+        updateTransportButtons();
+        if (event.payload.ok) {
+          appendConsoleLine("info", "Run ended.");
+        } else {
+          (event.payload.errors || []).forEach((e) => appendConsoleLine("error", e));
+          showToast({ variant: "error", message: "Run failed — see the Run tab." });
+        }
+      });
+
+      // Plugin log lines share the same Run tab — one place to look for anything the app or
+      // an installed plugin has to say, rather than needing per-plugin console real estate for it.
+      window.__TAURI__.event.listen("plugin-log", (event) => {
+        appendConsoleLine(event.payload.level, event.payload.message);
+      });
+
+      updateTransportButtons();
 
       // ---------- Unified panel state ----------
       // One place tracking each resizable panel's open/closed flag and its remembered size, so
-      // the close (X) button, the header toggle icon, the rail's collapse-on-reclick, and dragging
-      // the divider past its minimum all stay in sync instead of four separate ad-hoc mechanisms.
+      // the close (X) button, the header toggle icon, and dragging the divider past its minimum
+      // all stay in sync instead of three separate ad-hoc mechanisms. Persisted globally in
+      // settings.json's editorPanels (loaded below, saved on every toggle/close and on drag-end —
+      // never on every drag tick, see initDividerDrag's onUp).
 
       const shell = document.getElementById("shell");
 
+      // min/closeAt are shared across all three panels on purpose — different thresholds per
+      // panel read as visually inconsistent (a sidebar and an inspector at different minimum
+      // widths looks like a mistake, not a design choice).
       const PANELS = {
-        sidebar: { open: true, size: 240, min: 120, max: 560, cssVar: "--sidebar-width", dataAttr: "sidebarOpen" },
-        right: { open: true, size: 260, min: 160, max: 560, cssVar: "--right-width", dataAttr: "rightOpen" },
-        console: { open: true, size: 220, min: 80, max: 640, cssVar: "--console-height", dataAttr: "consoleOpen" },
+        sidebar: { open: false, size: 240, min: 160, closeAt: 50, max: 560, cssVar: "--sidebar-width", dataAttr: "sidebarOpen" },
+        right: { open: false, size: 260, min: 160, closeAt: 50, max: 560, cssVar: "--right-width", dataAttr: "rightOpen" },
+        console: { open: false, size: 220, min: 160, closeAt: 50, max: 640, cssVar: "--console-height", dataAttr: "consoleOpen" },
       };
+
+      // Split-editor state lives outside PANELS on purpose — it isn't a grid-track toggle (no
+      // cssVar/dataAttr, doesn't collapse to 0 on close), it's a flex ratio *inside* the "center"
+      // grid area. See the Tab bar/open files section below for the group machinery this drives.
+      let splitOpen = false;
+      let splitRatio = 0.5;
 
       function applyPanel(key) {
         const p = PANELS[key];
@@ -572,10 +1973,87 @@
         shell.dataset[p.dataAttr] = p.open ? "true" : "false";
       }
 
+      // Read-modify-write helper — every save* function below goes through this rather than
+      // spreading the cached loadedSettings directly. Real bug hit and fixed live: set_plugin_
+      // enabled/set_module_enabled/install_*/remove_* all write Settings straight from a *fresh*
+      // settings::load() on the Rust side, without loadedSettings (a plain JS variable, never
+      // pushed to from those other commands) ever finding out — so a later save*() spreading the
+      // stale cache would silently clobber whatever one of those had just written. Concretely:
+      // toggling Terminal's Enabled checkbox back on in the plugin manager, then later dragging a
+      // rail icon (triggering saveTabOrder), re-disabled Terminal — the drag's own save spread a
+      // loadedSettings snapshot captured before the enable toggle. Always re-fetching here instead
+      // of trusting the cache costs one extra IPC round-trip per save (infrequent, user-initiated
+      // actions, not a hot path) and closes the whole class of bug at once rather than patching
+      // each caller that happens to race with one of those other commands.
+      let loadedSettings = null;
+      let restoredSidebarActiveKey = null;
+
+      // buildPatch is either a plain object (merged as-is) or a function receiving the just-
+      // fetched fresh settings and returning the patch to merge — the function form is for a
+      // caller that needs to merge against a sub-object (tabOrder) rather than replace it wholesale,
+      // so two different containers' saves in quick succession don't stomp on each other either.
+      async function updateSettings(buildPatch) {
+        const fresh = await invoke("get_settings");
+        const patch = typeof buildPatch === "function" ? buildPatch(fresh) : buildPatch;
+        const settings = { ...fresh, ...patch };
+        await invoke("save_settings", { settings });
+        loadedSettings = settings;
+        return settings;
+      }
+
+      async function savePanelLayout() {
+        try {
+          await updateSettings({
+            editorPanels: {
+              sidebarOpen: PANELS.sidebar.open,
+              sidebarSize: PANELS.sidebar.size,
+              sidebarActiveKey: document.querySelector("#rail-tabs .sidebar-tab.is-active")?.dataset.tabValue || null,
+              rightOpen: PANELS.right.open,
+              rightSize: PANELS.right.size,
+              consoleOpen: PANELS.console.open,
+              consoleSize: PANELS.console.size,
+              splitOpen,
+              splitRatio,
+            },
+          });
+        } catch (err) {
+          showToast({ variant: "error", message: String(err) });
+        }
+      }
+
+      // ---------- Reorderable tab/rail strip order (Settings.tabOrder) ----------
+      // containerId is the strip's own DOM id ("rail-tabs", "tab-bar-tabs-0", "console-tabs").
+      async function saveTabOrder(containerId, order) {
+        try {
+          await updateSettings((fresh) => ({ tabOrder: { ...fresh.tabOrder, [containerId]: order } }));
+        } catch (err) {
+          showToast({ variant: "error", message: String(err) });
+        }
+      }
+
+      // Applies a saved order to whatever's already in the DOM — called once per renderTabStrip()
+      // call (see there), whether that strip is built once and never re-rendered (the rail, the
+      // console tabs) or rebuilt on every change (the file tab bars, whose contribution order
+      // otherwise reverts to plain open-order — natural registry insertion order — on the very
+      // next status change after a drag). anchorEl, if given, is a trailing non-item child items
+      // must stay before (the console's tabs-spacer, ahead of its own "+"/"..." controls) —
+      // container.insertBefore(el, null) already behaves like appendChild, so omitting it for the
+      // rail/file-tab-bar case (nothing trails there) needs no special case.
+      function applySavedOrder(container, itemSelector, keyAttr, anchorEl) {
+        const order = loadedSettings?.tabOrder?.[container.id];
+        if (!order || !order.length) return;
+        const byKey = new Map(Array.from(container.querySelectorAll(itemSelector)).map((el) => [el.dataset[keyAttr], el]));
+        for (const key of order) {
+          const el = byKey.get(key);
+          if (el) container.insertBefore(el, anchorEl || null);
+        }
+      }
+
       function setPanelOpen(key, open) {
         PANELS[key].open = open;
         applyPanel(key);
         syncToggleUI();
+        savePanelLayout();
       }
 
       function togglePanel(key) {
@@ -592,44 +2070,1370 @@
       document.getElementById("toggle-console").addEventListener("click", () => togglePanel("console"));
       document.getElementById("toggle-right").addEventListener("click", () => togglePanel("right"));
 
-      // ---------- Rail: switches the left panel, and closes the sidebar on a re-click of the
-      // already-active icon (VS Code's own activity-bar behavior) rather than being a plain
-      // single-select tab strip. ----------
+      async function loadPanelLayout() {
+        try {
+          loadedSettings = await invoke("get_settings");
+          const ep = loadedSettings.editorPanels;
+          if (ep) {
+            PANELS.sidebar.open = ep.sidebarOpen;
+            PANELS.sidebar.size = ep.sidebarSize;
+            restoredSidebarActiveKey = ep.sidebarActiveKey || null;
+            PANELS.right.open = ep.rightOpen;
+            PANELS.right.size = ep.rightSize;
+            PANELS.console.open = ep.consoleOpen;
+            PANELS.console.size = ep.consoleSize;
+            splitOpen = Boolean(ep.splitOpen);
+            splitRatio = typeof ep.splitRatio === "number" ? ep.splitRatio : 0.5;
+          }
+        } catch (err) {
+          showToast({ variant: "error", message: String(err) });
+        }
+        applyPanel("sidebar");
+        applyPanel("right");
+        applyPanel("console");
+        syncToggleUI();
+        // Split has no mounted files to restore (open files never persist across restart, split
+        // or not — see the Tab bar/open files section), just the layout shell itself: whether the
+        // second group is visible, and at what width.
+        document.getElementById("center-panel").classList.toggle("is-split", splitOpen);
+        document.getElementById("toggle-split").classList.toggle("is-active", splitOpen);
+        applySplitRatio();
+      }
 
-      const rail = document.getElementById("rail");
-      let activeRailPanel = "explorer";
+      loadPanelLayout();
 
-      rail.querySelectorAll(".rail-item").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const panel = btn.dataset.panel;
+      // ---------- Plugin UI hosting ----------
+      // A plugin declares its panels statically (PluginDescriptor.contributes, read at scan time
+      // by list_installed_plugins) — the shell builds rail icons/console tabs straight from that,
+      // eagerly, whether or not the plugin has actually finished starting yet. Panel *content*
+      // (the iframe) is mounted lazily, the first time it's actually shown — the plugin process is
+      // already started at app launch (setup() in lib.rs) by the time anyone could click a rail
+      // icon, so there's no real need to gate on the live registerPanel confirmation as well; that
+      // event is still listened for below, just for visibility/logging rather than as a gate.
+      //
+      // pluginPanels: "pluginId::panelId" -> { pluginId, panel: {id,title,entry,...}, iframe }
+      // windowToPlugin: an iframe's contentWindow -> pluginId, so the message-relay listener below
+      // can trust *which* plugin a postMessage actually came from instead of the message's own
+      // (self-reported, therefore untrustworthy) claim. Open-file viewer iframes (see the
+      // tab-bar/open-files block further down) register in this same map — one trust mechanism,
+      // shared by both kinds of plugin-hosted iframe.
+      const pluginPanels = new Map();
+      const windowToPlugin = new Map();
 
-          if (panel === activeRailPanel && PANELS.sidebar.open) {
-            setPanelOpen("sidebar", false);
+      function panelKey(pluginId, panelId) {
+        return `${pluginId}::${panelId}`;
+      }
+
+      function mountPanelIframe(key, container) {
+        const entry = pluginPanels.get(key);
+        if (!entry) return null;
+        if (!entry.iframe) {
+          const iframe = document.createElement("iframe");
+          iframe.className = "plugin-panel-frame";
+          iframe.setAttribute("sandbox", "allow-scripts");
+          container.appendChild(iframe);
+          entry.iframe = iframe;
+          windowToPlugin.set(iframe.contentWindow, entry.pluginId);
+          // Session-mode plugins (Terminal, so far — plugin.json's "session": true) start their
+          // own sessions on demand (window.lowarc.startSession(), see plugin_session.rs) — one
+          // per instance it wants running, not one the host auto-starts at mount time. Terminal
+          // requests its first instance itself, the moment its own script runs, the exact same
+          // way it requests every instance after that.
+          // A panel has no filesystem access of its own, so if it needs to know the project root
+          // (a file explorer does; most panels won't care) it's a URL fragment, not a postMessage
+          // pushed after load (synchronous and readable the instant the plugin's own script
+          // starts — no push-arrival-timing race to get wrong). Src is assigned once the
+          // (cached, near-instant) plugin asset port is known — callers here get the iframe
+          // element back synchronously to toggle classes on; they don't need the navigation
+          // itself to have started yet.
+          pluginAssetUrl(entry.pluginId, entry.panel.entry, `project=${encodeURIComponent(projectPath)}`).then((url) => {
+            iframe.src = url;
+          });
+          // So a freshly-mounted panel (the file explorer, most importantly) gets the current
+          // dirty/error/missing snapshot right away instead of waiting for the next change.
+          iframe.addEventListener("load", () => broadcastFileStatus());
+        }
+        return entry.iframe;
+      }
+
+      // Generalizes what showSidebarPanel used to be into something any tab-strip region can use
+      // (console joins in Phase 4) — shows contribution `id` from `slot` inside the element with id
+      // `containerId`, mounting it (once, ever — cached below, regardless of source) the first time
+      // it's actually shown. Host and plugin content are treated identically here: every
+      // contribution gets the same reused per-tab wrapper (.host-panel-frame's existing show/hide
+      // convention — flex column, 100%/100%, toggled via .is-active — not a new class just for
+      // this), and mount(el) is free to build whatever it wants inside it, including delegating
+      // straight to mountPanelIframe() the way a plugin adapter's mount() does; a plain iframe as
+      // that wrapper's sole flex child fills it exactly the same as a host panel's own toolbar+list
+      // markup does today.
+      const slotTabMounted = new Map(); // "slot::id" -> the wrapper element already mounted for it
+
+      function showSlotTab(slot, containerId, id) {
+        const container = document.getElementById(containerId);
+        container.classList.add("hosts-plugin");
+        // Only the per-tab WRAPPER's own is-active is cleared here — never a mounted plugin
+        // iframe's own .plugin-panel-frame.is-active nested inside one, which mount() sets exactly
+        // once and never touches again (see the wrapper comment above). Clearing it here too would
+        // un-set it permanently, since nothing would ever re-add it on a later show (mount() only
+        // runs the first time) — the panel would come back empty on the second visit.
+        container.querySelectorAll(".host-panel-frame").forEach((f) => f.classList.remove("is-active"));
+
+        const contribution = getSlot(slot).find((c) => c.id === id);
+        if (!contribution) return;
+
+        const mountKey = `${slot}::${id}`;
+        let el = slotTabMounted.get(mountKey);
+        if (!el) {
+          el = document.createElement("div");
+          el.className = "host-panel-frame";
+          container.appendChild(el);
+          try {
+            contribution.mount(el);
+          } catch (err) {
+            const errorEl = document.createElement("div");
+            errorEl.style.color = "var(--danger)";
+            errorEl.style.padding = "12px";
+            errorEl.textContent = `This panel failed to load: ${err}`;
+            el.appendChild(errorEl);
+            showToast({ variant: "error", message: `"${id}" failed to render: ${err}`, source: contribution.pluginId || null });
+          }
+          slotTabMounted.set(mountKey, el);
+        }
+        el.classList.add("is-active");
+        if (contribution.onShow) contribution.onShow();
+      }
+
+      // ---------- In-editor managers (host sidebar panels: __module-manager, __plugin-manager) ---
+      // A quality-of-life alternative to the standalone Modules/Plugins pages (see file-modules-item/
+      // file-plugins-item below) that never leaves the editor — deliberately separate surfaces, not
+      // one replacing the other (Nolan: "those will be separate things"). Both wrap the exact same
+      // Tauri commands the standalone pages already use — nothing new on the backend, just a
+      // narrower-sidebar-shaped front end (single-column accordion instead of those pages' wide
+      // two-pane list+detail layout, which needs more width than the sidebar's 240px default has).
+      // One factory instead of two near-duplicate blocks, since a module manager and a plugin
+      // manager are the same shape apart from which commands they call and which extra fields a
+      // row shows — config.extraFields(item) is the only part that actually differs between them.
+      function createManagerPanel(config) {
+        const CHEVRON_SVG = '<svg viewBox="0 0 10 10" fill="none"><path d="M3 1l4 4-4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        const CHECK_SVG = '<svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>';
+
+        let items = [];
+        let expandedId = null;
+        let listEl = null;
+
+        async function load() {
+          try {
+            items = await invoke(config.listCommand);
+          } catch (err) {
+            showToast({ variant: "error", message: String(err) });
+            items = [];
+          }
+          if (!items.some((i) => i.id === expandedId)) expandedId = null;
+          render();
+        }
+
+        function render() {
+          listEl.innerHTML = "";
+          if (items.length === 0) {
+            const empty = document.createElement("div");
+            empty.className = "plugin-manager-empty";
+            empty.textContent = `No ${config.nounPlural} installed.`;
+            listEl.appendChild(empty);
             return;
           }
+          for (const item of items) listEl.appendChild(renderRow(item));
+        }
 
-          rail.querySelectorAll(".rail-item").forEach((b) => b.classList.remove("is-active"));
-          btn.classList.add("is-active");
-          activeRailPanel = panel;
-          showLeftPanelContent(panel);
-          setPanelOpen("sidebar", true);
+        function renderRow(item) {
+          const row = document.createElement("div");
+          row.className = "plugin-manager-row";
+
+          const header = document.createElement("button");
+          header.type = "button";
+          header.className = "plugin-manager-row-header";
+
+          const dot = document.createElement("span");
+          dot.className = "status-dot" + (item.disabled ? "" : " is-enabled");
+          dot.dataset.tooltip = item.disabled ? "Disabled" : "Enabled";
+          header.appendChild(dot);
+
+          const name = document.createElement("span");
+          name.className = "plugin-manager-row-name";
+          name.textContent = item.name;
+          header.appendChild(name);
+
+          const chevron = document.createElement("span");
+          chevron.className = "plugin-manager-row-chevron" + (expandedId === item.id ? " expanded" : "");
+          chevron.innerHTML = CHEVRON_SVG;
+          header.appendChild(chevron);
+
+          header.addEventListener("click", () => {
+            expandedId = expandedId === item.id ? null : item.id;
+            render();
+          });
+          row.appendChild(header);
+
+          if (expandedId === item.id) row.appendChild(renderRowBody(item));
+          return row;
+        }
+
+        function renderRowBody(item) {
+          const body = document.createElement("div");
+          body.className = "plugin-manager-row-body";
+
+          const sub = document.createElement("div");
+          sub.className = "plugin-manager-row-sub";
+          sub.textContent = item.id + (item.version ? ` · v${item.version}` : "");
+          body.appendChild(sub);
+
+          for (const field of config.extraFields(item)) {
+            const fieldEl = document.createElement("div");
+            fieldEl.className = "plugin-manager-row-desc";
+            fieldEl.textContent = field.label ? `${field.label}: ${field.value}` : field.value;
+            body.appendChild(fieldEl);
+          }
+
+          const actions = document.createElement("div");
+          actions.className = "plugin-manager-row-actions";
+
+          const enabledLabel = document.createElement("label");
+          enabledLabel.className = "checkbox-row";
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.checked = !item.disabled;
+          const box = document.createElement("span");
+          box.className = "checkbox-box";
+          box.innerHTML = CHECK_SVG;
+          const enabledText = document.createElement("span");
+          enabledText.textContent = "Enabled";
+          enabledLabel.appendChild(checkbox);
+          enabledLabel.appendChild(box);
+          enabledLabel.appendChild(enabledText);
+          checkbox.addEventListener("change", async () => {
+            try {
+              await invoke(config.enableCommand, { id: item.id, enabled: checkbox.checked });
+              await load();
+            } catch (err) {
+              showToast({ variant: "error", message: String(err) });
+            }
+          });
+          actions.appendChild(enabledLabel);
+
+          const removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.className = "btn btn-xs btn-danger";
+          removeBtn.textContent = "Remove";
+          removeBtn.addEventListener("click", async () => {
+            const confirmed = await showPopup("manager-remove", { nounSingular: config.nounSingular, name: item.name });
+            if (!confirmed) return;
+            try {
+              await invoke(config.removeCommand, { id: item.id });
+              expandedId = null;
+              await load();
+            } catch (err) {
+              showToast({ variant: "error", message: String(err) });
+            }
+          });
+          actions.appendChild(removeBtn);
+
+          body.appendChild(actions);
+          return body;
+        }
+
+        function mount(el) {
+          const toolbar = document.createElement("div");
+          toolbar.className = "plugin-manager-toolbar";
+          const addBtn = document.createElement("button");
+          addBtn.type = "button";
+          addBtn.className = "btn btn-sm btn-outline";
+          addBtn.innerHTML = `<svg viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg> Add ${config.nounSingular}…`;
+          addBtn.addEventListener("click", async () => {
+            const sourceDir = await openDialog({ directory: true, title: `Choose a ${config.nounSingular.toLowerCase()} folder to install` });
+            if (!sourceDir) return;
+            try {
+              const id = await invoke(config.installCommand, { sourceDir });
+              showToast({ variant: "success", message: `Installed "${id}".` });
+              expandedId = id;
+              await load();
+            } catch (err) {
+              showToast({ variant: "error", message: String(err) });
+            }
+          });
+          toolbar.appendChild(addBtn);
+          el.appendChild(toolbar);
+
+          listEl = document.createElement("div");
+          listEl.className = "plugin-manager-list";
+          el.appendChild(listEl);
+
+          initTooltips();
+        }
+
+        return { mount, onShow: load };
+      }
+
+      // Keyed with no "::" so a reserved id can never collide with panelKey()'s "pluginId::panelId"
+      // shape. order is negative so both managers sort ahead of any plugin-contributed icon (which
+      // defaults to order 0) regardless of how many plugins are installed — matching the fixed
+      // "Modules, then Plugins, then everything else" position this HTML used to hard-code.
+      const pluginManagerPanel = createManagerPanel({
+        listCommand: "list_installed_plugins",
+        enableCommand: "set_plugin_enabled",
+        removeCommand: "remove_plugin",
+        installCommand: "install_plugin",
+        nounSingular: "Plugin",
+        nounPlural: "plugins",
+        extraFields: (item) => [{ value: item.description || "No description." }, { label: "Command", value: item.command }],
+      });
+      contribute("sidebar", {
+        id: "__plugin-manager",
+        sourceType: "host",
+        label: "Plugins",
+        order: -10,
+        iconHtml:
+          '<svg viewBox="0 0 16 16" fill="none"><path d="M5.5 2v3M10.5 2v3M4 5h8v2a4 4 0 0 1-4 4 4 4 0 0 1-4-4V5Z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" /><path d="M8 11v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" /></svg>',
+        mount: pluginManagerPanel.mount,
+        onShow: pluginManagerPanel.onShow,
+      });
+
+      const moduleManagerPanel = createManagerPanel({
+        listCommand: "list_installed_modules",
+        enableCommand: "set_module_enabled",
+        removeCommand: "remove_module",
+        installCommand: "install_module",
+        nounSingular: "Module",
+        nounPlural: "modules",
+        extraFields: (item) => [
+          { value: item.description || "No description." },
+          { label: "Load order", value: String(item.loadOrder) },
+          { label: "Requires", value: item.requires.length ? item.requires.join(", ") : "Nothing." },
+        ],
+      });
+      contribute("sidebar", {
+        id: "__module-manager",
+        sourceType: "host",
+        label: "Modules",
+        order: -20,
+        iconHtml:
+          '<svg viewBox="0 0 16 16" fill="none"><path d="M8 2l5.5 3.2v5.6L8 14l-5.5-3.2V5.2L8 2Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" /><path d="M8 8v6M8 8L2.5 4.8M8 8l5.5-3.2" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" /></svg>',
+        mount: moduleManagerPanel.mount,
+        onShow: moduleManagerPanel.onShow,
+      });
+
+      const FALLBACK_RAIL_ICON_SVG = '<svg viewBox="0 0 16 16" fill="none"><rect x="3" y="3" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.3" /></svg>';
+
+      // Strips anything that could execute if this SVG ends up in the HOST's own document (the
+      // rail lives in editor.html itself, not a sandboxed iframe — unlike a plugin's panel
+      // content, this has real Tauri access, so a plugin-supplied icon can't be trusted blindly).
+      // innerHTML already never runs a <script> tag it inserts, but inline event-handler
+      // attributes (onclick=, etc.) DO fire — those are the actual thing this strips.
+      function sanitizeSvg(root) {
+        root.querySelectorAll("script").forEach((el) => el.remove());
+        root.querySelectorAll("*").forEach((el) => {
+          for (const attr of Array.from(el.attributes)) {
+            const name = attr.name.toLowerCase();
+            if (name.startsWith("on") || (name === "href" && attr.value.trim().toLowerCase().startsWith("javascript:"))) {
+              el.removeAttribute(attr.name);
+            }
+          }
+        });
+      }
+
+      // Fetched as raw text over IPC (read_plugin_asset) rather than used as an <img src="..."> —
+      // inlining it as a real <svg> lets it inherit currentColor for free, the same as the
+      // fallback icon already does, which a rasterized <img> never could.
+      async function loadRailIconSvg(pluginId, railIcon) {
+        try {
+          const text = await invoke("read_plugin_asset", { pluginId, relPath: railIcon });
+          const doc = new DOMParser().parseFromString(text, "image/svg+xml");
+          if (doc.querySelector("parsererror")) return null;
+          const svg = doc.querySelector("svg");
+          if (!svg) return null;
+          sanitizeSvg(svg);
+          return svg;
+        } catch (err) {
+          return null;
+        }
+      }
+
+      // "__run" is the one console tab the app itself owns (dev-run + plugin log output) — every
+      // other key is a plugin-contributed tab, both registered via contribute("console", ...) and
+      // shown through the same showSlotTab() every other tab-strip region uses. activeConsoleTabKey
+      // is still tracked separately (rather than always re-querying the DOM for it) since
+      // requestNewTerminal() below needs it on every click, not just on activation.
+      let activeConsoleTabKey = "__run";
+
+      // Generalizes what activateConsoleTab(btn, key) used to be — takes just the key now (not a
+      // button reference) so it can be called both from a real click (via renderTabStrip's
+      // onActivate, below) and programmatically (startRun(), which has no click event to hand it).
+      // Manually re-toggling is-active here is redundant on the click path (primitives.js's
+      // initTabs() already did it, since #console-tabs is a [data-tabs] container) but necessary on
+      // the programmatic one — cheap enough either way not to bother with two separate functions.
+      function activateConsoleTab(key) {
+        document.querySelectorAll("#console-tabs .console-tab").forEach((t) => t.classList.remove("is-active"));
+        const btn = document.querySelector(`#console-tabs .console-tab[data-tab-value="${key}"]`);
+        if (btn) btn.classList.add("is-active");
+
+        activeConsoleTabKey = key;
+        showSlotTab("console", "console-body", key);
+
+        // The new-terminal controls only make sense while a session-mode tab (Terminal) is
+        // active — "__run" has no pluginPanels entry at all, so it falls through to hidden too.
+        const entry = key !== "__run" ? pluginPanels.get(key) : null;
+        document.getElementById("console-session-controls").style.display = entry && entry.session ? "flex" : "none";
+      }
+
+      // ---------- Terminal's "new instance" controls (host chrome, not the plugin's own UI —
+      // see the console header comment) ----------
+      // Both just ask whichever session-mode tab is currently active to open another instance —
+      // the plugin itself (Terminal) owns creating the session and adding it to its own sidebar,
+      // this is only ever "tell the active session-mode iframe a new-instance request happened".
+      function requestNewTerminal(shell) {
+        const entry = pluginPanels.get(activeConsoleTabKey);
+        if (entry && entry.iframe) {
+          entry.iframe.contentWindow.postMessage({ type: "emit", event: "lowarc:newTerminal", payload: { shell } }, "*");
+        }
+      }
+
+      document.getElementById("console-new-session").addEventListener("click", () => requestNewTerminal(null));
+
+      const CONSOLE_SESSION_SHELL_OPTIONS = [
+        { value: "__default", label: "Default" },
+        { value: "powershell", label: "PowerShell" },
+        { value: "pwsh", label: "PowerShell 7 (pwsh)" },
+        { value: "cmd", label: "Command Prompt" },
+        { value: "bash", label: "Bash" },
+        { value: "zsh", label: "Zsh" },
+      ];
+      document.getElementById("console-session-menu-trigger").addEventListener("click", (e) => {
+        e.stopPropagation();
+        openMenuFromTrigger(e.currentTarget, CONSOLE_SESSION_SHELL_OPTIONS).then((value) => {
+          if (value) requestNewTerminal(value === "__default" ? null : value);
         });
       });
 
-      // ---------- Drag-to-resize, with VS Code's "drag past the minimum closes it, keep dragging
-      // and it's still tracking" behavior ----------
-      // While dragging, the raw (unclamped-low) size is compared against the panel's minimum on
-      // every mousemove: below it, the panel goes visually closed (0) but stays "live" — dragging
-      // back out past the minimum reopens it at wherever the mouse currently is, no need to
-      // release and start a new drag. Below the minimum, the remembered size is left untouched, so
-      // reopening later (via the header icon or the rail) restores the size from before the drag,
-      // not 0 or whatever the mouse last happened to be at.
+      // ---------- Maximize console (permanent, like Close — not scoped to any one tab) ----------
+      let consoleMaximized = false;
+      function setConsoleMaximized(maximized) {
+        consoleMaximized = maximized;
+        document.getElementById("console-expand").classList.toggle("is-active", maximized);
+        if (maximized) {
+          // Not calc(100vh - Npx) — CSS Grid doesn't shrink the *other* explicit/auto rows to
+          // make room for one row that would overflow the container, it just lets the grid
+          // overflow instead (confirmed live: the CSS var applied correctly but nothing visually
+          // grew). Computing the real leftover pixels here, from the shell's own actual height
+          // minus what the menu bar/status bar/divider genuinely take up, is what actually
+          // collapses the center row to ~0 instead of merely overflowing past it.
+          const shellHeight = shell.getBoundingClientRect().height;
+          const menuHeight = document.querySelector(".menu-bar").getBoundingClientRect().height;
+          const statusHeight = document.querySelector(".status-bar").getBoundingClientRect().height;
+          const dividerHeight = 4; // the fixed 4px row between the center view and the console
+          const available = shellHeight - menuHeight - statusHeight - dividerHeight;
+          shell.style.setProperty("--console-height", `${Math.max(PANELS.console.min, available)}px`);
+        } else {
+          applyPanel("console"); // restores the normal, persisted (draggable) size
+        }
+      }
+      document.getElementById("console-expand").addEventListener("click", () => setConsoleMaximized(!consoleMaximized));
 
+      function appendConsoleLine(level, message) {
+        const panel = document.getElementById("console-run-panel");
+        const line = document.createElement("div");
+        line.className = "line";
+        line.textContent = message;
+        if (level === "error") line.style.color = "var(--danger)";
+        else if (level === "warn" || level === "warning") line.style.color = "var(--yellow)";
+        panel.appendChild(line);
+        panel.scrollTop = panel.scrollHeight;
+      }
+
+      // order:-10 so Run always sorts first, matching its old fixed "always first" position in the
+      // static HTML. closeable:false — nothing currently renders a per-tab close control for ANY
+      // console tab (Terminal manages closing its own sessions through its own UI, not a host-drawn
+      // X), so this is forward-looking metadata, not something consumed yet. mount(el) just
+      // re-parents the one #console-run-panel element that already exists and that
+      // appendConsoleLine() already writes into regardless of migration — its own "is-active" class
+      // (already set in its static HTML) is left untouched and permanent, exactly like a plugin
+      // sidebar iframe's is-active is (see showSlotTab's wrapper comment); the WRAPPER's is-active
+      // is what actually governs visibility once mounted.
+      contribute("console", {
+        id: "__run",
+        sourceType: "host",
+        label: "Run",
+        order: -10,
+        closeable: false,
+        mount(el) {
+          el.appendChild(document.getElementById("console-run-panel"));
+        },
+      });
+
+      // ---------- Base system: shared region renderers ----------
+      // Built on primitives.js's contribute()/getSlot() registry.
+
+      // For a region with no tab strip at all — just one contribution shown, full-size (Inspector,
+      // today). Same "first wins, a second is logged and otherwise ignored" rule the viewport used
+      // to follow too, before it became the tab-bar/open-files system below (arbitrated per file by
+      // extension, not one plugin claiming the whole slot forever — Inspector still claims it
+      // forever, since nothing there is keyed by anything a user picks). A contribution's mount()
+      // runs once, the first time this slot is actually rendered — calling renderSingleSlot again
+      // (e.g. loadPluginContributions() re-running) is a no-op for whichever contribution already
+      // won it.
+      const singleSlotMounted = new Map(); // slot id -> the contribution id already mounted into it
+
+      function renderSingleSlot(container, slot) {
+        const contributions = getSlot(slot);
+        if (!contributions.length) return;
+        const [contribution, ...rest] = contributions;
+        if (rest.length) {
+          console.warn(`[base] "${slot}" is single-slot — "${contribution.id}" claimed it; ignoring ${rest.map((c) => `"${c.id}"`).join(", ")}.`);
+        }
+        if (singleSlotMounted.get(slot) === contribution.id) return;
+        singleSlotMounted.set(slot, contribution.id);
+        container.classList.add("hosts-plugin");
+        try {
+          contribution.mount(container);
+        } catch (err) {
+          const errorEl = document.createElement("div");
+          errorEl.style.color = "var(--danger)";
+          errorEl.style.padding = "12px";
+          errorEl.textContent = `This panel failed to load: ${err}`;
+          container.appendChild(errorEl);
+          showToast({ variant: "error", message: `"${slot}" panel failed to render: ${err}`, source: contribution.pluginId || null });
+        }
+      }
+
+      // For a region with a tab strip — (re)builds a button per contribution in `slot`, into
+      // `container` (already wired as a [data-tabs] strip by primitives.js's initTabs(), and —
+      // separately — by whichever initReorderable(...) call already covers this container, see the
+      // "Drag-to-reorder" block above; this only builds the buttons and their activate/close
+      // behavior on top of both, it doesn't reimplement either). Safe to call repeatedly — every
+      // call clears and rebuilds just the tab elements (and the empty-state placeholder, if any) it
+      // itself owns, the same "rebuild from scratch on every relevant change" shape renderTabBar()
+      // already used before this existed; listener wiring (tab-change/click) only happens once per
+      // container, guarded below, so repeated calls don't stack duplicate listeners.
+      //
+      // opts: { itemClass, anchorEl (a trailing non-item child tabs must stay before — the
+      // console's own "+"/spacer controls; omit if there's none), iconBased (default true — rail
+      // tabs are icon-only with a tooltip for the label, matching addSidebarRailIcon's old
+      // convention; pass false for a text-label strip like the console's/a file tab's), emptyText
+      // (shown in the strip itself when the slot has no contributions — omit for a strip that's
+      // fine looking merely empty, like the rail), onActivate(contribution) (a tab just became the
+      // active one), onToggleClose(contribution, btn) (optional — clicking the ALREADY-active tab
+      // calls this INSTEAD of onActivate; return false to leave it active and let the click fall
+      // through as normal), onClose(contribution) (optional — only takes effect on a contribution
+      // whose own closeable is exactly true, e.g. a file tab; renders a close button and routes it
+      // here instead of onActivate/onToggleClose), decorate(contribution, tabEl) (optional — called
+      // for every tab element right after it's built, so a caller can apply status classes it reads
+      // from ITS OWN live state rather than the contribution, which is meant to stay a fairly static
+      // declaration — see renderTabBar()'s dirty/missing classes for the motivating case). An
+      // icon-based contribution's icon is either static (iconHtml, shown immediately) or resolved
+      // async (resolveIcon(), a plugin's own railIcon fetched over IPC — shown once it resolves,
+      // FALLBACK_RAIL_ICON_SVG until then), matching how addSidebarRailIcon used to load one.
+      function renderTabStrip(container, slot, opts) {
+        const { itemClass = "sidebar-tab", anchorEl = null, iconBased = true, emptyText = null, onActivate, onToggleClose, onClose, decorate } = opts;
+
+        container.querySelectorAll("[data-tab-value], .tab-bar-empty").forEach((el) => el.remove());
+
+        const contributions = getSlot(slot);
+
+        if (!contributions.length && emptyText) {
+          const empty = document.createElement("div");
+          empty.className = "tab-bar-empty";
+          empty.textContent = emptyText;
+          container.insertBefore(empty, anchorEl);
+        }
+
+        for (const contribution of contributions) {
+          const closeable = contribution.closeable === true;
+          // A closeable tab hosts a real nested <button> (the close control) — buttons can't nest,
+          // so it's a div standing in for one (role/tabindex/keydown-triggers-click), the same shape
+          // file-tabs already used before this existed. A non-closeable tab stays a real <button>.
+          const tab = document.createElement(closeable ? "div" : "button");
+          tab.className = itemClass;
+          tab.dataset.tabValue = contribution.id;
+
+          if (closeable) {
+            tab.setAttribute("role", "button");
+            tab.tabIndex = 0;
+            tab.addEventListener("keydown", (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                tab.click();
+              }
+            });
+          } else {
+            tab.type = "button";
+          }
+
+          if (iconBased) {
+            tab.dataset.tooltip = contribution.label;
+            tab.setAttribute("aria-label", contribution.label);
+            tab.innerHTML = contribution.iconHtml || FALLBACK_RAIL_ICON_SVG;
+            if (contribution.resolveIcon) {
+              contribution.resolveIcon().then((svg) => {
+                if (!svg) return;
+                svg.setAttribute("width", "16");
+                svg.setAttribute("height", "16");
+                tab.innerHTML = "";
+                tab.appendChild(svg);
+              });
+            }
+          } else if (closeable) {
+            const label = document.createElement("span");
+            label.textContent = contribution.label;
+            tab.appendChild(label);
+          } else {
+            tab.textContent = contribution.label;
+          }
+
+          if (closeable) {
+            const close = document.createElement("button");
+            close.type = "button";
+            close.className = "btn btn-icon-only btn-xs btn-ghost-danger file-tab-close";
+            close.setAttribute("aria-label", `Close ${contribution.label}`);
+            close.innerHTML =
+              '<svg viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>';
+            close.addEventListener("click", (e) => {
+              // Without this, the click bubbles up to the tab bar and the primitive's own
+              // delegation would treat it as "activate this tab" too, right as it's closing.
+              e.stopPropagation();
+              if (onClose) onClose(contribution);
+            });
+            tab.appendChild(close);
+          }
+
+          if (decorate) decorate(contribution, tab);
+          container.insertBefore(tab, anchorEl);
+        }
+
+        applySavedOrder(container, "[data-tab-value]", "tabValue", anchorEl);
+        initTooltips();
+
+        if (container.dataset.tabStripWired) return;
+        container.dataset.tabStripWired = "true";
+
+        if (onActivate) {
+          container.addEventListener("tab-change", (e) => {
+            const contribution = getSlot(slot).find((c) => c.id === e.detail.value);
+            if (contribution) onActivate(contribution);
+          });
+        }
+
+        // Toggle-close-on-reclick — generic here instead of hand-wired per region. This is the
+        // actual payoff of unifying: the behavior used to only exist for plugin-added rail icons
+        // (wired inside addSidebarRailIcon() itself) until the two host-added manager icons — added
+        // a different way — needed a second, separate fix. Capture phase: observes pre-click state
+        // before [data-tabs]' own bubble-phase handler (primitives.js's initTabs()) mutates
+        // is-active, and — only once onToggleClose actually handles it — stops that handler from
+        // also firing and immediately reopening what this just closed.
+        if (onToggleClose) {
+          container.addEventListener(
+            "click",
+            (e) => {
+              const btn = e.target.closest("[data-tab-value]");
+              if (!btn || !btn.classList.contains("is-active")) return;
+              const contribution = getSlot(slot).find((c) => c.id === btn.dataset.tabValue);
+              if (!contribution) return;
+              if (onToggleClose(contribution, btn) !== false) e.stopPropagation();
+            },
+            true,
+          );
+        }
+      }
+
+      // extension (lowercase, dot-included) -> { pluginId, viewer }. Same "first wins, no silent
+      // override" rule as renderSingleSlot, for the same reason — two viewers silently fighting
+      // over one file type would be worse than an honest, logged "already taken".
+      const viewersByExtension = new Map();
+
+      function registerViewer(pluginId, viewer) {
+        for (const ext of viewer.extensions || []) {
+          const key = ext.toLowerCase();
+          if (viewersByExtension.has(key)) {
+            console.warn(`[plugins] "${key}" is already viewed by "${viewersByExtension.get(key).pluginId}" — ignoring the same contribution from "${pluginId}".`);
+            continue;
+          }
+          viewersByExtension.set(key, { pluginId, viewer });
+        }
+      }
+
+      async function loadPluginContributions() {
+        let plugins = [];
+        try {
+          plugins = await invoke("list_installed_plugins");
+        } catch (err) {
+          return;
+        }
+
+        for (const plugin of plugins) {
+          if (plugin.disabled || !plugin.contributes) continue;
+
+          for (const panel of plugin.contributes.panels || []) {
+            const key = panelKey(plugin.id, panel.id);
+            pluginPanels.set(key, { pluginId: plugin.id, panel, iframe: null, session: plugin.session });
+            if (panel.location === "sidebar") {
+              contribute("sidebar", {
+                id: key,
+                sourceType: "plugin",
+                pluginId: plugin.id,
+                label: panel.title,
+                resolveIcon: panel.railIcon ? () => loadRailIconSvg(plugin.id, panel.railIcon) : undefined,
+                mount(container) {
+                  mountPanelIframe(key, container).classList.add("is-active");
+                },
+              });
+            } else if (panel.location === "inspector") {
+              contribute("inspector", {
+                id: key,
+                sourceType: "plugin",
+                pluginId: plugin.id,
+                mount(container) {
+                  mountPanelIframe(key, container).classList.add("is-active");
+                },
+              });
+            }
+          }
+
+          for (const tab of plugin.contributes.consoleTabs || []) {
+            const key = panelKey(plugin.id, tab.id);
+            pluginPanels.set(key, { pluginId: plugin.id, panel: tab, iframe: null, session: plugin.session });
+            contribute("console", {
+              id: key,
+              sourceType: "plugin",
+              pluginId: plugin.id,
+              label: tab.title,
+              mount(el) {
+                mountPanelIframe(key, el).classList.add("is-active");
+              },
+            });
+          }
+
+          for (const viewer of plugin.contributes.viewers || []) {
+            registerViewer(plugin.id, viewer);
+          }
+        }
+
+        // Mounted eagerly here (matching the old claimSingleSlot's timing) rather than lazily on
+        // first open — Inspector's own open/close is a pure CSS-width toggle (see PANELS.right),
+        // independent of whether anything is mounted inside it, so waiting for "first shown" would
+        // actually be waiting for an event that doesn't exist yet.
+        renderSingleSlot(document.getElementById("right-panel-body"), "inspector");
+
+        // Built once, here, from everything contribute("sidebar", ...) registered above (both
+        // managers, registered earlier at top-level script scope, plus whatever this loop just
+        // added) — applySavedOrder's drag-order pass happens inside renderTabStrip itself, so it
+        // only needs applying once, now that every icon that could be in it actually exists.
+        renderTabStrip(document.getElementById("rail-tabs"), "sidebar", {
+          itemClass: "sidebar-tab",
+          onActivate: (contribution) => {
+            showSlotTab("sidebar", "left-panel-body", contribution.id);
+            setPanelOpen("sidebar", true);
+          },
+          onToggleClose: (contribution, btn) => {
+            if (!PANELS.sidebar.open) return false;
+            btn.classList.remove("is-active");
+            setPanelOpen("sidebar", false);
+          },
+        });
+
+        // Same "built once, from the registry" shape as the rail above, just text-labeled
+        // (iconBased: false) and anchored before .console-tabs-spacer instead of nothing, since
+        // this container also holds the maximize/close/new-terminal controls after its tabs.
+        renderTabStrip(document.getElementById("console-tabs"), "console", {
+          itemClass: "console-tab",
+          iconBased: false,
+          anchorEl: document.querySelector(".console-tabs-spacer"),
+          onActivate: (contribution) => activateConsoleTab(contribution.id),
+        });
+
+        // [data-tabs] only marks .is-active in response to a real click (see initTabs() in
+        // primitives.js) — it doesn't know about restoredSidebarActiveKey, the tab that was active
+        // when this layout was last saved (see savePanelLayout/loadPanelLayout). Re-activate that
+        // same rail icon now that the icons actually exist, so a session that closed with a rail
+        // tab selected reopens showing that same panel instead of an empty one.
+        const restoredBtn = restoredSidebarActiveKey && document.querySelector(`#rail-tabs .sidebar-tab[data-tab-value="${restoredSidebarActiveKey}"]`);
+        if (restoredBtn) {
+          restoredBtn.classList.add("is-active");
+          showSlotTab("sidebar", "left-panel-body", restoredSidebarActiveKey);
+        }
+
+        // Whether or not that restore succeeded (the saved key might belong to a plugin that's no
+        // longer installed), PANELS.sidebar.open can still be stale — it's restored from settings
+        // independently of whether any rail tab ended up active. A panel claiming "open" with no
+        // active tab behind it is a blank strip that looks broken, the same failure shape as the
+        // console-maximize/xterm bugs already fixed this session. Force it shut if that's the state.
+        if (PANELS.sidebar.open && !document.querySelector("#rail-tabs .sidebar-tab.is-active")) {
+          setPanelOpen("sidebar", false);
+        }
+      }
+
+      // ---------- Tab bar / open files (one or two editor groups — see toggleSplit below) ----------
+      // openFiles: absolute path -> { title, dirty, missing, hasErrors, pluginId, iframe, groupId }.
+      // One iframe per open file (not one shared iframe told "now show a different file") so
+      // switching tabs preserves each file's own scroll position/undo history in the background,
+      // the same reason VS Code keeps backgrounded editors alive rather than tearing them down.
+      // Unlike VS Code, a file isn't shared across groups here — there's no shared document model
+      // between two separate sandboxed iframes to split — so a path can only be open in ONE group
+      // at a time; opening an already-open file just activates it wherever it already is.
+      const openFiles = new Map();
+      const windowToFilePath = new Map();
+      const groupActiveFilePath = { 0: null, 1: null };
+      let activeGroupId = 0;
+
+      function groupEls(id) {
+        return {
+          tabBar: document.getElementById(`tab-bar-tabs-${id}`),
+          viewport: document.getElementById(`center-viewport-${id}`),
+          empty: document.getElementById(`center-viewport-empty-${id}`),
+        };
+      }
+
+      // Tracks which group new files open into and which group's tab bar gets the "active" shade
+      // (see .editor-group.is-active-group in the CSS above) — updated on any real interaction
+      // with a group: clicking one of its tabs (via the per-group tab-change listener below),
+      // clicking anywhere else in its chrome (this listener), or a viewer iframe inside it
+      // receiving focus (see the iframe "focus" listener in openFile()).
+      function setActiveGroup(id) {
+        activeGroupId = id;
+        document.getElementById("editor-group-0").classList.toggle("is-active-group", id === 0);
+        document.getElementById("editor-group-1").classList.toggle("is-active-group", id === 1);
+      }
+      for (const id of [0, 1]) {
+        document.getElementById(`editor-group-${id}`).addEventListener("mousedown", () => setActiveGroup(id));
+      }
+
+      // Pushed to every currently-mounted plugin iframe (sidebar/inspector panels *and* open-file
+      // viewers, in either group) whenever anything about openFiles changes — the file explorer is
+      // the reason this exists (so it can decorate its own tree rows with the same dirty/error
+      // status the tab bar shows), but it's not addressed to any one plugin, since anything
+      // sidebar-hosted might reasonably want it later. Sent as a full snapshot rather than a
+      // delta: simpler, and cheap at the scale of "files a person has open in one project."
+      function broadcastFileStatus() {
+        const status = {};
+        for (const [path, file] of openFiles) {
+          status[path] = { dirty: file.dirty, missing: file.missing, hasErrors: file.hasErrors };
+        }
+        const payload = { type: "emit", event: "lowarc:fileStatus", payload: status };
+        for (const entry of pluginPanels.values()) {
+          if (entry.iframe) entry.iframe.contentWindow.postMessage(payload, "*");
+        }
+        for (const file of openFiles.values()) {
+          file.iframe.contentWindow.postMessage(payload, "*");
+        }
+      }
+
+      function fileTitle(path) {
+        return path.split(/[\\/]/).pop() || path;
+      }
+
+      function fileExtension(path) {
+        const name = fileTitle(path);
+        const dot = name.lastIndexOf(".");
+        return dot === -1 ? "" : name.slice(dot).toLowerCase();
+      }
+
+      // #tab-bar-tabs-0/#tab-bar-tabs-1 are each their own "center-0"/"center-1" slot (see
+      // contribute()/getSlot() in primitives.js) — a file's contribution is registered in
+      // openFile() and removed in closeFile()/setSplitOpen(), both alongside (not instead of) the
+      // matching openFiles.set()/delete(), since openFiles stays the authoritative store for the
+      // MUTABLE per-file state (dirty/missing/hasErrors) a contribution deliberately doesn't carry
+      // — decorate() below reads that live, straight from openFiles, on every render. groupId
+      // selects which group's tab bar (and slot) to render; renderTabStrip is what actually builds
+      // the tab elements, close buttons included (contribution.closeable:true is what triggers
+      // those — see openFile()'s contribute() call).
+      function renderTabBar(groupId) {
+        const container = groupEls(groupId).tabBar;
+        renderTabStrip(container, `center-${groupId}`, {
+          itemClass: "file-tab",
+          iconBased: false,
+          emptyText: "No files open",
+          decorate: (contribution, tab) => {
+            const file = openFiles.get(contribution.id);
+            if (!file) return;
+            tab.title = contribution.id;
+            tab.classList.toggle("is-active", contribution.id === groupActiveFilePath[groupId]);
+            tab.classList.add(file.missing ? "status-missing" : file.dirty ? "status-dirty" : "status-clean");
+          },
+          onActivate: (contribution) => {
+            groupActiveFilePath[groupId] = contribution.id;
+            setActiveGroup(groupId);
+            showActiveFile(groupId);
+          },
+          onClose: (contribution) => closeFile(contribution.id),
+        });
+      }
+
+      function showActiveFile(groupId) {
+        const { viewport, empty } = groupEls(groupId);
+        viewport.querySelectorAll(".plugin-panel-frame").forEach((f) => f.classList.remove("is-active"));
+
+        const path = groupActiveFilePath[groupId];
+        const file = path ? openFiles.get(path) : null;
+        empty.style.display = file ? "none" : "flex";
+        if (file && file.iframe) file.iframe.classList.add("is-active");
+      }
+
+      // Only for switching TO an already-rendered tab (a re-open, or right after openFile() has
+      // just rendered a new one) — clicks the real DOM element so it goes through the exact same
+      // primitive-delegated path a user's own click would, rather than a second way to activate.
+      function activateFile(path) {
+        const file = openFiles.get(path);
+        if (!file) return;
+        const tab = document.querySelector(`#tab-bar-tabs-${file.groupId} [data-tab-value="${CSS.escape(path)}"]`);
+        if (tab) tab.click();
+      }
+
+      // Closing isn't a primitive-mediated user click on a tab — it's host logic deciding what
+      // the next active tab should be, so this sets groupActiveFilePath directly rather than
+      // simulating a click on whatever's chosen. Async because a dirty file gates on the popup
+      // below — every caller (the close button, requestClose) already treats this as fire-and-
+      // forget, so nothing needed to change at the call sites for that.
+      async function closeFile(path) {
+        const file = openFiles.get(path);
+        if (!file) return;
+
+        if (file.dirty) {
+          const confirmed = await showPopup("confirm-close-dirty", { title: file.title });
+          if (!confirmed) return;
+          // The confirm popup is itself async — the file could have been closed some other way
+          // (e.g. its own plugin calling requestClose after a successful save) while it was open.
+          if (!openFiles.has(path)) return;
+        }
+
+        const groupId = file.groupId;
+
+        if (file.iframe) {
+          windowToFilePath.delete(file.iframe.contentWindow);
+          windowToPlugin.delete(file.iframe.contentWindow);
+          file.iframe.remove();
+        }
+        openFiles.delete(path);
+        removeContribution(`center-${groupId}`, path);
+
+        if (groupActiveFilePath[groupId] === path) {
+          const remaining = Array.from(openFiles.entries()).filter(([, f]) => f.groupId === groupId).map(([p]) => p);
+          groupActiveFilePath[groupId] = remaining.length ? remaining[remaining.length - 1] : null;
+        }
+
+        renderTabBar(groupId);
+        showActiveFile(groupId);
+        broadcastFileStatus();
+      }
+
+      // Moves an ALREADY-open file into a different group — re-parents the same iframe node (not
+      // a close+reopen, so scroll position/undo history survive, same reasoning as setSplitOpen's
+      // own group-0 merge) and moves its slot registration to match. Unlike setSplitOpen's bulk
+      // merge (which deliberately leaves whichever tab was already active in the destination group
+      // alone), this is always a direct response to the user acting on this ONE file — dragging its
+      // tab across, or "Open in Split View" — so it always becomes the active tab in its new group.
+      function moveFileToGroup(path, targetGroupId) {
+        const file = openFiles.get(path);
+        if (!file || file.groupId === targetGroupId) return;
+        const fromGroupId = file.groupId;
+
+        removeContribution(`center-${fromGroupId}`, path);
+        file.groupId = targetGroupId;
+        groupEls(targetGroupId).viewport.appendChild(file.iframe);
+        contribute(`center-${targetGroupId}`, { id: path, sourceType: "plugin", pluginId: file.pluginId, label: file.title, closeable: true });
+
+        if (groupActiveFilePath[fromGroupId] === path) {
+          const remaining = Array.from(openFiles.entries()).filter(([, f]) => f.groupId === fromGroupId).map(([p]) => p);
+          groupActiveFilePath[fromGroupId] = remaining.length ? remaining[remaining.length - 1] : null;
+        }
+        groupActiveFilePath[targetGroupId] = path;
+
+        renderTabBar(fromGroupId);
+        renderTabBar(targetGroupId);
+        showActiveFile(fromGroupId);
+        showActiveFile(targetGroupId);
+        setActiveGroup(targetGroupId);
+        broadcastFileStatus();
+      }
+
+      // opts.openInSplit: true forces this file into group 1, opening the split first if it isn't
+      // already — the file-explorer's "Open in Split View" context-menu item (see window.lowarc.
+      // openFile()'s new second argument in plugin_protocol.rs) and, later, a cross-group tab drag
+      // land here too, moving an already-open file rather than re-opening it.
+      async function openFile(path, opts = {}) {
+        const targetGroupId = opts.openInSplit ? 1 : activeGroupId;
+        if (opts.openInSplit && !splitOpen) setSplitOpen(true);
+
+        const existing = openFiles.get(path);
+        if (existing) {
+          if (existing.groupId !== targetGroupId && opts.openInSplit) {
+            moveFileToGroup(path, targetGroupId);
+          } else {
+            setActiveGroup(existing.groupId);
+            activateFile(path);
+          }
+          return;
+        }
+
+        const ext = fileExtension(path);
+        const viewer = viewersByExtension.get(ext);
+        if (!viewer) {
+          showToast({ variant: "error", message: `No installed plugin can open "${fileTitle(path)}"${ext ? ` (${ext})` : ""}.` });
+          return;
+        }
+
+        let contents;
+        try {
+          contents = await invoke("read_text_file", { path });
+        } catch (err) {
+          showToast({ variant: "error", message: String(err) });
+          return;
+        }
+
+        // Opens into whichever group was last interacted with, unless opts.openInSplit forced it —
+        // there's no OTHER per-open group picker, matching the toolbar-level (not per-tab) split
+        // button this pairs with.
+        const groupId = targetGroupId;
+        const iframe = document.createElement("iframe");
+        iframe.className = "plugin-panel-frame";
+        iframe.setAttribute("sandbox", "allow-scripts");
+        iframe.src = await pluginAssetUrl(viewer.pluginId, viewer.viewer.entry, `path=${encodeURIComponent(path)}`);
+        // A click inside a sandboxed iframe never bubbles to the parent document, so the
+        // mousedown-based group-activation listener above can't see it — this is the
+        // supplementary signal for "the user is now working in this group" once its content
+        // actually takes focus (Monaco, e.g., calls focus() on the editor surface).
+        iframe.addEventListener("focus", () => setActiveGroup(groupId));
+        groupEls(groupId).viewport.appendChild(iframe);
+        windowToFilePath.set(iframe.contentWindow, path);
+        windowToPlugin.set(iframe.contentWindow, viewer.pluginId);
+
+        // The viewer's own iframe has no filesystem access (sandboxed, connect-src 'none') — the
+        // host already read the file above, so it pushes the content in once the iframe's own
+        // script has had a chance to call lowarc.on("lowarc:openFile", ...) and start listening.
+        iframe.addEventListener("load", () => {
+          iframe.contentWindow.postMessage({ type: "emit", event: "lowarc:openFile", payload: { path, contents } }, "*");
+          broadcastFileStatus();
+        });
+
+        openFiles.set(path, { title: fileTitle(path), dirty: false, missing: false, hasErrors: false, pluginId: viewer.pluginId, iframe, groupId });
+        contribute(`center-${groupId}`, { id: path, sourceType: "plugin", pluginId: viewer.pluginId, label: fileTitle(path), closeable: true });
+        renderTabBar(groupId);
+        activateFile(path);
+      }
+
+      document.getElementById("open-file-item").addEventListener("click", async () => {
+        const picked = await openDialog({ title: "Open File", defaultPath: projectPath });
+        if (picked) openFile(picked);
+      });
+
+      // ---------- Split editor ----------
+      function applySplitRatio() {
+        const group0 = document.getElementById("editor-group-0");
+        group0.style.flex = splitOpen ? `0 0 ${splitRatio * 100}%` : "";
+      }
+
+      function setSplitOpen(open) {
+        if (splitOpen === open) return;
+        splitOpen = open;
+        document.getElementById("center-panel").classList.toggle("is-split", open);
+        document.getElementById("toggle-split").classList.toggle("is-active", open);
+        applySplitRatio();
+
+        if (!open) {
+          // Closing the split is a layout change, not "discard everything in the second group" —
+          // move its files back into group 0 (re-parenting the same iframe nodes, not recreating
+          // them, so scroll position/undo history survive) rather than closing them.
+          const toMove = Array.from(openFiles.entries()).filter(([, f]) => f.groupId === 1);
+          for (const [path, file] of toMove) {
+            removeContribution("center-1", path);
+            file.groupId = 0;
+            groupEls(0).viewport.appendChild(file.iframe);
+            contribute("center-0", { id: path, sourceType: "plugin", pluginId: file.pluginId, label: file.title, closeable: true });
+          }
+          groupActiveFilePath[1] = null;
+          renderTabBar(1);
+          renderTabBar(0);
+          showActiveFile(0);
+          setActiveGroup(0);
+        }
+
+        savePanelLayout();
+      }
+
+      function toggleSplit() {
+        setSplitOpen(!splitOpen);
+      }
+
+      document.getElementById("toggle-split").addEventListener("click", toggleSplit);
+      document.getElementById("view-toggle-split").addEventListener("click", toggleSplit);
+
+      // Same Pointer Capture reasoning as initDividerDrag below — this divider sits directly
+      // beside a group that can hold a sandboxed iframe (Monaco, most often), and a plain
+      // document-level mousemove would stop responding the instant the drag crosses into one.
+      function initSplitDividerDrag() {
+        const el = document.getElementById("editor-group-divider");
+        const group0 = document.getElementById("editor-group-0");
+        const centerPanel = document.getElementById("center-panel");
+        const minPx = 160;
+
+        el.addEventListener("pointerdown", (e) => {
+          if (!splitOpen) return;
+          e.preventDefault();
+          el.setPointerCapture(e.pointerId);
+          const startX = e.clientX;
+          const totalWidth = centerPanel.getBoundingClientRect().width;
+          const startWidth = group0.getBoundingClientRect().width;
+
+          el.classList.add("is-dragging");
+          document.body.style.cursor = "col-resize";
+          document.body.style.userSelect = "none";
+
+          const onMove = (moveEvent) => {
+            const delta = moveEvent.clientX - startX;
+            const rawWidth = Math.max(minPx, Math.min(totalWidth - minPx, startWidth + delta));
+            splitRatio = rawWidth / totalWidth;
+            group0.style.flex = `0 0 ${splitRatio * 100}%`;
+          };
+
+          const onUp = (upEvent) => {
+            el.releasePointerCapture(upEvent.pointerId);
+            el.classList.remove("is-dragging");
+            document.body.style.cursor = "";
+            document.body.style.userSelect = "";
+            el.removeEventListener("pointermove", onMove);
+            el.removeEventListener("pointerup", onUp);
+            savePanelLayout();
+          };
+
+          el.addEventListener("pointermove", onMove);
+          el.addEventListener("pointerup", onUp);
+        });
+      }
+      initSplitDividerDrag();
+
+      // Relays a plugin's own webview content calling lowarc.call(method, params) (see the
+      // __lowarc.js harness served by plugin_protocol.rs) into that exact plugin's process via
+      // invoke_plugin, and the reply back. Trust comes from windowToPlugin — event.source is the
+      // actual sending window, not something a message can lie about — never from anything the
+      // message payload itself claims. A second branch below handles "host" messages
+      // (lowarc.markDirty/requestClose) the same way, just routed to a tab instead of a process.
+      window.addEventListener("message", async (event) => {
+        const data = event.data;
+        if (!data || typeof data !== "object") return;
+
+        if (data.type === "host") {
+          // openFile isn't "about" a file that's already open the way markDirty/requestClose
+          // are, so it doesn't route through windowToFilePath — any tracked plugin iframe (a
+          // sidebar panel like the file explorer, not just a viewer) can ask the host to add a
+          // path to the open-files list. windowToPlugin is still the trust check: only a real,
+          // currently-mounted plugin iframe can trigger it, never an arbitrary postMessage.
+          if (data.action === "openFile") {
+            if (windowToPlugin.get(event.source) && typeof data.path === "string" && data.path) {
+              openFile(data.path, { openInSplit: Boolean(data.openInSplit) });
+            }
+            return;
+          }
+
+          // window.lowarc.notify() — routes into the exact same showToast() every host-chrome
+          // error/confirmation already goes through (see primitives.js's toast/notification-
+          // history section), tagged with which plugin it came from so the bell's history can
+          // attribute it. Not routed through windowToFilePath/windowToPlugin's file-specific
+          // lookups — any tracked plugin iframe can raise one, not just a file viewer.
+          if (data.action === "notify") {
+            const pluginId = windowToPlugin.get(event.source);
+            if (pluginId && typeof data.message === "string" && data.message) {
+              const variant = ["info", "warning", "success", "error"].includes(data.variant) ? data.variant : "info";
+              showToast({ variant, message: data.message, source: pluginId });
+            }
+            return;
+          }
+
+          // Same trust/routing shape as openFile — these come from whatever plugin performed the
+          // filesystem operation (the file explorer, today), not from the affected file's own
+          // viewer iframe, so they're keyed by windowToPlugin and an explicit path lookup rather
+          // than windowToFilePath. Only exact-path matches are handled: a folder rename/move/
+          // delete doesn't currently cascade to mark every open file underneath it — a deliberate
+          // scope cut, not an oversight.
+          if (data.action === "notifyPathDeleted") {
+            if (windowToPlugin.get(event.source) && typeof data.path === "string") {
+              const file = openFiles.get(data.path);
+              if (file) {
+                file.missing = true;
+                renderTabBar(file.groupId);
+                broadcastFileStatus();
+              }
+            }
+            return;
+          }
+          if (data.action === "notifyPathRenamed") {
+            if (windowToPlugin.get(event.source) && typeof data.oldPath === "string") {
+              const file = openFiles.get(data.oldPath);
+              if (file) {
+                file.missing = true;
+                renderTabBar(file.groupId);
+                broadcastFileStatus();
+              }
+            }
+            return;
+          }
+          // All three routed by windowToPlugin, not windowToFilePath — a session-mode plugin's UI
+          // (a console-tab panel, not a file viewer) manages its own instances, each identified by
+          // a sessionId it minted itself; the host just needs to know which plugin's files/backend
+          // that id belongs to, the same trust boundary as everything else here.
+          if (data.action === "startSession") {
+            const pluginId = windowToPlugin.get(event.source);
+            if (pluginId && typeof data.sessionId === "string") {
+              invoke("start_plugin_session", { id: pluginId, sessionId: data.sessionId, shell: data.shell ?? null }).catch((err) => {
+                showToast({ variant: "error", message: String(err) });
+              });
+            }
+            return;
+          }
+          if (data.action === "sendSession") {
+            if (windowToPlugin.get(event.source) && typeof data.sessionId === "string") {
+              invoke("send_to_plugin_session", { sessionId: data.sessionId, message: data.message ?? null });
+            }
+            return;
+          }
+          if (data.action === "stopSession") {
+            if (windowToPlugin.get(event.source) && typeof data.sessionId === "string") {
+              invoke("stop_plugin_session", { sessionId: data.sessionId });
+            }
+            return;
+          }
+          // window.lowarc.showMenu() — see plugin_protocol.rs's harness. data.x/data.y are in the
+          // calling iframe's OWN document coordinates (typically a right-click's clientX/clientY);
+          // this iframe could be mounted in either editor group's viewport, a sidebar/inspector
+          // panel, or a console tab, so its screen position isn't fixed — iframeForWindow() finds
+          // the actual element and its current getBoundingClientRect() gives the real offset to
+          // add. Trust is windowToPlugin, same as every other action here: only a real, currently-
+          // mounted plugin iframe can trigger this.
+          if (data.action === "showMenu") {
+            if (windowToPlugin.get(event.source) && Array.isArray(data.items)) {
+              const iframeEl = iframeForWindow(event.source);
+              const rect = iframeEl ? iframeEl.getBoundingClientRect() : { left: 0, top: 0 };
+              const anchor = { x: rect.left + (Number(data.x) || 0), y: rect.top + (Number(data.y) || 0) };
+              openMenuOverlay(data.items, anchor).then((value) => {
+                event.source.postMessage({ type: "reply", id: data.id, ok: true, result: value }, "*");
+              });
+            }
+            return;
+          }
+          // window.lowarc.openPopup() — see plugin_protocol.rs's harness. Unlike showMenu, a popup
+          // is always centered on the real window rather than anchored to the calling iframe, so
+          // there's no position to translate here. popupId must name a popup some contribution
+          // already registered via contribute("popups", ...) — no plugin declares one yet, so this
+          // is proven the same way notify() was: real, but unexercised until one has a reason to.
+          // Same trust (windowToPlugin) and reply-routing (event.source, never broadcast) as every
+          // other action here — the result goes back to the exact iframe that asked.
+          if (data.action === "openPopup") {
+            if (windowToPlugin.get(event.source) && typeof data.popupId === "string") {
+              showPopup(data.popupId, data.target)
+                .then((result) => event.source.postMessage({ type: "reply", id: data.id, ok: true, result }, "*"))
+                .catch((err) => event.source.postMessage({ type: "reply", id: data.id, ok: false, error: String(err) }, "*"));
+            }
+            return;
+          }
+
+          const path = windowToFilePath.get(event.source);
+          if (!path) return;
+          if (data.action === "markDirty") {
+            const file = openFiles.get(path);
+            if (file) {
+              file.dirty = Boolean(data.dirty);
+              renderTabBar(file.groupId);
+              broadcastFileStatus();
+            }
+          } else if (data.action === "markErrors") {
+            const file = openFiles.get(path);
+            if (file) {
+              file.hasErrors = Boolean(data.hasErrors);
+              broadcastFileStatus();
+            }
+          } else if (data.action === "requestClose") {
+            closeFile(path);
+          } else if (data.action === "saveFile") {
+            // Unlike markDirty/requestClose, this one owes the caller a reply (see saveFile()'s
+            // own comment in __lowarc.js) — a write can fail, and the plugin needs to know before
+            // it clears its own dirty state. data.path must match the path this iframe was
+            // actually opened for, same trust boundary as everything else routed through
+            // windowToFilePath — a viewer only gets to save the one file it owns.
+            if (data.path !== path) return;
+            try {
+              await invoke("write_text_file", { path, contents: String(data.contents ?? "") });
+              const file = openFiles.get(path);
+              if (file) {
+                // A successful write also clears "missing" — saving recreates the file at this
+                // exact path if it had been deleted, which is a legitimate recovery, not a no-op.
+                file.dirty = false;
+                file.missing = false;
+                renderTabBar(file.groupId);
+                broadcastFileStatus();
+              }
+              event.source.postMessage({ type: "reply", id: data.id, ok: true }, "*");
+            } catch (err) {
+              showToast({ variant: "error", message: String(err) });
+              event.source.postMessage({ type: "reply", id: data.id, ok: false, error: String(err) }, "*");
+            }
+          }
+          return;
+        }
+
+        const pluginId = windowToPlugin.get(event.source);
+        if (!pluginId || data.type !== "call") return;
+
+        let reply;
+        try {
+          const result = await invoke("invoke_plugin", { id: pluginId, method: data.method, params: data.params ?? null });
+          reply = { type: "reply", id: data.id, ok: true, result };
+        } catch (err) {
+          reply = { type: "reply", id: data.id, ok: false, error: String(err) };
+        }
+        event.source.postMessage(reply, "*");
+      });
+
+      // Plugins are invoked per call now, not kept running (see plugin_host/protocol.rs) — a
+      // backend can't push something unprompted at some arbitrary later time any more, since
+      // nothing persists between calls. It CAN still ride an "emit" along on a call's own reply
+      // though (invoke_plugin in lib.rs re-fires it as this event), so a plugin can tell its own
+      // other panels/viewers "something changed" as a side effect of whatever it was just asked
+      // to do — still call-triggered, just not truly live.
+      window.__TAURI__.event.listen("plugin-emit", (event) => {
+        const { pluginId, event: eventName, payload } = event.payload;
+        for (const entry of pluginPanels.values()) {
+          if (entry.pluginId === pluginId && entry.iframe) {
+            entry.iframe.contentWindow.postMessage({ type: "emit", event: eventName, payload }, "*");
+          }
+        }
+        for (const file of openFiles.values()) {
+          if (file.pluginId === pluginId && file.iframe) {
+            file.iframe.contentWindow.postMessage({ type: "emit", event: eventName, payload }, "*");
+          }
+        }
+      });
+
+      renderTabBar(0);
+      renderTabBar(1);
+      loadPluginContributions();
+
+      // ---------- Drag-to-resize, with VS Code's two-stage close ----------
+      // Dragging past the minimum doesn't close the panel right away — it sticks at the minimum
+      // size (a dead zone) until the drag reaches a second, closer-to-the-edge threshold
+      // (closeAt), only then does it actually collapse. Below closeAt, the panel goes visually
+      // closed (0) but stays "live" — dragging back out past closeAt reopens it pinned at the
+      // minimum, no need to release and start a new drag. While fully closed, the remembered size
+      // is left untouched, so reopening later (via the header icon or the rail) restores the size
+      // from before the drag, not 0 or whatever the mouse last happened to be at.
+
+      // Pointer Capture, not plain mousedown/mousemove/mouseup on document — every panel this
+      // resizes sits right next to a sandboxed iframe (the file explorer, Monaco, Terminal...),
+      // and a plain document-level mousemove listener stops receiving events the instant the
+      // cursor crosses into one, since the iframe has its own separate document/event target.
+      // Confirmed live: dragging past an iframe's edge would just silently stop responding,
+      // making a panel impossible to shrink whenever the mouse happened to cross one — a
+      // pointerdown that setPointerCapture()s on the divider itself keeps *all* subsequent
+      // pointer events routed to that element regardless of what's visually underneath the
+      // cursor, iframe or not, which is exactly the guarantee this needs.
       function initDividerDrag(el, key, axis, invert, sizeEl) {
         const p = PANELS[key];
 
-        el.addEventListener("mousedown", (e) => {
+        el.addEventListener("pointerdown", (e) => {
           e.preventDefault();
+          el.setPointerCapture(e.pointerId);
           const startPos = axis === "x" ? e.clientX : e.clientY;
           const startRect = sizeEl.getBoundingClientRect();
           const startSize = p.open ? (axis === "x" ? startRect.width : startRect.height) : 0;
@@ -643,8 +3447,11 @@
             const delta = (pos - startPos) * (invert ? -1 : 1);
             const raw = Math.max(0, Math.min(p.max, startSize + delta));
 
-            if (raw < p.min) {
+            if (raw < p.closeAt) {
               p.open = false;
+            } else if (raw < p.min) {
+              p.open = true;
+              p.size = p.min;
             } else {
               p.open = true;
               p.size = raw;
@@ -653,16 +3460,18 @@
             syncToggleUI();
           };
 
-          const onUp = () => {
+          const onUp = (upEvent) => {
+            el.releasePointerCapture(upEvent.pointerId);
             el.classList.remove("is-dragging");
             document.body.style.cursor = "";
             document.body.style.userSelect = "";
-            document.removeEventListener("mousemove", onMove);
-            document.removeEventListener("mouseup", onUp);
+            el.removeEventListener("pointermove", onMove);
+            el.removeEventListener("pointerup", onUp);
+            savePanelLayout();
           };
 
-          document.addEventListener("mousemove", onMove);
-          document.addEventListener("mouseup", onUp);
+          el.addEventListener("pointermove", onMove);
+          el.addEventListener("pointerup", onUp);
         });
       }
 

@@ -2,8 +2,9 @@
    Depends on the tokens defined in style.css's :root; load style.css first. */
 
 /* ---------- Buttons ---------- */
-/* One shape per size (.btn-sm/md/lg/xl), one color scheme per type (.btn-main/sub/outline/
-   ghost/danger/confirm). A button always gets exactly one of each. .btn-md is the standard size. */
+/* One shape per size (.btn-xs/sm/md/lg/xl), one color scheme per type (.btn-main/sub/outline/
+   ghost/danger/confirm/warning, plus the ghost-tint family below). A button always gets exactly
+   one of each. .btn-md is the standard size. */
 
 .btn {
   display: inline-flex;
@@ -38,6 +39,10 @@
   padding: 0;
   flex: none;
 }
+.btn-icon-only.btn-xs {
+  width: 22px;
+  height: 22px;
+}
 .btn-icon-only.btn-sm {
   width: 28px;
   height: 28px;
@@ -54,6 +59,10 @@
   width: 52px;
   height: 52px;
 }
+.btn-icon-only.btn-xs svg {
+  width: 12px;
+  height: 12px;
+}
 .btn-icon-only.btn-sm svg {
   width: 14px;
   height: 14px;
@@ -69,6 +78,14 @@
 .btn-icon-only.btn-xl svg {
   width: 20px;
   height: 20px;
+}
+
+/* Below .btn-sm on the size ladder — for dense chrome rows (a panel header, a tab's own close
+   control) where even .btn-sm's 28px reads as too heavy sitting among several other icons at once. */
+.btn-xs {
+  padding: 2px 8px;
+  font-size: 11px;
+  border-radius: 3px;
 }
 
 .btn-sm {
@@ -170,6 +187,73 @@
 }
 .btn-confirm:active:not(:disabled) {
   filter: brightness(0.85);
+}
+
+/* Not one of the standard "always pick one of these six" types — reserved for state-driven
+   controls that turn yellow while something's in a caution/in-progress state (e.g. the editor's
+   Pause button while a run is active), not a general-purpose color choice. */
+.btn-warning {
+  background: var(--yellow);
+  border-color: var(--yellow);
+  color: var(--yellow-ink);
+}
+.btn-warning:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+.btn-warning:active:not(:disabled) {
+  background: var(--yellow-dark);
+  border-color: var(--yellow-dark);
+  color: var(--fg);
+  filter: none;
+}
+
+/* Ghost-shaped, but the color signals consequence only on hover rather than as a permanent fill —
+   for a dense row of always-visible icon buttons (a panel header, the console header, a file tab)
+   where every icon being solid-red/green/yellow/blue all the time would be loud, but the row still
+   needs "close reads red, adding reads green, opening a menu reads yellow, changing the IDE's own
+   layout reads blue" to actually be consistent instead of every icon defaulting to the same color
+   regardless of what it does. Transparent at rest, identical to .btn-ghost; only the hover color
+   differs per type. Pick exactly one, same as any other .btn type. */
+.btn-ghost-danger,
+.btn-ghost-confirm,
+.btn-ghost-warning,
+.btn-ghost-info {
+  background: transparent;
+  border-color: transparent;
+  color: var(--fg-dim);
+}
+.btn-ghost-danger:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--danger);
+}
+.btn-ghost-confirm:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--success);
+}
+.btn-ghost-warning:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--yellow);
+}
+.btn-ghost-info:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--info);
+}
+.btn-ghost-danger:active:not(:disabled),
+.btn-ghost-confirm:active:not(:disabled),
+.btn-ghost-warning:active:not(:disabled),
+.btn-ghost-info:active:not(:disabled) {
+  background: var(--border);
+}
+/* The "currently toggled on" look (e.g. the console's maximize button while maximized) — reuses
+   the app's one accent color for "this is active" everywhere else (the rail's selected item, a
+   file tab's active underline), deliberately NOT the hover-tint color, since "active" and "what
+   this button does on hover" are two different signals. */
+.btn-ghost-danger.is-active,
+.btn-ghost-confirm.is-active,
+.btn-ghost-warning.is-active,
+.btn-ghost-info.is-active {
+  background: var(--cyan-dim);
+  color: var(--cyan);
 }
 
 /* ---------- Focus ---------- */
@@ -517,14 +601,50 @@
   color: var(--fg);
 }
 
+/* Just the left border line signals "active" — no background fill or icon tint, per Nolan: "the
+   blue line on the left side is enough of a visual." */
 .sidebar-tab.is-active {
-  background: var(--cyan-dim);
   border-left-color: var(--cyan);
   color: var(--fg);
 }
 
-.sidebar-tab.is-active svg {
-  color: var(--cyan);
+/* ---------- Drag-to-reorder ---------- */
+/* See initReorderable() in primitives.js. Only ever active on a container carrying
+   data-reorderable — the cursor affordance below is scoped the same way, so a tab strip that
+   hasn't opted in never even hints that dragging does anything. */
+[data-reorderable] > [data-tab-value],
+[data-reorderable] > [data-panel-key] {
+  cursor: grab;
+}
+
+[data-reorderable].is-reordering {
+  cursor: grabbing;
+}
+
+.is-dragging {
+  opacity: 0.4;
+}
+
+/* The drop-position line — a vertical bar between horizontally-arranged tabs (.is-x) or a
+   horizontal bar between vertically-stacked ones (.is-y, the rail). align-self:stretch makes it
+   span the strip's own cross-axis automatically whichever way the container's flex-direction
+   runs, so the same two rules work for every reorderable strip in the app. */
+.reorder-indicator {
+  background: var(--cyan);
+  border-radius: 1px;
+  flex: none;
+  align-self: stretch;
+  pointer-events: none;
+}
+
+.reorder-indicator.is-x {
+  width: 2px;
+  margin: 0 2px;
+}
+
+.reorder-indicator.is-y {
+  height: 2px;
+  margin: 2px 0;
 }
 
 /* ---------- Navigation: header tab ---------- */
@@ -729,7 +849,7 @@
 }
 .popup-close:hover {
   background: var(--bg-hover);
-  color: var(--fg);
+  color: var(--danger);
 }
 
 .popup-body {
@@ -746,6 +866,206 @@
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* Plain container for editor.html's Popup Base (see showPopup() there) — no layout of its own,
+   since each instance it holds is its own position:fixed .popup-backdrop; a stacked instance's
+   z-index is set inline (POPUP_Z_FLOOR + depth) rather than here, since nesting depth is only
+   known at runtime. */
+.popup-stack {
+  display: contents;
+}
+
+/* ---------- Dropdown menu ---------- */
+/* A small floating action list anchored to a trigger — File/Edit/View/Run/Help in editor.html's
+   menu bar, and the rail's account/settings flyouts. .menu-dropdown is the position:relative
+   wrapper around a trigger + list; .is-open on it shows the list. Items disabled rather than
+   omitted when there's nothing to route to yet, same as everywhere else in the shell. */
+.menu-dropdown {
+  position: relative;
+}
+
+.menu-dropdown-list {
+  display: none;
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  min-width: 180px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  z-index: 50;
+}
+
+.menu-dropdown.is-open .menu-dropdown-list {
+  display: block;
+}
+
+/* For a trigger sitting near the right edge of its container (e.g. a per-row ⋮ button) — anchors
+   the list's right edge to the trigger instead of its left, so it opens leftward and never pushes
+   the page wider than the viewport. */
+.menu-dropdown-list.anchor-right {
+  left: auto;
+  right: 0;
+}
+
+.menu-dropdown-item {
+  all: unset;
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.menu-dropdown-item:hover {
+  background: var(--bg-hover);
+}
+
+.menu-dropdown-item:disabled {
+  color: var(--fg-dim);
+  cursor: default;
+  pointer-events: none;
+}
+
+.menu-dropdown-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 2px;
+}
+
+/* ---------- Floating menu (host-level, never clipped) ---------- */
+/* .menu-dropdown-list above is positioned relative to its own trigger and constrained by whatever
+   ancestor happens to clip overflow — fine for chrome sitting in open space, but a trigger near a
+   panel's edge needs a manual anchor-right/opens-upward override to avoid running off-screen (see
+   the old .rail-dropdown-list/.console-session-menu-list overrides this replaced in editor.html),
+   and a trigger inside a sandboxed plugin iframe can't be fixed with CSS at all — position:fixed
+   cannot escape a sandboxed subframe's own box on Windows/WebView2 (see plugin_asset_server.rs's
+   note on the same platform limit). .floating-menu is the actual fix: ONE shared surface, appended
+   once outside every panel and every iframe, JS-positioned at an arbitrary screen point and clamped
+   to the real viewport edges (see openMenuOverlay() in editor.html) — everything that needs a menu,
+   host chrome or a plugin's own content, calls into this one instead of rendering its own. Reuses
+   .menu-dropdown-item/.menu-dropdown-divider verbatim for its items, so a menu looks identical
+   regardless of which system rendered it. */
+.floating-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: none;
+}
+.floating-menu.is-open {
+  display: block;
+}
+.floating-menu-list {
+  position: absolute;
+  min-width: 180px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* ---------- Manage list/detail ---------- */
+/* The "installed items, pick one to see its details" layout shared by the Modules page, the
+   Plugins page, and the editor's own in-editor managers (see editor.html) — a left list
+   (.sidebar-nav/.sidebar-tab) plus a right detail pane, both scrolling independently. Consolidated
+   here after the third copy of this exact CSS showed up (Modules and Plugins pages each had their
+   own near-identical block) — one definition instead of three drifting slowly apart. */
+.manage-list {
+  width: 240px;
+  flex: none;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.manage-list .item-sub {
+  font-size: 11px;
+  color: var(--fg-dim);
+}
+
+.manage-list-empty {
+  color: var(--fg-dim);
+  font-size: 13px;
+  padding: 8px 4px;
+}
+
+.manage-detail {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.manage-detail-empty,
+.marketplace-placeholder {
+  color: var(--fg-dim);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+}
+
+.marketplace-placeholder {
+  flex: 1;
+}
+
+.detail-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 17px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--fg-dim);
+  flex: none;
+}
+
+.status-dot.is-enabled {
+  background: var(--success);
+}
+
+.detail-sub {
+  font-size: 12px;
+  color: var(--fg-dim);
+  margin: 0 0 20px;
+}
+
+.detail-field {
+  margin-bottom: 16px;
+}
+
+.detail-field .value {
+  font-size: 14px;
+  margin-top: 2px;
+}
+
+.detail-field .value.mono {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+.detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
 }
 
 /* ---------- Tooltip ---------- */

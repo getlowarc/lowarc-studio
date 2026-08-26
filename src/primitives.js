@@ -118,6 +118,153 @@ function initTabs(root = document) {
   });
 }
 
+// Drag-to-reorder for a tab/rail strip — opt-in per container via the data-reorderable attribute
+// (checked here, not left to callers to remember), not wired onto every [data-tabs] container
+// automatically: most tab strips in this app (the top menu bar, a standalone page's view tabs)
+// have no business being reorderable, and the caller shouldn't have to think about that each time
+// — the container either declares data-reorderable in its own markup or this is a silent no-op.
+// Pointer Events, not native HTML5 drag-and-drop — same reasoning as every other drag interaction
+// in this app (see editor.html's initDividerDrag): setPointerCapture keeps tracking the pointer
+// reliably regardless of what's visually underneath it, and native DnD's dataTransfer/ghost-image
+// machinery is unneeded complexity for an in-page reorder with no drop target outside the page.
+// itemSelector picks which children count as draggable items (default [data-tab-value], override
+// for a container using a different identity attribute); keyAttr names the matching dataset
+// property read for that item's identity when reporting the final order. axis is "x" for a
+// horizontal strip, "y" for a vertical one (the rail). onReorder(orderedKeys) fires once, after a
+// completed drag that ends back in this same container, with the container's full new order — not
+// on every intermediate move, so a caller doing something non-trivial with it (like persisting to
+// disk) isn't doing that on every pixel of pointer movement.
+//
+// crossContainer + onMoveAcross(key, targetContainer, beforeKey) are optional — pass a SECOND
+// reorderable container an item from this one can be dropped into (the editor's two split groups,
+// each passing the other as its crossContainer — see editor.html). crossZone is the (typically
+// larger) element that actually counts as "hovering over the other side" — e.g. the whole editor
+// group/pane rather than just its thin tab strip, a far easier drop target — while the indicator
+// itself still only ever renders inside crossContainer (it has to; that's what has the sibling
+// tab elements to position relative to). Defaults to crossContainer when omitted.
+//
+// Pointer Capture keeps clientX/clientY reporting the real screen position throughout the drag
+// regardless of which element the events are captured to, which is what makes detecting "the
+// pointer is now over the OTHER side" possible at all without a second listener tree. A
+// collapsed/hidden crossZone (e.g. the split isn't open) has offsetParent === null, checked
+// explicitly below rather than relying on a hidden element's rect happening to sit at (0,0). On
+// drop, if the pointer ended up over the other side, the actual DOM node is deliberately left
+// alone (only the indicator moves during the drag) — onMoveAcross is expected to update whatever
+// real state governs group membership and re-render both sides from scratch, which would discard
+// any manual DOM surgery done here anyway; onReorder does NOT fire for a cross-container drop.
+function initReorderable(container, { itemSelector = "[data-tab-value]", keyAttr = "tabValue", axis = "x", onReorder, crossContainer, crossZone, onMoveAcross } = {}) {
+  if (!container || !container.hasAttribute("data-reorderable")) return;
+  if (container.dataset.reorderInit) return;
+  container.dataset.reorderInit = "true";
+
+  const THRESHOLD = 4;
+  const indicator = document.createElement("div");
+  indicator.className = "reorder-indicator " + (axis === "x" ? "is-x" : "is-y");
+
+  function itemsIn(targetContainer, except) {
+    return Array.from(targetContainer.querySelectorAll(itemSelector)).filter((el) => el !== except);
+  }
+
+  function withinRect(el, x, y) {
+    const rect = el.getBoundingClientRect();
+    return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+  }
+
+  // Finds where, among the OTHER items in `targetContainer`, the pointer currently sits, and moves
+  // the (already-detached-looking, via .is-dragging) indicator there — before the first item whose
+  // midpoint the pointer has passed, or right after the last item if the pointer is past all of
+  // them (never past the container's own trailing non-item children, e.g. the console's spacer/
+  // new-terminal controls — appendChild-ing straight onto the container would land the indicator
+  // there instead of at the actual end of the tab strip).
+  function placeIndicatorIn(targetContainer, clientPos, dragging) {
+    const others = itemsIn(targetContainer, dragging);
+    let before = null;
+    for (const item of others) {
+      const rect = item.getBoundingClientRect();
+      const mid = axis === "x" ? rect.left + rect.width / 2 : rect.top + rect.height / 2;
+      if (clientPos < mid) {
+        before = item;
+        break;
+      }
+    }
+    if (before) targetContainer.insertBefore(indicator, before);
+    else if (others.length) others[others.length - 1].after(indicator);
+    else targetContainer.appendChild(indicator);
+  }
+
+  let justDragged = false;
+
+  container.addEventListener("pointerdown", (e) => {
+    const item = e.target.closest(itemSelector);
+    if (!item || !container.contains(item)) return;
+
+    const startPos = axis === "x" ? e.clientX : e.clientY;
+    let dragging = false;
+    let activeContainer = container;
+
+    const onMove = (moveEvent) => {
+      const pos = axis === "x" ? moveEvent.clientX : moveEvent.clientY;
+      if (!dragging) {
+        if (Math.abs(pos - startPos) < THRESHOLD) return;
+        dragging = true;
+        item.setPointerCapture(e.pointerId);
+        item.classList.add("is-dragging");
+        container.classList.add("is-reordering");
+      }
+
+      const zone = crossZone || crossContainer;
+      const crossVisible = crossContainer && zone.offsetParent !== null;
+      const target = crossVisible && withinRect(zone, moveEvent.clientX, moveEvent.clientY) ? crossContainer : container;
+      if (target !== activeContainer) {
+        activeContainer.classList.remove("is-reordering");
+        target.classList.add("is-reordering");
+        activeContainer = target;
+      }
+      placeIndicatorIn(activeContainer, pos, item);
+    };
+
+    const onUp = (upEvent) => {
+      container.removeEventListener("pointermove", onMove);
+      container.removeEventListener("pointerup", onUp);
+      if (!dragging) return;
+
+      item.releasePointerCapture(upEvent.pointerId);
+      item.classList.remove("is-dragging");
+      activeContainer.classList.remove("is-reordering");
+      justDragged = true;
+
+      if (activeContainer === container) {
+        if (indicator.parentElement === container) container.insertBefore(item, indicator);
+        indicator.remove();
+        if (onReorder) onReorder(itemsIn(container, null).map((el) => el.dataset[keyAttr]));
+      } else {
+        const beforeEl = indicator.nextElementSibling;
+        indicator.remove();
+        if (onMoveAcross) onMoveAcross(item.dataset[keyAttr], activeContainer, beforeEl && beforeEl !== item ? beforeEl.dataset[keyAttr] : null);
+      }
+    };
+
+    container.addEventListener("pointermove", onMove);
+    container.addEventListener("pointerup", onUp);
+  });
+
+  // A genuine drag still ends in a real click event on release (pointerup with no movement since
+  // the last frame doesn't prevent the browser's own click synthesis) — capture phase, same
+  // "observe and stop before the item's own click handler runs" shape as the rail's toggle-close
+  // listener, so dragging a tab to reorder it doesn't also activate it as a side effect.
+  container.addEventListener(
+    "click",
+    (e) => {
+      if (justDragged) {
+        justDragged = false;
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    },
+    true,
+  );
+}
+
 // Wires a plain text input to filter `options` ({value, label}[]) into the shared dropdown-menu
 // popover. The popover only ever appears when there's something to suggest — an empty query or a
 // query with no matches keeps it closed, per "only show a dropdown when the searchbar can show
@@ -167,7 +314,78 @@ function initSearchbar(el, { options, onSelect } = {}) {
   });
 }
 
-// ---------- Toast ----------
+// ---------- Base system: slot registry ----------
+// One shared content registry every "Base" region (sidebar, inspector, console, a center-panel
+// group, popups) reads from — replacing the copy of "plugin vs host content, open/close, active
+// tab" logic that today lives separately in HOST_SIDEBAR_PANELS/pluginPanels/addSidebarRailIcon/
+// addConsoleTab/claimSingleSlot/openFiles (editor.html). Not a class hierarchy — one Map plus plain
+// functions, same style as everything else in this file. Nothing calls contribute()/getSlot() yet;
+// each region migrates onto this one at a time (see the Base-system plan).
+const slotRegistry = new Map(); // slot id -> Contribution[]
+const KNOWN_SLOTS = new Set(["sidebar", "inspector", "console", "center-0", "center-1", "popups"]);
+
+// contribution: { id, sourceType: "host" | "plugin", pluginId, label, icon, order, closeable,
+// when, mount }. id must be unique within this slot; mount(container) is called lazily, the first
+// time this contribution is actually shown (mirrors editor.html's mountPanelIframe "create once"
+// caching) — never eagerly, so a `when`-gated contribution that isn't currently shown never runs
+// whatever setup mount() does (a lesson from a related system's own regression: a hidden-but-
+// mounted section can still run background work, e.g. an interval, that a truly unmounted one
+// wouldn't).
+function contribute(slot, contribution) {
+  if (!KNOWN_SLOTS.has(slot)) throw new Error(`contribute(): unknown slot "${slot}"`);
+  if (!contribution || !contribution.id) throw new Error("contribute(): contribution needs an id");
+  if (!slotRegistry.has(slot)) slotRegistry.set(slot, []);
+  const list = slotRegistry.get(slot);
+  if (list.some((c) => c.id === contribution.id)) {
+    throw new Error(`contribute(): duplicate id "${contribution.id}" in slot "${slot}"`);
+  }
+  list.push(contribution);
+}
+
+// Returns this slot's contributions, filtered by each contribution's own `when(ctx)` (default:
+// always shown) and sorted by declared `order` (default 0). The caller is expected to apply the
+// user's own drag-order on top of this as a final override — same two-step shape
+// sortByOrder()/applySavedOrder() already use in editor.html today.
+function getSlot(slot, ctx) {
+  const list = slotRegistry.get(slot) || [];
+  return list.filter((c) => (c.when ? c.when(ctx) : true)).sort((a, b) => (a.order || 0) - (b.order || 0));
+}
+
+// Plugin disable/uninstall, or any other dynamic teardown of a previously-contributed entry.
+function removeContribution(slot, id) {
+  const list = slotRegistry.get(slot);
+  if (!list) return;
+  const idx = list.findIndex((c) => c.id === id);
+  if (idx !== -1) list.splice(idx, 1);
+}
+
+// ---------- Toast / notification history ----------
+// One system, not two — every toast IS a notification (Nolan: "The toast and notif system need to
+// be very integrated together. They are the same system."). showToast() below pushes into this
+// history unconditionally; a page with somewhere to show that history (editor.html's bell, so far
+// — see openNotificationPanel there) reads it back via getNotificationHistory()/onNotification(),
+// a page with nowhere to show it (index.html, settings.html, ...) just never looks, at the cost of
+// one array push per toast either way. Session-only — an in-memory array, not persisted — toasts
+// are inherently ephemeral status messages, so "what did I miss" only ever means "since this page
+// loaded," never forever. Capped so a very long session can't grow this unboundedly.
+const NOTIFICATION_HISTORY_CAP = 200;
+const notificationHistory = [];
+let notificationAddedListener = null;
+let notificationIdSeq = 0;
+
+// Registers the one listener a page's notification UI cares about (there's only ever one bell) —
+// fires once per new entry, right after it's pushed to history.
+function onNotification(onAdd) {
+  notificationAddedListener = onAdd;
+}
+
+function getNotificationHistory() {
+  return notificationHistory;
+}
+
+function clearNotificationHistory() {
+  notificationHistory.length = 0;
+}
 
 const TOAST_ICON_PATHS = {
   info: '<circle cx="8" cy="8" r="6.4" stroke="currentColor" stroke-width="1.4" /><path d="M8 7.3v4M8 5.1v.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />',
@@ -190,9 +408,17 @@ function getToastStack() {
 }
 
 // variant: "info" | "warning" | "success" | "error". duration is ms before auto-dismiss, or 0 to
-// require a manual close. Returns a dismiss() function so the caller can close it early (e.g. once
-// a longer operation the toast was reporting on has moved past what it said).
-function showToast({ variant = "info", message, duration = 4000 } = {}) {
+// require a manual close. source, if given, is the id of the plugin that asked for this (see
+// window.lowarc.notify() in plugin_protocol.rs) — recorded in the notification history but not
+// shown in the toast itself, which has no room for attribution. Returns a dismiss() function so
+// the caller can close it early (e.g. once a longer operation the toast was reporting on has moved
+// past what it said).
+function showToast({ variant = "info", message, duration = 4000, source = null } = {}) {
+  const entry = { id: ++notificationIdSeq, variant, message, time: Date.now(), source };
+  notificationHistory.unshift(entry);
+  if (notificationHistory.length > NOTIFICATION_HISTORY_CAP) notificationHistory.length = NOTIFICATION_HISTORY_CAP;
+  if (notificationAddedListener) notificationAddedListener(entry);
+
   const stack = getToastStack();
 
   const toast = document.createElement("div");
@@ -308,4 +534,38 @@ function initTooltips(root = document) {
       tooltipEl.classList.remove("is-visible");
     });
   });
+}
+
+// Wires the three caption buttons every page's custom titlebar needs since the window runs with
+// decorations:false (that's a whole-window setting, not per-page, so every page draws its own).
+// Expects #win-minimize / #win-maximize / #win-close to already be in the DOM.
+
+const MAXIMIZE_ICON = '<svg viewBox="0 0 16 16" fill="none"><rect x="3.5" y="3.5" width="9" height="9" rx="0.5" stroke="currentColor" stroke-width="1.3" /></svg>';
+const RESTORE_ICON = '<svg viewBox="0 0 16 16" fill="none"><rect x="5.5" y="2.5" width="8" height="8" rx="0.5" stroke="currentColor" stroke-width="1.3" /><path d="M3 5.5v7a1 1 0 001 1h7" stroke="currentColor" stroke-width="1.3" /></svg>';
+
+async function initWindowControls() {
+  const tauriWindow = window.__TAURI__ && window.__TAURI__.window;
+  if (!tauriWindow) return;
+
+  const minBtn = document.getElementById("win-minimize");
+  const maxBtn = document.getElementById("win-maximize");
+  const closeBtn = document.getElementById("win-close");
+  if (!minBtn || !maxBtn || !closeBtn) return;
+
+  const appWindow = tauriWindow.getCurrentWindow();
+
+  async function syncMaximizeButton() {
+    const maximized = await appWindow.isMaximized();
+    maxBtn.innerHTML = maximized ? RESTORE_ICON : MAXIMIZE_ICON;
+    const label = maximized ? "Restore" : "Maximize";
+    maxBtn.dataset.tooltip = label;
+    maxBtn.setAttribute("aria-label", label);
+  }
+
+  minBtn.addEventListener("click", () => appWindow.minimize());
+  maxBtn.addEventListener("click", () => appWindow.toggleMaximize());
+  closeBtn.addEventListener("click", () => appWindow.close());
+
+  await syncMaximizeButton();
+  appWindow.onResized(() => syncMaximizeButton());
 }
