@@ -26,9 +26,12 @@
   /* Single sharp colors, not tonal families like cyan/yellow — same reasoning for both: a status
      color reads one way, it doesn't need a lighter/darker self to pair with. Green's hue sits at
      150° specifically to keep clear water between it and cyan's 180° — too close and a success
-     accent next to an idle cyan control gets hard to tell apart at a glance. */
+     accent next to an idle cyan control gets hard to tell apart at a glance. Info sits on the other
+     side of cyan, at ~215°, for the same reason — distinct from both cyan (the app's own primary/
+     active accent) and success. */
   --danger: #ff3b30;
   --success: #00e676;
+  --info: #4d9fff;
 
   --accent: var(--cyan);
 }
@@ -40,10 +43,20 @@
 html, body {
   margin: 0;
   height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
   background: var(--bg);
   color: var(--fg);
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 14px;
+}
+
+/* Every page stacks a titlebar (when it has one) above its content — decorations:false applies to
+   the whole native window, not per-page, so pages without their own custom titlebar row still need
+   this column flow reserved for one. */
+body {
+  display: flex;
+  flex-direction: column;
 }
 
 button {
@@ -70,10 +83,24 @@ a {
   color: var(--accent);
 }
 
+/* Every page that uses .page (Settings, Modules, Plugins) is a utility screen that sits on top of
+   the start screen or the editor, not a screen of its own — styled as a card floating on the
+   body's normal dark background rather than edge-to-edge content, so it reads as a "fullscreen
+   popup" you dismiss (via the X in .page-header, calling history.back()) back to wherever it was
+   opened from. */
 .page {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 780px;
+  margin: 20px auto;
   display: flex;
   flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-raised);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
 }
 
 .page-header {
@@ -107,6 +134,80 @@ a {
 .back-link:hover {
   color: var(--fg);
   background: var(--bg-hover);
+}
+
+/* ---------- Titlebar ---------- */
+/* The window runs with decorations:false, so every page draws its own caption row — the OS never
+   gets to. data-tauri-drag-region goes only on the brand/spacer pieces, never on a wrapper that
+   also contains the control buttons, or clicking a button would start a window drag instead of
+   firing its click. */
+.titlebar {
+  display: flex;
+  align-items: stretch;
+  height: 34px;
+  flex: none;
+  border-bottom: 1px solid var(--border);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.titlebar-brand {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  flex: none;
+}
+
+.titlebar-icon {
+  height: 15px;
+  width: auto;
+  display: block;
+}
+
+/* Only on pages whose titlebar has no menu bar to otherwise identify the app (index/settings/
+   modules/plugins) — editor.html has its own File/Edit/View/Run/Help row and skips this. */
+.titlebar-brand-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-dim);
+  margin-left: 8px;
+}
+
+.titlebar-spacer {
+  flex: 1;
+}
+
+.titlebar-controls {
+  display: flex;
+  align-items: stretch;
+  flex: none;
+  border-left: 1px solid var(--border);
+}
+
+.titlebar-btn {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+
+.titlebar-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+.titlebar-btn:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.titlebar-btn-close:hover {
+  background: var(--danger);
+  color: #fff;
 }
 
 /* ---------- Scrollbar ---------- */

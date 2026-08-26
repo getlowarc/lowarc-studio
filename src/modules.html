@@ -5,22 +5,275 @@
     <script src="theme.js"></script>
     <title>LowArc Studio — Modules</title>
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="primitives.css" />
+    <style>
+      .page {
+        max-width: 900px;
+      }
+
+      .page-header {
+        gap: 10px;
+      }
+
+      .page-header .header-tab {
+        margin: 0 4px;
+      }
+
+      .tab-panel {
+        display: none;
+        flex: 1;
+        min-height: 0;
+      }
+
+      .tab-panel.is-active {
+        display: flex;
+      }
+
+      /* .manage-list/.manage-detail/.detail-*/.status-dot now live in primitives.css — shared with
+         plugins.html and editor.html's own in-editor managers. */
+    </style>
   </head>
   <body>
-    <div class="page">
-      <div class="page-header">
-        <button class="back-link" id="back">← Start</button>
-        <h1>Modules</h1>
-      </div>
-      <div class="page-body">
-        <p>The modules manager isn't built yet — this page is a placeholder so the
-        button on the startup screen has somewhere real to go.</p>
+    <div class="titlebar">
+      <div class="titlebar-brand" data-tauri-drag-region><img src="la-logo.svg" alt="" class="titlebar-icon" /><span class="titlebar-brand-text">LowArc Studio</span></div>
+      <div class="titlebar-spacer" data-tauri-drag-region></div>
+      <div class="titlebar-controls">
+        <button type="button" class="titlebar-btn" id="win-minimize" data-tooltip="Minimize" aria-label="Minimize">
+          <svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" /></svg>
+        </button>
+        <button type="button" class="titlebar-btn" id="win-maximize" data-tooltip="Maximize" aria-label="Maximize">
+          <svg viewBox="0 0 16 16" fill="none"><rect x="3.5" y="3.5" width="9" height="9" rx="0.5" stroke="currentColor" stroke-width="1.3" /></svg>
+        </button>
+        <button type="button" class="titlebar-btn titlebar-btn-close" id="win-close" data-tooltip="Close" aria-label="Close">
+          <svg viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
+        </button>
       </div>
     </div>
+    <div class="page">
+      <div class="page-header" data-tabs id="view-tabs">
+        <h1>Modules</h1>
+        <div class="header-spacer" style="flex: 1"></div>
+        <button type="button" class="btn btn-sm btn-outline" id="add-item">
+          <svg viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+          Add Module…
+        </button>
+        <button type="button" class="header-tab is-active" data-tab-value="installed">Installed</button>
+        <button type="button" class="header-tab" data-tab-value="marketplace">Marketplace</button>
+        <button type="button" class="popup-close" id="close" data-tooltip="Close" aria-label="Close">
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
+        </button>
+      </div>
+
+      <div class="tab-panel is-active" id="tab-panel-installed">
+        <div class="manage-list">
+          <div class="sidebar-nav" data-tabs id="item-list"></div>
+        </div>
+        <div class="manage-detail" id="detail-pane">
+          <div class="manage-detail-empty">Select a module to see its details.</div>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tab-panel-marketplace">
+        <div class="marketplace-placeholder">The marketplace isn't built yet.</div>
+      </div>
+    </div>
+
+    <div class="popup-backdrop" data-popup id="remove-popup">
+      <div class="popup" style="width: 340px">
+        <div class="popup-header">
+          <h2>Remove module?</h2>
+          <button type="button" class="popup-close" data-popup-close data-tooltip="Close" aria-label="Close"><svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg></button>
+        </div>
+        <div class="popup-body" id="remove-popup-body">This can't be undone.</div>
+        <div class="popup-actions">
+          <button type="button" class="btn btn-md btn-ghost" data-popup-close>Cancel</button>
+          <button type="button" class="btn btn-md btn-danger" id="confirm-remove">Remove</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="primitives.js"></script>
     <script>
-      document.getElementById("back").addEventListener("click", () => {
-        window.location.href = "index.html";
+      const { invoke } = window.__TAURI__.core;
+      const { open: openDialog } = window.__TAURI__.dialog;
+
+      let items = [];
+      let selectedId = null;
+
+      function reportError(err) {
+        showToast({ variant: "error", message: String(err) });
+      }
+
+      // ---------- List (left) ----------
+      function renderList() {
+        const list = document.getElementById("item-list");
+        list.innerHTML = "";
+
+        if (items.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "manage-list-empty";
+          empty.textContent = "No modules installed.";
+          list.appendChild(empty);
+          return;
+        }
+
+        for (const item of items) {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "sidebar-tab" + (item.id === selectedId ? " is-active" : "");
+          btn.dataset.tabValue = item.id;
+          if (item.disabled) btn.style.opacity = "0.55";
+
+          const stack = document.createElement("div");
+          const name = document.createElement("div");
+          name.textContent = item.name;
+          const sub = document.createElement("div");
+          sub.className = "item-sub";
+          sub.textContent = (item.version ? `v${item.version}` : item.id) + (item.disabled ? " — Disabled" : "");
+          stack.appendChild(name);
+          stack.appendChild(sub);
+          btn.appendChild(stack);
+
+          list.appendChild(btn);
+        }
+      }
+
+      // ---------- Detail (right) ----------
+      function detailField(label, value) {
+        const field = document.createElement("div");
+        field.className = "detail-field";
+        const lab = document.createElement("div");
+        lab.className = "field-label";
+        lab.textContent = label;
+        const val = document.createElement("div");
+        val.className = "value";
+        val.textContent = value;
+        field.appendChild(lab);
+        field.appendChild(val);
+        return field;
+      }
+
+      function renderDetail(item) {
+        const pane = document.getElementById("detail-pane");
+        pane.innerHTML = "";
+
+        if (!item) {
+          const empty = document.createElement("div");
+          empty.className = "manage-detail-empty";
+          empty.textContent = "Select a module to see its details.";
+          pane.appendChild(empty);
+          return;
+        }
+
+        const title = document.createElement("div");
+        title.className = "detail-title";
+        title.textContent = item.name;
+        pane.appendChild(title);
+
+        const sub = document.createElement("div");
+        sub.className = "detail-sub";
+        sub.textContent = item.id + (item.version ? ` · v${item.version}` : "");
+        pane.appendChild(sub);
+
+        pane.appendChild(detailField("Description", item.description || "No description."));
+        pane.appendChild(detailField("Load order", String(item.loadOrder)));
+        pane.appendChild(detailField("Requires", item.requires.length ? item.requires.join(", ") : "Nothing."));
+
+        const actions = document.createElement("div");
+        actions.className = "detail-actions";
+
+        const enabledLabel = document.createElement("label");
+        enabledLabel.className = "checkbox-row";
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = !item.disabled;
+        const box = document.createElement("span");
+        box.className = "checkbox-box";
+        box.innerHTML = '<svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>';
+        const enabledText = document.createElement("span");
+        enabledText.textContent = "Enabled";
+        enabledLabel.appendChild(checkbox);
+        enabledLabel.appendChild(box);
+        enabledLabel.appendChild(enabledText);
+        checkbox.addEventListener("change", async () => {
+          try {
+            await invoke("set_module_enabled", { id: item.id, enabled: checkbox.checked });
+            await loadItems();
+          } catch (err) {
+            reportError(err);
+          }
+        });
+        actions.appendChild(enabledLabel);
+
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "btn btn-sm btn-danger";
+        removeBtn.textContent = "Remove";
+        removeBtn.addEventListener("click", () => {
+          document.getElementById("remove-popup-body").textContent = `This deletes "${item.name}" from disk. This can't be undone.`;
+          document.getElementById("confirm-remove").onclick = async () => {
+            try {
+              await invoke("remove_module", { id: item.id });
+              closePopup("remove-popup");
+              selectedId = null;
+              await loadItems();
+            } catch (err) {
+              reportError(err);
+            }
+          };
+          openPopup("remove-popup");
+        });
+        actions.appendChild(removeBtn);
+
+        pane.appendChild(actions);
+      }
+
+      document.getElementById("item-list").addEventListener("tab-change", (e) => {
+        selectedId = e.detail.value;
+        renderDetail(items.find((i) => i.id === selectedId));
       });
+
+      document.getElementById("view-tabs").addEventListener("tab-change", (e) => {
+        document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("is-active", p.id === `tab-panel-${e.detail.value}`));
+      });
+
+      async function loadItems() {
+        try {
+          items = await invoke("list_installed_modules");
+        } catch (err) {
+          reportError(err);
+          items = [];
+        }
+        if (!items.some((i) => i.id === selectedId)) selectedId = null;
+        renderList();
+        renderDetail(items.find((i) => i.id === selectedId));
+      }
+
+      // ---------- Add ----------
+      document.getElementById("add-item").addEventListener("click", async () => {
+        const sourceDir = await openDialog({ directory: true, title: "Choose a module folder to install" });
+        if (!sourceDir) return;
+
+        try {
+          const id = await invoke("install_module", { sourceDir });
+          showToast({ variant: "success", message: `Installed "${id}".` });
+          selectedId = id;
+          await loadItems();
+        } catch (err) {
+          reportError(err);
+        }
+      });
+
+      // ---------- Chrome ----------
+      document.getElementById("close").addEventListener("click", () => {
+        window.history.back();
+      });
+
+      initPopups();
+      initTooltips();
+      initWindowControls();
+      initTabs();
+      loadItems();
     </script>
   </body>
 </html>

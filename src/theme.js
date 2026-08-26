@@ -4,8 +4,9 @@
 // this file's job.
 //
 // Three theme-mode values live in Settings.themeMode: "system" (follow the OS), "light", "dark",
-// or the name of a user-saved custom preset (see theme.rs / appearance.html). Built-in Light/Dark
-// are plain constants here, not files — every install has them regardless of what's on disk.
+// or the name of a user-saved custom preset (see theme.rs / settings.html's Appearance tab).
+// Built-in Light/Dark are plain constants here, not files — every install has them regardless of
+// what's on disk.
 
 const THEME_CACHE_KEY = "lowarc-theme-cache";
 
