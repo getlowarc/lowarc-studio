@@ -789,6 +789,257 @@ function initTooltips(root = document) {
   });
 }
 
+// ---------- Manager page (Modules/Plugins' Installed tab) ----------
+// modules.html and plugins.html are two deliberately SEPARATE pages/popups — different concepts
+// (game-runtime deps vs. sandboxed editor plugins, see installs.rs), never merged into one — that
+// happen to need the exact same two-pane list+detail UI shape (.manage-list/.manage-detail,
+// primitives.css) wrapping the same four-command shape (list/enable/remove/install). This factory
+// is what's actually shared: each page calls it once with its own config and nothing else, instead
+// of hand-rolling ~180 near-identical lines apiece. Mirrors how editor.html's own
+// createManagerPanel() does the same thing for its narrower accordion-style in-editor panels — a
+// different visual shape (this needs the two-pane width neither the sidebar nor a popup's header
+// has room for), same underlying idea, so deliberately not the same function.
+//
+// config: { nounSingular, nounPlural, listCommand, enableCommand, removeCommand, installCommand,
+// installDialogTitle, addButtonLabel, showStatusDot (bool — plugins shows an enabled/disabled dot
+// next to the detail title, modules doesn't), detailFields(item) -> [{label, value, mono?}] }. Self-
+// initializing — call it once at page load; it wires everything (including the popup-header relay
+// and the shared remove-confirm popup) and loads the list itself, nothing else needs to run after.
+function createManagerPage(config) {
+  const { invoke } = window.__TAURI__.core;
+  const { open: openDialog } = window.__TAURI__.dialog;
+  const popupId = `remove-${config.nounSingular.toLowerCase()}`;
+
+  let items = [];
+  let selectedId = null;
+
+  contribute("popups", {
+    id: popupId,
+    sourceType: "host",
+    title: (target) => `Remove ${target.nounSingular}?`,
+    size: 340,
+    mount(container, ctx) {
+      const body = document.createElement("div");
+      body.className = "popup-body";
+      body.textContent = `This deletes "${ctx.target.name}" from disk. This can't be undone.`;
+      container.appendChild(body);
+
+      const actions = document.createElement("div");
+      actions.className = "popup-actions";
+      const cancelBtn = document.createElement("button");
+      cancelBtn.type = "button";
+      cancelBtn.className = "btn btn-md btn-ghost";
+      cancelBtn.textContent = "Cancel";
+      cancelBtn.addEventListener("click", () => ctx.close(false));
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "btn btn-md btn-danger";
+      removeBtn.textContent = "Remove";
+      removeBtn.addEventListener("click", () => ctx.close(true));
+      actions.appendChild(cancelBtn);
+      actions.appendChild(removeBtn);
+      container.appendChild(actions);
+    },
+  });
+
+  function reportError(err) {
+    showToast({ variant: "error", message: String(err) });
+  }
+
+  // ---------- List (left) ----------
+  function renderList() {
+    const list = document.getElementById("item-list");
+    list.innerHTML = "";
+
+    if (items.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "manage-list-empty";
+      empty.textContent = `No ${config.nounPlural} installed.`;
+      list.appendChild(empty);
+      return;
+    }
+
+    for (const item of items) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "sidebar-tab" + (item.id === selectedId ? " is-active" : "");
+      btn.dataset.tabValue = item.id;
+      if (item.disabled) btn.style.opacity = "0.55";
+
+      const stack = document.createElement("div");
+      const name = document.createElement("div");
+      name.textContent = item.name;
+      const sub = document.createElement("div");
+      sub.className = "item-sub";
+      const bits = [item.version ? `v${item.version}` : item.id];
+      if (item.disabled) bits.push("Disabled");
+      sub.textContent = bits.join(" — ");
+      stack.appendChild(name);
+      stack.appendChild(sub);
+      btn.appendChild(stack);
+
+      list.appendChild(btn);
+    }
+  }
+
+  // ---------- Detail (right) ----------
+  function detailField({ label, value, mono }) {
+    const field = document.createElement("div");
+    field.className = "detail-field";
+    const lab = document.createElement("div");
+    lab.className = "field-label";
+    lab.textContent = label;
+    const val = document.createElement("div");
+    val.className = "value" + (mono ? " mono" : "");
+    val.textContent = value;
+    field.appendChild(lab);
+    field.appendChild(val);
+    return field;
+  }
+
+  function renderDetail(item) {
+    const pane = document.getElementById("detail-pane");
+    pane.innerHTML = "";
+
+    if (!item) {
+      const empty = document.createElement("div");
+      empty.className = "manage-detail-empty";
+      empty.textContent = `Select a ${config.nounSingular.toLowerCase()} to see its details.`;
+      pane.appendChild(empty);
+      return;
+    }
+
+    const title = document.createElement("div");
+    title.className = "detail-title";
+    if (config.showStatusDot) {
+      const dot = document.createElement("span");
+      dot.className = "status-dot" + (item.disabled ? "" : " is-enabled");
+      dot.dataset.tooltip = item.disabled ? "Disabled" : "Enabled";
+      title.appendChild(dot);
+    }
+    const titleText = document.createElement("span");
+    titleText.textContent = item.name;
+    title.appendChild(titleText);
+    pane.appendChild(title);
+
+    const sub = document.createElement("div");
+    sub.className = "detail-sub";
+    sub.textContent = item.id + (item.version ? ` · v${item.version}` : "");
+    pane.appendChild(sub);
+
+    for (const field of config.detailFields(item)) {
+      pane.appendChild(detailField(field));
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "detail-actions";
+
+    const enabledLabel = document.createElement("label");
+    enabledLabel.className = "checkbox-row";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = !item.disabled;
+    const box = document.createElement("span");
+    box.className = "checkbox-box";
+    box.innerHTML = '<svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>';
+    const enabledText = document.createElement("span");
+    enabledText.textContent = "Enabled";
+    enabledLabel.appendChild(checkbox);
+    enabledLabel.appendChild(box);
+    enabledLabel.appendChild(enabledText);
+    checkbox.addEventListener("change", async () => {
+      try {
+        await invoke(config.enableCommand, { id: item.id, enabled: checkbox.checked });
+        await loadItems();
+      } catch (err) {
+        reportError(err);
+      }
+    });
+    actions.appendChild(enabledLabel);
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "btn btn-sm btn-danger";
+    removeBtn.textContent = "Remove";
+    removeBtn.addEventListener("click", async () => {
+      const confirmed = await showPopup(popupId, { nounSingular: config.nounSingular, name: item.name });
+      if (!confirmed) return;
+      try {
+        await invoke(config.removeCommand, { id: item.id });
+        selectedId = null;
+        await loadItems();
+      } catch (err) {
+        reportError(err);
+      }
+    });
+    actions.appendChild(removeBtn);
+
+    pane.appendChild(actions);
+    if (config.showStatusDot) initTooltips(); // the detail title's own status-dot needs one too
+  }
+
+  document.getElementById("item-list").addEventListener("tab-change", (e) => {
+    selectedId = e.detail.value;
+    renderDetail(items.find((i) => i.id === selectedId));
+  });
+
+  async function loadItems() {
+    try {
+      items = await invoke(config.listCommand);
+    } catch (err) {
+      reportError(err);
+      items = [];
+    }
+    if (!items.some((i) => i.id === selectedId)) selectedId = null;
+    renderList();
+    renderDetail(items.find((i) => i.id === selectedId));
+  }
+
+  // ---------- Add ----------
+  async function addItem() {
+    const sourceDir = await openDialog({ directory: true, title: config.installDialogTitle });
+    if (!sourceDir) return;
+
+    try {
+      const id = await invoke(config.installCommand, { sourceDir });
+      showToast({ variant: "success", message: `Installed "${id}".` });
+      selectedId = id;
+      await loadItems();
+    } catch (err) {
+      reportError(err);
+    }
+  }
+
+  // ---------- Popup header (Installed/Marketplace tabs + Add …, rendered by the popup shell
+  // itself — see setPopupHeaderControls()/onPopupHeaderAction() above) ----------
+  setPopupHeaderControls({
+    tabs: [
+      { value: "installed", label: "Installed" },
+      { value: "marketplace", label: "Marketplace" },
+    ],
+    activeTab: "installed",
+    buttons: [
+      {
+        id: "add-item",
+        label: config.addButtonLabel,
+        icon: '<svg viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>',
+      },
+    ],
+  });
+  onPopupHeaderAction({
+    onTabChange: (value) => {
+      document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("is-active", p.id === `tab-panel-${value}`));
+    },
+    onButtonClick: (id) => {
+      if (id === "add-item") addItem();
+    },
+  });
+
+  initTooltips();
+  initTabs();
+  loadItems();
+}
+
 // Wires the three caption buttons every page's custom titlebar needs since the window runs with
 // decorations:false (that's a whole-window setting, not per-page, so every page draws its own).
 // Expects #win-minimize / #win-maximize / #win-close to already be in the DOM.
