@@ -1,0 +1,11 @@
+# Normalize line endings on checkin, keep them as LF in the working tree regardless of the
+# checking-out platform's own git config (core.autocrlf) — the repo has contributors/CI on
+# both Windows and Unix, and unpinned line endings turn into diff noise the moment either side
+# touches a file the other created.
+* text=auto eol=lf
+
+# Compiled binary — never line-ending-normalized (would corrupt it) and not worth a text diff
+# either. Defensive: .exe is gitignored everywhere in this repo except two paths, and even
+# those are Cargo build output copied in at runtime (see AppPaths::ensure_builtin_plugin_
+# binaries()), never committed — but if that ever changes, this is still the right rule.
+*.exe binary
