@@ -1,12 +1,24 @@
-// Proves the actual point of running plugins as isolated processes, not just that messages
-// flow: a well-behaved plugin registers a panel and stops cleanly, AND a plugin that crashes
-// mid-session doesn't hang or take the test process down — the host just observes it died and
-// moves on. If the second test didn't hold, isolation would be theater.
+// Proves the actual point of invoking plugins per call rather than keeping a process alive: a
+// well-behaved plugin replies (and any log line it sends before its reply is captured), a plugin
+// that never replies times out instead of hanging the host, a plugin that exits early reports an
+// error promptly, and concurrent invocations of the same plugin stay correctly isolated from each
+// other — trivially true now, since each call gets its own process, but worth confirming directly
+// rather than by luck.
 
-use lowarc_studio_lib::plugin_host;
-use lowarc_studio_lib::plugin_host::protocol::PanelRegistration;
-use lowarc_studio_lib::runtime::runtime_loader::LogLevel;
+use lowarc_studio_lib::plugin_host::protocol::{self, LogFn, PluginDescriptor};
+use serde_json::Value;
 use std::sync::{Arc, Mutex};
+
+fn no_op_log() -> LogFn {
+    Arc::new(|_level, _msg| {})
+}
+
+fn collecting_log() -> (LogFn, Arc<Mutex<Vec<String>>>) {
+    let logs = Arc::new(Mutex::new(Vec::new()));
+    let sink = logs.clone();
+    let log: LogFn = Arc::new(move |_level, msg| sink.lock().unwrap().push(msg.to_string()));
+    (log, logs)
+}
 
 fn temp_dir(name: &str) -> std::path::PathBuf {
     let dir = std::env::temp_dir().join(format!("lowarc_studio_plugin_e2e_{name}_{}", std::process::id()));
@@ -15,31 +27,14 @@ fn temp_dir(name: &str) -> std::path::PathBuf {
     dir
 }
 
-fn collectors() -> (
-    Arc<dyn Fn(LogLevel, &str) + Send + Sync>,
-    Arc<Mutex<Vec<String>>>,
-    Arc<dyn Fn(PanelRegistration) + Send + Sync>,
-    Arc<Mutex<Vec<PanelRegistration>>>,
-) {
-    let logs = Arc::new(Mutex::new(Vec::new()));
-    let log_sink = logs.clone();
-    let log: Arc<dyn Fn(LogLevel, &str) + Send + Sync> = Arc::new(move |_lvl, msg| log_sink.lock().unwrap().push(msg.to_string()));
-
-    let panels = Arc::new(Mutex::new(Vec::new()));
-    let panel_sink = panels.clone();
-    let on_register: Arc<dyn Fn(PanelRegistration) + Send + Sync> = Arc::new(move |p| panel_sink.lock().unwrap().push(p));
-
-    (log, logs, on_register, panels)
-}
-
 #[test]
-fn a_well_behaved_plugin_registers_a_panel_and_stops_cleanly() {
+fn a_well_behaved_plugin_replies_and_its_log_line_is_captured() {
     if !cfg!(windows) {
         return;
     }
 
     let plugins_dir = temp_dir("well_behaved");
-    let dir = plugins_dir.join("hello-panel");
+    let dir = plugins_dir.join("hello");
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(
         dir.join("plugin.json"),
@@ -49,69 +44,126 @@ fn a_well_behaved_plugin_registers_a_panel_and_stops_cleanly() {
     std::fs::write(
         dir.join("plugin.ps1"),
         r#"
-while ($line = [Console]::In.ReadLine()) {
-    if ([string]::IsNullOrWhiteSpace($line)) { continue }
-    $msg = $line | ConvertFrom-Json
-    if ($msg.phase -eq "start") {
-        $reg = @{ registerPanel = @{ id = "hello"; title = "Hello Panel"; location = "left" } } | ConvertTo-Json -Compress
-        [Console]::Out.WriteLine($reg); [Console]::Out.Flush()
-        [Console]::Out.WriteLine('{"ok":true}'); [Console]::Out.Flush()
-    } elseif ($msg.phase -eq "stop") {
-        [Console]::Out.WriteLine('{"ok":true}'); [Console]::Out.Flush()
-        break
-    }
-}
+$line = [Console]::In.ReadLine()
+$msg = $line | ConvertFrom-Json
+$log = @{ log = @{ severity = "info"; message = "handling $($msg.method)" } } | ConvertTo-Json -Compress
+[Console]::Out.WriteLine($log); [Console]::Out.Flush()
+$reply = @{ ok = $true; result = "reply-for-$($msg.method)" } | ConvertTo-Json -Compress
+[Console]::Out.WriteLine($reply); [Console]::Out.Flush()
 "#,
     )
     .unwrap();
 
-    let (log, _logs, on_register, panels) = collectors();
-    let started = plugin_host::start_all(&plugins_dir, log, on_register);
+    let desc = PluginDescriptor::read(&dir).expect("plugin.json should be readable");
+    let (log, logs) = collecting_log();
+    let reply = protocol::invoke(&dir, &desc, "hello", "ping", &Value::Null, &log);
 
-    assert_eq!(started.len(), 1, "expected exactly one plugin to have started");
-    std::thread::sleep(std::time::Duration::from_millis(200)); // let the async registration notification arrive
-
-    let panels = panels.lock().unwrap();
-    assert_eq!(panels.len(), 1, "expected the plugin's panel registration to reach the host");
-    assert_eq!(panels[0].id, "hello");
-    assert_eq!(panels[0].location, "left");
-
-    for p in &started {
-        assert!(p.is_alive());
-        p.stop_and_kill();
-    }
+    assert_eq!(reply.get("ok").and_then(|v| v.as_bool()), Some(true));
+    assert_eq!(reply.get("result").and_then(|v| v.as_str()), Some("reply-for-ping"));
+    assert!(
+        logs.lock().unwrap().iter().any(|m| m.contains("handling ping")),
+        "the log line sent before the reply should have reached the log callback"
+    );
 }
 
 #[test]
-fn a_crashing_plugin_cannot_take_the_host_down() {
+fn a_plugin_that_never_replies_times_out_instead_of_hanging() {
     if !cfg!(windows) {
         return;
     }
 
-    let plugins_dir = temp_dir("crashing");
-    let dir = plugins_dir.join("bad-plugin");
+    let plugins_dir = temp_dir("hangs");
+    let dir = plugins_dir.join("slow");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("plugin.json"),
+        r#"{"command":"powershell","args":["-NoProfile","-ExecutionPolicy","Bypass","-File","plugin.ps1"],"timeoutMs":300}"#,
+    )
+    .unwrap();
+    // Reads the request, then just sits there — never writes a reply. The host has to notice on
+    // its own via the timeout, not by anything the plugin says.
+    std::fs::write(dir.join("plugin.ps1"), "$line = [Console]::In.ReadLine()\nStart-Sleep -Seconds 30\n").unwrap();
+
+    let desc = PluginDescriptor::read(&dir).expect("plugin.json should be readable");
+    let started = std::time::Instant::now();
+    let reply = protocol::invoke(&dir, &desc, "slow", "ping", &Value::Null, &no_op_log());
+
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(5),
+        "invoke() must return once its 300ms timeout fires, not hang for the full 30s the plugin sleeps"
+    );
+    assert_eq!(reply.get("ok").and_then(|v| v.as_bool()), Some(false));
+}
+
+#[test]
+fn a_plugin_that_exits_without_replying_reports_an_error_not_a_hang() {
+    if !cfg!(windows) {
+        return;
+    }
+
+    let plugins_dir = temp_dir("crashes");
+    let dir = plugins_dir.join("bad");
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(
         dir.join("plugin.json"),
         r#"{"command":"powershell","args":["-NoProfile","-ExecutionPolicy","Bypass","-File","plugin.ps1"],"timeoutMs":2000}"#,
     )
     .unwrap();
-    // Replies to "start" successfully, then exits without ever handling anything else — the
-    // process just dies, exactly like a real crash would look to the host.
-    std::fs::write(dir.join("plugin.ps1"), r#"[Console]::Out.WriteLine('{"ok":true}'); [Console]::Out.Flush(); exit 1"#).unwrap();
+    std::fs::write(dir.join("plugin.ps1"), "$line = [Console]::In.ReadLine()\nexit 1\n").unwrap();
 
-    let (log, _logs, on_register, _panels) = collectors();
-    let started = plugin_host::start_all(&plugins_dir, log, on_register);
-    assert_eq!(started.len(), 1);
+    let desc = PluginDescriptor::read(&dir).expect("plugin.json should be readable");
+    let started = std::time::Instant::now();
+    let reply = protocol::invoke(&dir, &desc, "bad", "ping", &Value::Null, &no_op_log());
 
-    // Give the process time to actually exit, then confirm the host correctly sees it as dead —
-    // and, critically, that reaching this line at all means the test process itself is still
-    // alive and responsive, not hung waiting on a process that will never answer again.
-    std::thread::sleep(std::time::Duration::from_millis(300));
-    assert!(!started[0].is_alive(), "the host should have noticed the plugin process ended");
+    assert_eq!(reply.get("ok").and_then(|v| v.as_bool()), Some(false));
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(3),
+        "an early exit should be noticed (stdout EOF) and reported quickly, not wait out the full 2s timeout"
+    );
+}
 
-    // stop_and_kill on an already-dead plugin must not hang either.
-    let stop_started = std::time::Instant::now();
-    started[0].stop_and_kill();
-    assert!(stop_started.elapsed() < std::time::Duration::from_secs(5));
+#[test]
+fn concurrent_invocations_of_the_same_plugin_stay_isolated() {
+    if !cfg!(windows) {
+        return;
+    }
+
+    let plugins_dir = temp_dir("concurrent");
+    let dir = plugins_dir.join("echo");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("plugin.json"),
+        r#"{"command":"powershell","args":["-NoProfile","-ExecutionPolicy","Bypass","-File","plugin.ps1"]}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join("plugin.ps1"),
+        r#"
+$line = [Console]::In.ReadLine()
+$msg = $line | ConvertFrom-Json
+$reply = @{ ok = $true; result = "reply-for-$($msg.method)" } | ConvertTo-Json -Compress
+[Console]::Out.WriteLine($reply); [Console]::Out.Flush()
+"#,
+    )
+    .unwrap();
+
+    let mut handles = Vec::new();
+    for i in 0..8 {
+        let dir = dir.clone();
+        handles.push(std::thread::spawn(move || {
+            let desc = PluginDescriptor::read(&dir).expect("plugin.json should be readable");
+            let method = format!("method-{i}");
+            let reply = protocol::invoke(&dir, &desc, "echo", &method, &Value::Null, &no_op_log());
+            (method, reply)
+        }));
+    }
+
+    for handle in handles {
+        let (method, reply) = handle.join().unwrap();
+        assert_eq!(
+            reply.get("result").and_then(|r| r.as_str()),
+            Some(format!("reply-for-{method}").as_str()),
+            "each concurrent invocation — its own process, no shared connection — must get its own matching reply"
+        );
+    }
 }

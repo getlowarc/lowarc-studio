@@ -68,10 +68,10 @@ impl AppPaths {
     pub fn settings_file() -> PathBuf {
         Self::user_data().join("settings.json")
     }
-    /// One project path per line — see the structure decision: a path list needs nothing more
-    /// than that, JSON would be pure overhead.
+    /// A JSON array of `{ path, pinned }` entries — see projects.rs for why this isn't a bare
+    /// path-per-line list (pinning needs somewhere to put per-entry state).
     pub fn recent_projects_file() -> PathBuf {
-        Self::user_data().join("recent.txt")
+        Self::user_data().join("recent.json")
     }
     /// One JSON file per user-saved custom color theme, named after the preset. Built-in Light/
     /// Dark aren't here — they ship baked into the frontend, since every install always has them.

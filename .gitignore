@@ -14,6 +14,7 @@ dist/
 /themes/
 /settings.json
 /recent.txt
+/recent.json
 
 # Editors / OS
 .vs/

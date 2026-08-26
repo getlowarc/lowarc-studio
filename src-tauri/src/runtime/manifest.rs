@@ -2,10 +2,10 @@
 // project.json's preset list reuses (Dependency = {id, version}), so a project's "requires" and a
 // module's "requires" are literally the same schema at two different levels.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Default, Deserialize, Clone)]
+#[derive(Debug, Default, Deserialize, Serialize, Clone)]
 #[serde(default)]
 pub struct Dependency {
     pub id: String,
@@ -20,11 +20,16 @@ pub struct Manifest {
     #[serde(rename = "loadOrder")]
     pub load_order: i32,
     pub requires: Vec<Dependency>,
+    /// Purely descriptive — shown in the Modules manage page, never read by resolve()'s
+    /// dependency-closure logic (Dependency.version is the thing that's actually checked, and
+    /// isn't even satisfied yet — see resolve()'s own note on that gap).
+    pub version: Option<String>,
+    pub description: Option<String>,
 }
 
 impl Default for Manifest {
     fn default() -> Self {
-        Self { id: String::new(), name: "Unnamed Module".into(), load_order: 100, requires: Vec::new() }
+        Self { id: String::new(), name: "Unnamed Module".into(), load_order: 100, requires: Vec::new(), version: None, description: None }
     }
 }
 

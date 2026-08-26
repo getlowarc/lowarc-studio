@@ -5,14 +5,20 @@
 // the run doesn't happen at all until the user resolves it themselves.
 
 use crate::runtime::manifest::{Dependency, Manifest, ModuleInfo};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(default)]
 pub struct ProjectPreset {
     pub requires: Vec<Dependency>,
+    /// Path to the project's entry file, relative to the project's own root. Empty by default —
+    /// create_project never sets one (there's no project-configuration UI to set one from yet;
+    /// this field exists so dev-run has something to read once that UI does). A blank entry is
+    /// checked for on the frontend before start_dev_run is even called, so this stays a plain
+    /// String rather than an Option — "not set" and "empty string" are the same thing here.
+    pub entry: String,
 }
 
 impl ProjectPreset {
@@ -20,6 +26,11 @@ impl ProjectPreset {
         let text = std::fs::read_to_string(project_dir.join("project.json"))
             .map_err(|e| format!("project.json not found or unreadable: {e}"))?;
         serde_json::from_str(&text).map_err(|e| format!("project.json is invalid: {e}"))
+    }
+
+    pub fn save(&self, project_dir: &Path) -> Result<(), String> {
+        let text = serde_json::to_string_pretty(self).map_err(|e| e.to_string())?;
+        std::fs::write(project_dir.join("project.json"), text).map_err(|e| e.to_string())
     }
 }
 
@@ -79,8 +90,9 @@ pub fn resolve(preset: &ProjectPreset, modules_dir: &Path) -> Result<Vec<ModuleI
 
 /// folder-name -> manifest.json read from every immediate subdirectory of the global store,
 /// grouped by declared id (a `Vec` per id, so a duplicate is visible rather than silently
-/// overwritten by whichever folder happened to be scanned last).
-fn scan_store(modules_dir: &Path) -> HashMap<String, Vec<PathBuf>> {
+/// overwritten by whichever folder happened to be scanned last). pub(crate) so installs.rs can
+/// reuse it for the "list everything installed, regardless of what any one project needs" view.
+pub(crate) fn scan_store(modules_dir: &Path) -> HashMap<String, Vec<PathBuf>> {
     let mut by_id: HashMap<String, Vec<PathBuf>> = HashMap::new();
     let Ok(entries) = std::fs::read_dir(modules_dir) else {
         return by_id; // no store yet — every requirement will report as missing, correctly
@@ -127,7 +139,7 @@ mod tests {
         write_module(&modules_dir, "a", "mod-a", &["mod-b"]);
         write_module(&modules_dir, "b", "mod-b", &[]);
 
-        let preset = ProjectPreset { requires: vec![Dependency { id: "mod-a".into(), version: "*".into() }] };
+        let preset = ProjectPreset { requires: vec![Dependency { id: "mod-a".into(), version: "*".into() }], ..Default::default() };
         let resolved = resolve(&preset, &modules_dir).expect("expected a successful resolution");
 
         let ids: Vec<&str> = resolved.iter().map(|m| m.manifest.id.as_str()).collect();
@@ -138,7 +150,7 @@ mod tests {
     #[test]
     fn missing_module_is_a_visible_error_not_a_silent_skip() {
         let modules_dir = temp_dir("resolve_missing");
-        let preset = ProjectPreset { requires: vec![Dependency { id: "does-not-exist".into(), version: "*".into() }] };
+        let preset = ProjectPreset { requires: vec![Dependency { id: "does-not-exist".into(), version: "*".into() }], ..Default::default() };
 
         let errors = resolve(&preset, &modules_dir).expect_err("a missing module must fail resolution");
         assert!(errors.iter().any(|e| e.contains("does-not-exist")), "error should name the missing module: {errors:?}");
@@ -150,7 +162,7 @@ mod tests {
         write_module(&modules_dir, "a-old", "mod-a", &[]);
         write_module(&modules_dir, "a-new", "mod-a", &[]);
 
-        let preset = ProjectPreset { requires: vec![Dependency { id: "mod-a".into(), version: "*".into() }] };
+        let preset = ProjectPreset { requires: vec![Dependency { id: "mod-a".into(), version: "*".into() }], ..Default::default() };
         let errors = resolve(&preset, &modules_dir).expect_err("two modules claiming one id must fail, not silently pick one");
         assert!(errors.iter().any(|e| e.contains("more than one")), "error should explain the conflict: {errors:?}");
     }
