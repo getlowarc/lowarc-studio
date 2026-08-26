@@ -1,7 +1,7 @@
 // Startup screen — new/open project, recents, and links out to the other top-level pages.
 // Talks to the Rust side purely through the commands registered in lib.rs. Load order matters:
 // primitives.js must load before this file since it defines showPopup/contributeIframePopup/
-// showToast, all used below.
+// showToast/reportError, all used below.
 
 const { invoke } = window.__TAURI__.core;
 const { open: openDialog } = window.__TAURI__.dialog;
@@ -9,10 +9,6 @@ const { openUrl } = window.__TAURI__.opener;
 
 const pinnedListEl = document.getElementById("pinned-list");
 const recentListEl = document.getElementById("recent-list");
-
-function reportError(err) {
-  showToast({ variant: "error", message: String(err) });
-}
 
 function openEditor(projectPath) {
   window.location.href = `editor.html?project=${encodeURIComponent(projectPath)}`;

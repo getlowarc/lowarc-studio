@@ -34,6 +34,12 @@
   --info: #4d9fff;
 
   --accent: var(--cyan);
+
+  /* The one monospace stack every page that shows code/paths/commands should use — was three
+     independent copies of the same literal font-family list (primitives.css, editor.html) plus a
+     fourth spot (settings.html) referencing a --font-mono that was never actually defined anywhere,
+     silently falling back to the browser default instead. */
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 * {

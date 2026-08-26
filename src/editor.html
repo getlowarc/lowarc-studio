@@ -834,7 +834,7 @@
         height: 100%;
         overflow: auto;
         padding: 8px 12px;
-        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        font-family: var(--font-mono);
         font-size: 12px;
         color: var(--fg-dim);
         white-space: pre-wrap;
@@ -2658,6 +2658,7 @@
         try {
           plugins = await invoke("list_installed_plugins");
         } catch (err) {
+          showToast({ variant: "error", message: String(err) });
           return;
         }
 

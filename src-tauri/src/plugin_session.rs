@@ -9,10 +9,12 @@
 //
 // Keyed by an opaque session_id (frontend-generated, e.g. a UUID), not by plugin_id — one plugin
 // can own several concurrent sessions (Terminal's multi-instance support: each open terminal tab
-// is its own session_id under the same "terminal" plugin). Each Session remembers its own
-// plugin_id purely so the output relay knows which iframe(s) to reach — a plugin's own frontend is
-// responsible for further routing an incoming lowarc:sessionOutput by the session_id riding along
-// in its payload to whichever internal terminal instance it belongs to.
+// is its own session_id under the same "terminal" plugin). plugin_id itself isn't stored on the
+// Session struct below — it's only ever needed by the output-relay thread (so the emitted event
+// says which iframe(s) to reach), so it's captured straight into that thread's own closure at
+// start() instead of living on Session as a field nothing else would read. A plugin's own frontend
+// is responsible for further routing an incoming lowarc:sessionOutput by the session_id riding
+// along in its payload to whichever internal terminal instance it belongs to.
 
 use crate::plugin_host::protocol::PluginDescriptor;
 use crate::runtime::child_process::{resolve_command, spawn_piped};

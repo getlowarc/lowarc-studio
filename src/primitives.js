@@ -451,6 +451,13 @@ function showToast({ variant = "info", message, duration = 4000, source = null }
   return dismiss;
 }
 
+// The one-line "show a caught error as a toast" wrapper every page's own catch blocks kept
+// redefining independently (startup.js, and the manager page factory below, among others) —
+// String(err) so both a real Error and a plain string/Rust-side error message display the same way.
+function reportError(err) {
+  showToast({ variant: "error", message: String(err) });
+}
+
 // ---------- Popup ----------
 
 function openPopup(idOrEl) {
@@ -841,10 +848,6 @@ function createManagerPage(config) {
       container.appendChild(actions);
     },
   });
-
-  function reportError(err) {
-    showToast({ variant: "error", message: String(err) });
-  }
 
   // ---------- List (left) ----------
   function renderList() {
