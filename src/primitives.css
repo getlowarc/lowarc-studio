@@ -567,8 +567,11 @@
 
 /* ---------- Navigation: sidebar tab ---------- */
 /* A vertical list of sections where one is always active (a left panel's page list, an editor's
-   inspector sections). border-left is 3px solid at rest too (just transparent) so the active
-   state's color doesn't shift layout by 3px when it appears. */
+   inspector sections). The active indicator is an inset box-shadow, not a border-left — a border
+   (even transparent, at rest) reserves real box-model width, which shifts the padding/content box
+   off-center from the button's true outer width. box-shadow paints the same line without touching
+   layout at all, so padding can stay symmetric and anything centered inside (e.g. an icon-only
+   rail tab) centers on the button's actual width, not on a border-shifted one. */
 
 .sidebar-nav {
   display: flex;
@@ -582,8 +585,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 12px 8px 13px;
-  border-left: 3px solid transparent;
+  padding: 8px 12px;
   border-radius: 0 6px 6px 0;
   font-size: 14px;
   color: var(--fg-dim);
@@ -601,10 +603,10 @@
   color: var(--fg);
 }
 
-/* Just the left border line signals "active" — no background fill or icon tint, per Nolan: "the
+/* Just the left indicator line signals "active" — no background fill or icon tint, per Nolan: "the
    blue line on the left side is enough of a visual." */
 .sidebar-tab.is-active {
-  border-left-color: var(--cyan);
+  box-shadow: inset 3px 0 0 var(--cyan);
   color: var(--fg);
 }
 

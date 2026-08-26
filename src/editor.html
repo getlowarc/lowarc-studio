@@ -342,8 +342,16 @@
         gap: 2px;
       }
       #rail-tabs .sidebar-tab {
-        padding: 7px 7px 7px 8px;
+        padding: 7px;
         border-radius: 0 4px 4px 0;
+        /* The shared primitive has no justify-content — fine where there's a text label to keep
+           left-aligned (Modules/Plugins, the in-editor managers), but a rail icon has nothing else
+           in the row to anchor to, so centering it here (icon-only usage, scoped the same way as
+           the padding/radius above) is what actually centers it in the rail's own width. Padding
+           is symmetric (7px both sides) and the active indicator is an inset box-shadow rather than
+           a border (see .sidebar-tab in primitives.css), so nothing here shifts the button's true
+           center — this centers on the rail's full width, active or not. */
+        justify-content: center;
       }
 
       .rail-spacer {
