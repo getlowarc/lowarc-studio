@@ -10,12 +10,13 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
-use std::process::{Child, ChildStdin, Command, Stdio};
+use std::process::{Child, ChildStdin};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use crate::runtime::child_process::{parse_log_severity, resolve_command, spawn_piped, STDERR_LOG_TRUNCATE_CHARS};
 use crate::runtime::manifest::{order_by_requires, ModuleInfo};
 use crate::runtime::runtime_loader::{LogLevel, RunContext, RuntimeLoader};
 
@@ -59,23 +60,8 @@ pub struct ProcessModule {
 
 impl ProcessModule {
     pub fn spawn(folder: &Path, desc: &ProcessDescriptor, name: String, log: LogFn, stop_flag: Arc<AtomicBool>) -> std::io::Result<Self> {
-        let local = folder.join(&desc.command);
-        let exe = if local.is_file() { local } else { std::path::PathBuf::from(&desc.command) };
-
-        let mut cmd = Command::new(exe);
-        cmd.args(&desc.args)
-            .current_dir(folder)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-            cmd.creation_flags(CREATE_NO_WINDOW);
-        }
-
-        let mut child = cmd.spawn()?;
+        let exe = resolve_command(folder, &desc.command);
+        let mut child = spawn_piped(exe, &desc.args, folder)?;
         let stdin = child.stdin.take().expect("piped stdin");
         let stdout = child.stdout.take().expect("piped stdout");
         let stderr = child.stderr.take().expect("piped stderr");
@@ -205,12 +191,7 @@ fn spawn_stdout_reader(
             if let Some(l) = obj.get("log").and_then(|l| l.as_object()) {
                 let severity = l.get("severity").and_then(|s| s.as_str()).unwrap_or("info");
                 let message = l.get("message").and_then(|m| m.as_str()).unwrap_or("");
-                let level = match severity.to_ascii_lowercase().as_str() {
-                    "error" => LogLevel::Error,
-                    "warn" | "warning" => LogLevel::Warn,
-                    _ => LogLevel::Info,
-                };
-                log(level, &format!("[{name}] {message}"));
+                log(parse_log_severity(severity), &format!("[{name}] {message}"));
                 continue;
             }
             if obj.get("requestStop").and_then(|r| r.as_bool()) == Some(true) {
@@ -231,7 +212,7 @@ fn spawn_stderr_reader(stderr: std::process::ChildStderr, log: LogFn, name: Stri
             if line.trim().is_empty() {
                 continue;
             }
-            let truncated: String = line.chars().take(300).collect();
+            let truncated: String = line.chars().take(STDERR_LOG_TRUNCATE_CHARS).collect();
             log(LogLevel::Error, &format!("[{name}] {truncated}"));
         }
     });

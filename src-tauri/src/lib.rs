@@ -3,7 +3,7 @@ mod dylib;
 mod installs;
 pub mod plugin_host;
 mod plugin_asset_server;
-mod plugin_protocol;
+mod plugin_assets;
 mod plugin_session;
 mod projects;
 pub mod runtime;
@@ -145,7 +145,7 @@ fn write_text_file(path: String, contents: String) -> Result<(), String> {
 /// inline, not a URL to fetch.
 #[tauri::command]
 fn read_plugin_asset(plugin_id: String, rel_path: String) -> Result<String, String> {
-    let resolved = plugin_protocol::resolve_asset_path(&plugin_id, &rel_path)
+    let resolved = plugin_assets::resolve_asset_path(&plugin_id, &rel_path)
         .ok_or_else(|| format!("No such plugin asset: \"{plugin_id}/{rel_path}\"."))?;
     std::fs::read_to_string(&resolved).map_err(|e| format!("Could not read {}: {e}", resolved.display()))
 }
@@ -303,7 +303,7 @@ fn list_installed_plugins() -> Vec<PluginListItem> {
     installs::list_plugins(&AppPaths::plugins(), &disabled)
 }
 
-/// Relays a call from a plugin's own webview content (see plugin_protocol.rs's injected harness
+/// Relays a call from a plugin's own webview content (see plugin_assets.rs's injected harness
 /// and editor.html's message-relay listener) into a fresh invocation of that plugin's backend,
 /// and surfaces its reply. This is the only path a plugin's UI has back to its own backend — it
 /// never gets a real Tauri capability of its own. A reply carrying an "emit" field gets relayed on
@@ -354,7 +354,7 @@ fn start_plugin_session(app: AppHandle, id: String, session_id: String, shell: O
 }
 
 /// Fire-and-forget write to a running session's stdin — see window.lowarc.sendSession() in
-/// plugin_protocol.rs. Whatever the session has to say back arrives separately, as a
+/// plugin_assets.rs. Whatever the session has to say back arrives separately, as a
 /// lowarc:sessionOutput emit (plugin_session.rs), not as this call's return value.
 #[tauri::command]
 fn send_to_plugin_session(session_id: String, message: serde_json::Value, sessions: State<plugin_session::SessionRegistry>) -> Result<(), String> {

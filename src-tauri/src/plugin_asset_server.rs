@@ -1,5 +1,5 @@
 // Serves each installed plugin's static UI assets over plain loopback HTTP, so a panel's content
-// loads as an ordinary cross-origin document in a sandboxed iframe. See plugin_protocol.rs for why
+// loads as an ordinary cross-origin document in a sandboxed iframe. See plugin_assets.rs for why
 // this exists instead of a Tauri custom URI scheme (`plugin://...`): on Windows/WebView2, a
 // sub-frame navigation to a custom scheme silently never reaches the registered handler.
 //
@@ -13,7 +13,7 @@
 // regardless of the URL's real origin. Isolation comes from the sandbox attribute, not from this
 // server, so nothing extra is needed here for that.
 
-use crate::plugin_protocol::{resolve_asset_path, CSP, HARNESS_JS};
+use crate::plugin_assets::{resolve_asset_path, CSP, HARNESS_JS};
 use std::sync::atomic::{AtomicU16, Ordering};
 
 static PORT: AtomicU16 = AtomicU16::new(0);

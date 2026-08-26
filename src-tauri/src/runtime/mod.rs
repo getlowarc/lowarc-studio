@@ -4,6 +4,7 @@
 // already resolved and staged by the C# Exporter; here, nothing has done that yet, so this crate
 // does it itself.
 
+pub mod child_process;
 pub mod driver;
 pub mod manifest;
 pub mod native_module;

@@ -409,7 +409,7 @@ function getToastStack() {
 
 // variant: "info" | "warning" | "success" | "error". duration is ms before auto-dismiss, or 0 to
 // require a manual close. source, if given, is the id of the plugin that asked for this (see
-// window.lowarc.notify() in plugin_protocol.rs) — recorded in the notification history but not
+// window.lowarc.notify() in plugin_assets.rs) — recorded in the notification history but not
 // shown in the toast itself, which has no room for attribution. Returns a dismiss() function so
 // the caller can close it early (e.g. once a longer operation the toast was reporting on has moved
 // past what it said).

@@ -14,12 +14,13 @@
 // responsible for further routing an incoming lowarc:sessionOutput by the session_id riding along
 // in its payload to whichever internal terminal instance it belongs to.
 
-use crate::plugin_host::protocol::{resolve_command, PluginDescriptor};
+use crate::plugin_host::protocol::PluginDescriptor;
+use crate::runtime::child_process::{resolve_command, spawn_piped};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
-use std::process::{Child, ChildStdin, Command, Stdio};
+use std::process::{Child, ChildStdin};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter};
 
@@ -43,17 +44,7 @@ impl SessionRegistry {
         }
 
         let exe = resolve_command(folder, &desc.command);
-
-        let mut cmd = Command::new(exe);
-        cmd.args(&desc.args).current_dir(folder).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-            cmd.creation_flags(CREATE_NO_WINDOW);
-        }
-
-        let mut child = cmd.spawn().map_err(|e| format!("failed to start \"{plugin_id}\": {e}"))?;
+        let mut child = spawn_piped(exe, &desc.args, folder).map_err(|e| format!("failed to start \"{plugin_id}\": {e}"))?;
         let stdin = child.stdin.take().expect("piped stdin");
         let stdout = child.stdout.take().expect("piped stdout");
 

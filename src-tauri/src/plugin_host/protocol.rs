@@ -27,12 +27,12 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Write};
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::path::Path;
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::runtime::child_process::{parse_log_severity, resolve_command, spawn_piped, STDERR_LOG_TRUNCATE_CHARS};
 use crate::runtime::runtime_loader::LogLevel;
 
 pub const DESCRIPTOR_NAME: &str = "plugin.json";
@@ -128,49 +128,18 @@ impl PluginDescriptor {
     }
 }
 
-/// Resolves a plugin's `command` to an actual file: prefers a same-named file in the plugin's own
-/// folder, also trying the platform's native executable extension so a single plugin.json entry
-/// (e.g. "file_explorer_backend", no extension) resolves correctly whether the shipped binary is
-/// `file_explorer_backend.exe` (Windows) or the extension-less build everywhere else — falling
-/// back to a bare PATH lookup (e.g. "powershell", "bash") if no local file matches either way.
-/// Shared between invoke() below and plugin_session.rs, since both need the exact same rule.
-pub fn resolve_command(folder: &Path, command: &str) -> PathBuf {
-    let local = folder.join(command);
-    if local.is_file() {
-        return local;
-    }
-    if cfg!(windows) {
-        let with_exe = folder.join(format!("{command}.exe"));
-        if with_exe.is_file() {
-            return with_exe;
-        }
-    }
-    PathBuf::from(command)
-}
-
 /// Spawns `desc.command` fresh in `folder`, writes exactly one `{"method":..,"params":..}` line to
 /// its stdin, and returns whatever it replies with — or a synthetic `{"ok":false,"error":..}` if
 /// it fails to launch, doesn't reply within `desc.timeout_ms`, or replies with something that
 /// isn't valid JSON. The process is killed immediately once a reply is in hand (or the timeout
 /// fires) regardless of whether it was already finishing up on its own — a one-shot invocation has
-/// nothing left to do for it once it's answered.
+/// nothing left to do for it once it's answered. Command resolution and the spawn itself
+/// (resolve_command/spawn_piped) are shared with plugin_session.rs and this crate's own
+/// runtime::process_module, not reimplemented here — see runtime::child_process.
 pub fn invoke(folder: &Path, desc: &PluginDescriptor, plugin_id: &str, method: &str, params: &Value, log: &LogFn) -> Value {
     let exe = resolve_command(folder, &desc.command);
 
-    let mut cmd = Command::new(exe);
-    cmd.args(&desc.args)
-        .current_dir(folder)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
-
-    let mut child = match cmd.spawn() {
+    let mut child = match spawn_piped(exe, &desc.args, folder) {
         Ok(c) => c,
         Err(e) => return json!({"ok": false, "error": format!("failed to launch plugin: {e}")}),
     };
@@ -208,12 +177,7 @@ pub fn invoke(folder: &Path, desc: &PluginDescriptor, plugin_id: &str, method: &
             if let Some(l) = value.get("log").and_then(|l| l.as_object()) {
                 let severity = l.get("severity").and_then(|s| s.as_str()).unwrap_or("info");
                 let message = l.get("message").and_then(|m| m.as_str()).unwrap_or("");
-                let level = match severity.to_ascii_lowercase().as_str() {
-                    "error" => LogLevel::Error,
-                    "warn" | "warning" => LogLevel::Warn,
-                    _ => LogLevel::Info,
-                };
-                reader_log(level, &format!("[{reader_plugin_id}] {message}"));
+                reader_log(parse_log_severity(severity), &format!("[{reader_plugin_id}] {message}"));
                 continue;
             }
             // First non-log line is the reply — this invocation is done regardless of whether
@@ -239,7 +203,7 @@ pub fn invoke(folder: &Path, desc: &PluginDescriptor, plugin_id: &str, method: &
     match reply {
         Some(value) => value,
         None => {
-            let detail: String = stderr_text.trim().chars().take(300).collect();
+            let detail: String = stderr_text.trim().chars().take(STDERR_LOG_TRUNCATE_CHARS).collect();
             let suffix = if detail.is_empty() { String::new() } else { format!(" ({detail})") };
             json!({"ok": false, "error": format!("plugin did not respond in time{suffix}")})
         }

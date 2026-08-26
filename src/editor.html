@@ -2948,7 +2948,7 @@
 
       // opts.openInSplit: true forces this file into group 1, opening the split first if it isn't
       // already — the file-explorer's "Open in Split View" context-menu item (see window.lowarc.
-      // openFile()'s new second argument in plugin_protocol.rs) and, later, a cross-group tab drag
+      // openFile()'s new second argument in plugin_assets.rs) and, later, a cross-group tab drag
       // land here too, moving an already-open file rather than re-opening it.
       async function openFile(path, opts = {}) {
         const targetGroupId = opts.openInSplit ? 1 : activeGroupId;
@@ -3102,7 +3102,7 @@
       initSplitDividerDrag();
 
       // Relays a plugin's own webview content calling lowarc.call(method, params) (see the
-      // __lowarc.js harness served by plugin_protocol.rs) into that exact plugin's process via
+      // __lowarc.js harness served by plugin_assets.rs) into that exact plugin's process via
       // invoke_plugin, and the reply back. Trust comes from windowToPlugin — event.source is the
       // actual sending window, not something a message can lie about — never from anything the
       // message payload itself claims. A second branch below handles "host" messages
@@ -3191,7 +3191,7 @@
             }
             return;
           }
-          // window.lowarc.showMenu() — see plugin_protocol.rs's harness. data.x/data.y are in the
+          // window.lowarc.showMenu() — see plugin_assets.rs's harness. data.x/data.y are in the
           // calling iframe's OWN document coordinates (typically a right-click's clientX/clientY);
           // this iframe could be mounted in either editor group's viewport, a sidebar/inspector
           // panel, or a console tab, so its screen position isn't fixed — iframeForWindow() finds
@@ -3209,7 +3209,7 @@
             }
             return;
           }
-          // window.lowarc.openPopup() — see plugin_protocol.rs's harness. Unlike showMenu, a popup
+          // window.lowarc.openPopup() — see plugin_assets.rs's harness. Unlike showMenu, a popup
           // is always centered on the real window rather than anchored to the calling iframe, so
           // there's no position to translate here. popupId must name a popup some contribution
           // already registered via contribute("popups", ...) — no plugin declares one yet, so this

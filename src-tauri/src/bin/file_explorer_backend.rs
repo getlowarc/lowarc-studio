@@ -7,7 +7,7 @@
 // like."
 //
 // Every call carries "root" (the project directory) alongside its own arguments and gets
-// canonicalize-checked against it before touching disk — same reasoning as plugin_protocol.rs's
+// canonicalize-checked against it before touching disk — same reasoning as plugin_assets.rs's
 // path-traversal check for served assets: never trust a path without confirming it's still inside
 // the boundary it's supposed to be confined to, regardless of who's asking.
 
