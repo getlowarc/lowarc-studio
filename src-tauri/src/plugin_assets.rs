@@ -29,6 +29,11 @@ pub const HARNESS_JS: &str = r#"(function () {
   try { delete window.__TAURI__; } catch (e) {}
   try { delete window.__TAURI_INTERNALS__; } catch (e) {}
 
+  // No system right-click menu anywhere a plugin doesn't build its own — a plugin that wants a
+  // context menu calls showMenu() below, whose own listener calls preventDefault() itself before
+  // this ever runs, so that path is unaffected. Anything without one just gets no menu at all.
+  window.addEventListener("contextmenu", (e) => e.preventDefault());
+
   let nextId = 1;
   const pending = new Map();
   const listeners = new Map();

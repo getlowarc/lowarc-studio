@@ -62,6 +62,13 @@ function initDropdowns(root = document) {
   });
 }
 
+// No system right-click menu anywhere the app doesn't build its own — a row/element with a custom
+// context menu (file-explorer's tree rows, via window.lowarc.showMenu()) calls preventDefault()
+// itself before this ever runs, so that path is unaffected; this only removes the default for
+// everything else. Plugin iframes get the equivalent listener from HARNESS_JS (plugin_assets.rs)
+// since this document-level one can't reach into a separate iframe document.
+document.addEventListener("contextmenu", (e) => e.preventDefault());
+
 document.addEventListener("click", (e) => {
   if (!e.target.closest("[data-dropdown]")) closeAllDropdowns();
 });
