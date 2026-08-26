@@ -1,7 +1,7 @@
 // Startup screen — new/open project, recents, and links out to the other top-level pages.
 // Talks to the Rust side purely through the commands registered in lib.rs. Load order matters:
-// primitives.js must load before this file since it defines openPopup/closePopup/showToast/
-// initPopups, all used below.
+// primitives.js must load before this file since it defines showPopup/contributeIframePopup/
+// showToast, all used below.
 
 const { invoke } = window.__TAURI__.core;
 const { open: openDialog } = window.__TAURI__.dialog;
@@ -163,34 +163,69 @@ async function loadRecents() {
   initTooltips();
 }
 
-initPopups();
 initTooltips();
 initWindowControls();
+
+contribute("popups", {
+  id: "new-project",
+  sourceType: "host",
+  title: "New project name",
+  size: 360,
+  mount(container, ctx) {
+    const body = document.createElement("div");
+    body.className = "popup-body";
+    const field = document.createElement("div");
+    field.className = "field";
+    const nameInput = document.createElement("input");
+    nameInput.className = "input";
+    nameInput.type = "text";
+    nameInput.placeholder = "my-game";
+    nameInput.autocomplete = "off";
+    field.appendChild(nameInput);
+    body.appendChild(field);
+    const errorEl = document.createElement("div");
+    errorEl.className = "field-hint";
+    errorEl.style.color = "var(--danger)";
+    errorEl.style.minHeight = "16px";
+    errorEl.style.marginTop = "6px";
+    body.appendChild(errorEl);
+    container.appendChild(body);
+
+    const actions = document.createElement("div");
+    actions.className = "popup-actions";
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "btn btn-md btn-ghost";
+    cancelBtn.textContent = "Cancel";
+    cancelBtn.addEventListener("click", () => ctx.close(null));
+    const createBtn = document.createElement("button");
+    createBtn.type = "button";
+    createBtn.className = "btn btn-md btn-confirm";
+    createBtn.textContent = "Create";
+    actions.appendChild(cancelBtn);
+    actions.appendChild(createBtn);
+    container.appendChild(actions);
+
+    const create = async () => {
+      try {
+        const projectPath = await invoke("create_project", { parentDir: ctx.target.parentDir, name: nameInput.value });
+        ctx.close(projectPath);
+      } catch (err) {
+        errorEl.textContent = String(err);
+      }
+    };
+    createBtn.addEventListener("click", create);
+    nameInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") create();
+    });
+  },
+});
 
 document.getElementById("new-project").addEventListener("click", async () => {
   const parentDir = await openDialog({ directory: true, title: "Choose a folder for the new project" });
   if (!parentDir) return;
-
-  const nameInput = document.getElementById("new-project-name");
-  const errorEl = document.getElementById("new-project-error");
-  nameInput.value = "";
-  errorEl.textContent = "";
-  openPopup("new-project-popup");
-
-  const create = async () => {
-    try {
-      const projectPath = await invoke("create_project", { parentDir, name: nameInput.value });
-      closePopup("new-project-popup");
-      openEditor(projectPath);
-    } catch (err) {
-      errorEl.textContent = String(err);
-    }
-  };
-
-  document.getElementById("new-project-create").onclick = create;
-  nameInput.onkeydown = (e) => {
-    if (e.key === "Enter") create();
-  };
+  const projectPath = await showPopup("new-project", { parentDir });
+  if (projectPath) openEditor(projectPath);
 });
 
 document.getElementById("open-project").addEventListener("click", async () => {
@@ -205,16 +240,20 @@ document.getElementById("open-project").addEventListener("click", async () => {
   }
 });
 
+contributeIframePopup("settings", { title: "Settings" });
+contributeIframePopup("modules", { title: "Modules" });
+contributeIframePopup("plugins", { title: "Plugins" });
+
 document.getElementById("open-settings").addEventListener("click", () => {
-  window.location.href = "settings.html";
+  showPopup("settings", { url: "settings.html" });
 });
 
 document.getElementById("open-modules").addEventListener("click", () => {
-  window.location.href = "modules.html";
+  showPopup("modules", { url: "modules.html" });
 });
 
 document.getElementById("open-plugins").addEventListener("click", () => {
-  window.location.href = "plugins.html";
+  showPopup("plugins", { url: "plugins.html" });
 });
 
 document.getElementById("open-website").addEventListener("click", () => {

@@ -83,23 +83,17 @@ a {
   color: var(--accent);
 }
 
-/* Every page that uses .page (Settings, Modules, Plugins) is a utility screen that sits on top of
-   the start screen or the editor, not a screen of its own — styled as a card floating on the
-   body's normal dark background rather than edge-to-edge content, so it reads as a "fullscreen
-   popup" you dismiss (via the X in .page-header, calling history.back()) back to wherever it was
-   opened from. */
+/* Every page that uses .page (Settings, Modules, Plugins) exists only as popup content now (see
+   contributeIframePopup() in primitives.js) — the popup shell (.popup in primitives.css) is the
+   real card: its own background/border/border-radius/box-shadow. .page just fills whatever space
+   the iframe gives it, plain, so it doesn't draw a second nested card on top of that one. */
 .page {
   flex: 1;
   min-height: 0;
   width: 100%;
-  max-width: 780px;
-  margin: 20px auto;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--bg-raised);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
   overflow: hidden;
 }
 

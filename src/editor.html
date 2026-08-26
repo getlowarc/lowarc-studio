@@ -1307,124 +1307,12 @@
         return openMenuOverlay(items, { x: rect.left, y: rect.bottom + 2, gap: rect.height + 4 });
       }
 
-      // ---------- Popup (Base) ----------
-      // A "popups" slot in the shared registry (see primitives.js's contribute()/getSlot()), but
-      // unlike a persistent region (sidebar/inspector/console) it's a STACK, not a single mounted
-      // slot: showing one doesn't replace another, a popup can open a second one on top of it, and
-      // nothing about it persists — it exists only while shown. contribute("popups", {...}) just
-      // registers WHAT a popup is; showPopup(id, target) is what actually opens an instance, fresh,
-      // every call — never cached the way mountPanelIframe caches a region's iframe, since a popup
-      // has no reason to stay in the DOM once closed and a nested open of the same id needs its own
-      // independent instance.
-      //
-      // Deliberately reuses .popup-backdrop/.popup/.popup-header/.popup-body/.popup-actions from
-      // primitives.css as-is, but WITHOUT ever adding the "is-open" class primitives.js's own
-      // openPopup()/closePopup() toggle — primitives.js also has a document-level Escape listener
-      // keyed on ".popup-backdrop.is-open" (for the old, still-live-elsewhere-in-the-app static
-      // popup system), and this stack has its own Escape handling below; adding "is-open" here
-      // would make that old listener match these instances too and fight over closing them.
-      // Visibility here is a plain inline style.display instead.
-      const popupStack = [];
-      const POPUP_Z_FLOOR = 200; // above floating-menu (60) / toast-stack (100), below tooltip (300)
-
-      function topPopup() {
-        return popupStack.length ? popupStack[popupStack.length - 1] : null;
-      }
-
-      // contribution: { id, sourceType: "host" | "plugin", pluginId, title (string, or
-      // (target) => string for a title that depends on what showPopup() was called with), size (px
-      // width — omit for .popup's own CSS default), closeOnBackdrop (default true), closeOnEscape
-      // (default true), mount(container, ctx) }. mount receives the .popup element itself — already
-      // containing the header/title/X, the Base's own chrome — and appends whatever .popup-body/
-      // .popup-actions markup it needs, the same split every popup already used before this existed,
-      // just no longer hand-copied per instance. ctx = { close(result), target }.
-      //
-      // A plugin's own content is already safe if its mount() (really just its declared existence —
-      // no plugin contributes a popup yet) misbehaves, since nothing here calls INTO a plugin's
-      // iframe directly; a HOST contribution's mount() runs in this same script, though, so it's
-      // wrapped in try/catch below — the same reasoning already applied to markMounting a host
-      // sidebar panel, just newly relevant here since Popup didn't exist before.
-      function showPopup(id, target) {
-        const contribution = getSlot("popups").find((c) => c.id === id);
-        if (!contribution) return Promise.reject(new Error(`showPopup(): no popup contributed with id "${id}"`));
-
-        return new Promise((resolve) => {
-          const depth = popupStack.length;
-          const backdrop = document.createElement("div");
-          backdrop.className = "popup-backdrop";
-          backdrop.style.display = "flex";
-          backdrop.style.zIndex = String(POPUP_Z_FLOOR + depth * 10);
-
-          const box = document.createElement("div");
-          box.className = "popup";
-          if (contribution.size) box.style.width = `${contribution.size}px`;
-
-          const header = document.createElement("div");
-          header.className = "popup-header";
-          const h2 = document.createElement("h2");
-          h2.textContent = typeof contribution.title === "function" ? contribution.title(target) : contribution.title || "";
-          const closeBtn = document.createElement("button");
-          closeBtn.type = "button";
-          closeBtn.className = "popup-close";
-          closeBtn.dataset.tooltip = "Close";
-          closeBtn.setAttribute("aria-label", "Close");
-          closeBtn.innerHTML =
-            '<svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>';
-          header.appendChild(h2);
-          header.appendChild(closeBtn);
-          box.appendChild(header);
-          backdrop.appendChild(box);
-
-          const instance = { closeOnBackdrop: contribution.closeOnBackdrop !== false, closeOnEscape: contribution.closeOnEscape !== false };
-          let closed = false;
-          const close = (result) => {
-            if (closed) return;
-            closed = true;
-            const idx = popupStack.indexOf(instance);
-            if (idx !== -1) popupStack.splice(idx, 1);
-            backdrop.remove();
-            resolve(result === undefined ? null : result);
-          };
-          instance.close = close;
-
-          closeBtn.addEventListener("click", () => close(null));
-          backdrop.addEventListener("click", (e) => {
-            if (e.target === backdrop && instance.closeOnBackdrop) close(null);
-          });
-
-          try {
-            contribution.mount(box, { close, target });
-          } catch (err) {
-            const errorBody = document.createElement("div");
-            errorBody.className = "popup-body";
-            errorBody.style.color = "var(--danger)";
-            errorBody.textContent = `This popup failed to load: ${err}`;
-            box.appendChild(errorBody);
-            showToast({ variant: "error", message: `Popup "${id}" failed to render: ${err}`, source: contribution.pluginId || null });
-          }
-
-          document.getElementById("popup-stack").appendChild(backdrop);
-          popupStack.push(instance);
-          initTooltips(box);
-
-          const focusable = box.querySelector("input, textarea, select, button, [tabindex]");
-          if (focusable) focusable.focus();
-        });
-      }
-
-      // Only the TOP popup reacts to Escape — closeOnBackdrop/closeOnEscape are read independently
-      // per contribution rather than coupled, so a dialog that disables backdrop-click doesn't also
-      // lose its only other way out.
-      document.addEventListener("keydown", (e) => {
-        if (e.key !== "Escape") return;
-        const top = topPopup();
-        if (top && top.closeOnEscape) top.close(null);
-      });
-
       // ---------- Popup contributions (host) ----------
-      // The three popups editor.html used to hand-author as static HTML + openPopup(id)/
-      // closePopup(id) (primitives.js's simple element-toggle pair — still used as-is by
-      // modules.html/plugins.html's own remove-confirm popups, out of scope for this migration).
+      // showPopup()/the "popups" stack itself now lives in primitives.js (promoted there once
+      // settings.html/modules.html/plugins.html adopted it too — see the comment on it there for
+      // the full mechanics). These are the three popups editor.html used to hand-author as static
+      // HTML + openPopup(id)/closePopup(id) (primitives.js's older, simple element-toggle pair —
+      // still used as-is by anything that hasn't migrated).
 
       contribute("popups", {
         id: "new-project",
@@ -1575,6 +1463,14 @@
         },
       });
 
+      // Settings/Modules/Plugins stay their own separate documents (real Tauri API access,
+      // multiple entry points already before this) — see contributeIframePopup() in primitives.js.
+      // The url passed to each showPopup() call below is what actually varies per trigger (e.g.
+      // settings.html's own ?tab=appearance), not the registration itself.
+      contributeIframePopup("settings", { title: "Settings" });
+      contributeIframePopup("modules", { title: "Modules" });
+      contributeIframePopup("plugins", { title: "Plugins" });
+
       // ---------- Notification bell ----------
       // Reads the exact same history every showToast() call (host chrome's own, and any plugin's
       // via window.lowarc.notify()) already feeds — see primitives.js's toast/notification-history
@@ -1708,8 +1604,8 @@
           { divider: true },
           { label: "Check for Updates", disabled: true },
         ]).then((value) => {
-          if (value === "settings") window.location.href = "settings.html";
-          else if (value === "appearance") window.location.href = "settings.html?tab=appearance";
+          if (value === "settings") showPopup("settings", { url: "settings.html" });
+          else if (value === "appearance") showPopup("settings", { url: "settings.html?tab=appearance" });
         });
       });
 
@@ -1719,11 +1615,11 @@
       });
 
       document.getElementById("file-modules-item").addEventListener("click", () => {
-        window.location.href = "modules.html";
+        showPopup("modules", { url: "modules.html" });
       });
 
       document.getElementById("file-plugins-item").addEventListener("click", () => {
-        window.location.href = "plugins.html";
+        showPopup("plugins", { url: "plugins.html" });
       });
 
       document.getElementById("exit-item").addEventListener("click", () => {
@@ -1756,7 +1652,7 @@
       document.getElementById("view-toggle-right").addEventListener("click", () => togglePanel("right"));
 
       document.getElementById("view-appearance-item").addEventListener("click", () => {
-        window.location.href = "settings.html?tab=appearance";
+        showPopup("settings", { url: "settings.html?tab=appearance" });
       });
 
       document.getElementById("view-reload-item").addEventListener("click", () => {
@@ -1774,7 +1670,7 @@
       document.getElementById("run-menu-set-entry").addEventListener("click", pickAndSetEntry);
 
       document.getElementById("dev-run-settings-item").addEventListener("click", () => {
-        window.location.href = "settings.html";
+        showPopup("settings", { url: "settings.html" });
       });
 
       // ---------- Help menu ----------

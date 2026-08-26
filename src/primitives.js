@@ -490,6 +490,259 @@ document.addEventListener("keydown", (e) => {
   if (open) closePopup(open);
 });
 
+// ---------- Popup (Base) ----------
+// A "popups" slot in the shared registry above, but unlike a persistent region
+// (sidebar/inspector/console in editor.html) it's a STACK, not a single mounted slot: showing one
+// doesn't replace another, a popup can open a second one on top of it, and nothing about it
+// persists — it exists only while shown. contribute("popups", {...}) just registers WHAT a popup
+// is; showPopup(id, target) is what actually opens an instance, fresh, every call — never cached
+// the way a region's mounted content is, since a popup has no reason to stay in the DOM once
+// closed and a nested open of the same id needs its own independent instance.
+//
+// Deliberately reuses .popup-backdrop/.popup/.popup-header/.popup-body/.popup-actions as-is, but
+// WITHOUT ever adding the "is-open" class openPopup()/closePopup() above toggle — this file also
+// has a document-level Escape listener keyed on ".popup-backdrop.is-open" (for the simple,
+// element-toggle popup system above, still used as-is by modules.html/plugins.html/settings.html's
+// own popups), and this stack has its own Escape handling below; adding "is-open" here would make
+// that other listener match these instances too and fight over closing them. Visibility here is a
+// plain inline style.display instead.
+//
+// Any page that wants this needs a `<div class="popup-stack" id="popup-stack"></div>` in its own
+// markup (a sibling of the page's main content, same "nothing can clip it" placement reasoning as
+// editor.html's #floating-menu) — see editor.html for the original, and settings.html/modules.html/
+// plugins.html for pages that adopted it afterward.
+const popupStack = [];
+const POPUP_Z_FLOOR = 200; // above floating-menu (60) / toast-stack (100), below tooltip (300)
+
+function topPopup() {
+  return popupStack.length ? popupStack[popupStack.length - 1] : null;
+}
+
+// contribution: { id, sourceType: "host" | "plugin", pluginId, title (string, or
+// (target) => string for a title that depends on what showPopup() was called with), size (px
+// width — omit for .popup's own CSS default), large (bool — a near-fullscreen popup instead of a
+// small dialog, see .popup-large in primitives.css; for a page substantial enough to stay its own
+// separate document rather than a small confirm/form, see contributeIframePopup below),
+// closeOnBackdrop (default true), closeOnEscape (default true), mount(container, ctx) }. mount
+// receives the .popup element itself — already containing the header/title/X, the Base's own
+// chrome — and appends whatever .popup-body/.popup-actions markup it needs, the same split every
+// popup already used before this existed, just no longer hand-copied per instance.
+// ctx = { close(result), target, header, onClose(fn) }. header is the .popup-header element
+// itself — mount() can append extra controls into it (tabs, buttons) alongside the title/X; see
+// contributeIframePopup's use of it to relay header content posted up from an embedded iframe, and
+// primitives.css's .popup-header-extras for how that content is expected to lay out. onClose
+// registers cleanup that runs exactly once, whenever this popup instance actually closes —
+// REGARDLESS of what triggered it (the X, backdrop click, Escape, or mount()'s own close(result)
+// call) — for content that set up something needing teardown (see contributeIframePopup's message
+// listener).
+//
+// A plugin's own content is already safe if its mount() (really just its declared existence — no
+// plugin contributes a popup yet) misbehaves, since nothing here calls INTO a plugin's iframe
+// directly; a HOST contribution's mount() runs in this same script, though, so it's wrapped in
+// try/catch below — the same reasoning already applied to a host sidebar panel's mount() in
+// editor.html.
+function showPopup(id, target) {
+  const contribution = getSlot("popups").find((c) => c.id === id);
+  if (!contribution) return Promise.reject(new Error(`showPopup(): no popup contributed with id "${id}"`));
+
+  return new Promise((resolve) => {
+    const depth = popupStack.length;
+    const backdrop = document.createElement("div");
+    backdrop.className = "popup-backdrop";
+    backdrop.style.display = "flex";
+    backdrop.style.zIndex = String(POPUP_Z_FLOOR + depth * 10);
+
+    const box = document.createElement("div");
+    box.className = "popup" + (contribution.large ? " popup-large" : "");
+    if (contribution.size) box.style.width = `${contribution.size}px`;
+
+    const header = document.createElement("div");
+    header.className = "popup-header";
+    const h2 = document.createElement("h2");
+    h2.textContent = typeof contribution.title === "function" ? contribution.title(target) : contribution.title || "";
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "popup-close";
+    closeBtn.dataset.tooltip = "Close";
+    closeBtn.setAttribute("aria-label", "Close");
+    closeBtn.innerHTML =
+      '<svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>';
+    header.appendChild(h2);
+    header.appendChild(closeBtn);
+    box.appendChild(header);
+    closeBtn.addEventListener("click", () => close(null));
+    backdrop.appendChild(box);
+
+    const instance = { closeOnBackdrop: contribution.closeOnBackdrop !== false, closeOnEscape: contribution.closeOnEscape !== false };
+    let closed = false;
+    const cleanupFns = [];
+    const close = (result) => {
+      if (closed) return;
+      closed = true;
+      cleanupFns.forEach((fn) => {
+        try {
+          fn();
+        } catch (err) {
+          console.error("[popup] onClose cleanup failed:", err);
+        }
+      });
+      const idx = popupStack.indexOf(instance);
+      if (idx !== -1) popupStack.splice(idx, 1);
+      backdrop.remove();
+      resolve(result === undefined ? null : result);
+    };
+    instance.close = close;
+
+    backdrop.addEventListener("click", (e) => {
+      if (e.target === backdrop && instance.closeOnBackdrop) close(null);
+    });
+
+    try {
+      contribution.mount(box, { close, target, header, onClose: (fn) => cleanupFns.push(fn) });
+    } catch (err) {
+      const errorBody = document.createElement("div");
+      errorBody.className = "popup-body";
+      errorBody.style.color = "var(--danger)";
+      errorBody.textContent = `This popup failed to load: ${err}`;
+      box.appendChild(errorBody);
+      showToast({ variant: "error", message: `Popup "${id}" failed to render: ${err}`, source: contribution.pluginId || null });
+    }
+
+    document.getElementById("popup-stack").appendChild(backdrop);
+    popupStack.push(instance);
+    initTooltips(box);
+
+    const focusable = box.querySelector("input, textarea, select, button, [tabindex]");
+    if (focusable) focusable.focus();
+  });
+}
+
+// Only the TOP popup reacts to Escape — closeOnBackdrop/closeOnEscape are read independently per
+// contribution rather than coupled, so a dialog that disables backdrop-click doesn't also lose its
+// only other way out.
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  const top = topPopup();
+  if (top && top.closeOnEscape) top.close(null);
+});
+
+// For a page substantial enough to stay its own separate, unsandboxed document (Settings/Modules/
+// Plugins use real Tauri APIs directly, unlike a plugin's own sandboxed panel) rather than being
+// folded inline — registers a large popup (see the `large` contribution flag above) whose body is
+// just an <iframe>. Call once per page that can trigger it (each page has its own separate
+// contribute()/getSlot() registry — see the slot-registry section above — so a page needs its own
+// registration even though the logic lives here, shared). showPopup(id, { url }) is what actually
+// opens it — url is per-call, not fixed at registration time, so e.g. settings.html's own
+// ?tab=appearance variant is just a different url on the same "settings" id, not a second popup.
+//
+// These pages exist ONLY as popup content now (Nolan: "those pages will only exist as popups, so
+// they need to fit the popup, not be exceptions to the standard") — their own titlebar/page-title/
+// close button were removed from their markup entirely, not conditionally hidden at runtime. The
+// popup shell's own header/X (built by showPopup) is the only chrome; closing is entirely its job.
+//
+// A page's own tabs/toolbar buttons (Modules/Plugins' Installed-vs-Marketplace + "Add …") still
+// need to render SOMEWHERE, though, and the popup's header is the one place left for them — but
+// they're built by the embedded page's own script, in a different document, so they can't just be
+// appended into ctx.header directly the way a same-document mount() could. setPopupHeaderControls()/
+// onPopupHeaderAction() (below) are the embedded page's own half of this relay: it posts up what to
+// render, this renders real controls into ctx.header, and posts clicks back down for the page's own
+// existing handlers to react to — the page's tab/button LOGIC never moves out of its own script,
+// only where the buttons themselves are drawn.
+function contributeIframePopup(id, { title }) {
+  contribute("popups", {
+    id,
+    sourceType: "host",
+    title,
+    large: true,
+    mount(container, ctx) {
+      const iframe = document.createElement("iframe");
+      iframe.className = "popup-iframe";
+      iframe.src = ctx.target.url;
+      container.appendChild(iframe);
+
+      // A stable closure, not rebuilt per-message — onTabClick/onButtonClick stay live across every
+      // re-render (including the optimistic one a click itself triggers), so a second click never
+      // finds itself talking to handlers a previous render nulled out.
+      let latestTabs = [];
+      let latestButtons = [];
+      let activeTab = null;
+      const render = () => {
+        renderPopupHeaderExtras(ctx.header, latestTabs, latestButtons, activeTab, {
+          onTabClick: (value) => {
+            activeTab = value;
+            render(); // immediate highlight feedback, before the iframe even reacts
+            iframe.contentWindow.postMessage({ type: "popup-tab-change", value }, "*");
+          },
+          onButtonClick: (id_) => iframe.contentWindow.postMessage({ type: "popup-button-click", id: id_ }, "*"),
+        });
+      };
+
+      const onMessage = (e) => {
+        if (e.source !== iframe.contentWindow || !e.data || typeof e.data !== "object") return;
+        if (e.data.type !== "popup-header") return;
+        latestTabs = e.data.tabs || [];
+        latestButtons = e.data.buttons || [];
+        if (typeof e.data.activeTab === "string") activeTab = e.data.activeTab;
+        render();
+      };
+      window.addEventListener("message", onMessage);
+      ctx.onClose(() => window.removeEventListener("message", onMessage));
+    },
+  });
+}
+
+// The actual DOM-building behind contributeIframePopup's relay — a plain function (not tied to
+// postMessage) so it's just as usable by same-document popup content later, if anything ever wants
+// header tabs/buttons without going through an iframe. tabs: [{value, label}], buttons:
+// [{id, label, icon}]. Rebuilds from scratch on every call (cheap, and the only way to guarantee no
+// stale click handlers linger from a previous render).
+function renderPopupHeaderExtras(header, tabs, buttons, activeTab, { onTabClick, onButtonClick }) {
+  header.querySelectorAll(".popup-header-extras").forEach((el) => el.remove());
+  if (!tabs.length && !buttons.length) return;
+
+  const extras = document.createElement("div");
+  extras.className = "popup-header-extras";
+
+  for (const btn of buttons) {
+    const el = document.createElement("button");
+    el.type = "button";
+    el.className = "btn btn-sm btn-outline";
+    el.innerHTML = (btn.icon || "") + (btn.label ? `<span>${btn.label}</span>` : "");
+    if (onButtonClick) el.addEventListener("click", () => onButtonClick(btn.id));
+    extras.appendChild(el);
+  }
+
+  for (const tab of tabs) {
+    const el = document.createElement("button");
+    el.type = "button";
+    el.className = "header-tab" + (tab.value === activeTab ? " is-active" : "");
+    el.textContent = tab.label;
+    if (onTabClick) el.addEventListener("click", () => onTabClick(tab.value));
+    extras.appendChild(el);
+  }
+
+  const closeBtn = header.querySelector(".popup-close");
+  header.insertBefore(extras, closeBtn);
+}
+
+// Embedded-page side of the relay above — tells the parent popup (if this page is actually running
+// inside one; a no-op otherwise, so the same call is safe regardless) what to render in ITS header.
+// spec: { tabs: [{value, label}], activeTab, buttons: [{id, label, icon}] }.
+function setPopupHeaderControls(spec) {
+  if (window.parent === window) return;
+  window.parent.postMessage({ type: "popup-header", ...spec }, "*");
+}
+
+// Embedded-page side — registers what happens when the parent-rendered header controls (from
+// setPopupHeaderControls) are actually clicked. onTabChange(value) / onButtonClick(id).
+function onPopupHeaderAction({ onTabChange, onButtonClick } = {}) {
+  window.addEventListener("message", (e) => {
+    if (e.source !== window.parent || !e.data || typeof e.data !== "object") return;
+    if (e.data.type === "popup-tab-change" && onTabChange) onTabChange(e.data.value);
+    else if (e.data.type === "popup-button-click" && onButtonClick) onButtonClick(e.data.id);
+  });
+}
+
 // ---------- Tooltip ----------
 // Any element with data-tooltip="..." gets a small delayed popup on hover, positioned to its
 // right by default (falls back to the left if there's no room). One shared popup element for the

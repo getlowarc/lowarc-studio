@@ -11,14 +11,6 @@
         max-width: 900px;
       }
 
-      .page-header {
-        gap: 10px;
-      }
-
-      .page-header .header-tab {
-        margin: 0 4px;
-      }
-
       .tab-panel {
         display: none;
         flex: 1;
@@ -34,35 +26,12 @@
     </style>
   </head>
   <body>
-    <div class="titlebar">
-      <div class="titlebar-brand" data-tauri-drag-region><img src="la-logo.svg" alt="" class="titlebar-icon" /><span class="titlebar-brand-text">LowArc Studio</span></div>
-      <div class="titlebar-spacer" data-tauri-drag-region></div>
-      <div class="titlebar-controls">
-        <button type="button" class="titlebar-btn" id="win-minimize" data-tooltip="Minimize" aria-label="Minimize">
-          <svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" /></svg>
-        </button>
-        <button type="button" class="titlebar-btn" id="win-maximize" data-tooltip="Maximize" aria-label="Maximize">
-          <svg viewBox="0 0 16 16" fill="none"><rect x="3.5" y="3.5" width="9" height="9" rx="0.5" stroke="currentColor" stroke-width="1.3" /></svg>
-        </button>
-        <button type="button" class="titlebar-btn titlebar-btn-close" id="win-close" data-tooltip="Close" aria-label="Close">
-          <svg viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
-        </button>
-      </div>
-    </div>
+    <!-- No titlebar, no page title/close — this page exists only as popup content now (see
+         contributeIframePopup() in primitives.js); the popup shell supplies title/close chrome. -->
     <div class="page">
-      <div class="page-header" data-tabs id="view-tabs">
-        <h1>Modules</h1>
-        <div class="header-spacer" style="flex: 1"></div>
-        <button type="button" class="btn btn-sm btn-outline" id="add-item">
-          <svg viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
-          Add Module…
-        </button>
-        <button type="button" class="header-tab is-active" data-tab-value="installed">Installed</button>
-        <button type="button" class="header-tab" data-tab-value="marketplace">Marketplace</button>
-        <button type="button" class="popup-close" id="close" data-tooltip="Close" aria-label="Close">
-          <svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
-        </button>
-      </div>
+      <!-- The Installed/Marketplace tabs and Add-module button render in the POPUP's own header
+           instead (see setPopupHeaderControls()/onPopupHeaderAction() in primitives.js) — this page
+           only exists as popup content, so there's nothing else that needs its own header row here. -->
 
       <div class="tab-panel is-active" id="tab-panel-installed">
         <div class="manage-list">
@@ -78,19 +47,9 @@
       </div>
     </div>
 
-    <div class="popup-backdrop" data-popup id="remove-popup">
-      <div class="popup" style="width: 340px">
-        <div class="popup-header">
-          <h2>Remove module?</h2>
-          <button type="button" class="popup-close" data-popup-close data-tooltip="Close" aria-label="Close"><svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg></button>
-        </div>
-        <div class="popup-body" id="remove-popup-body">This can't be undone.</div>
-        <div class="popup-actions">
-          <button type="button" class="btn btn-md btn-ghost" data-popup-close>Cancel</button>
-          <button type="button" class="btn btn-md btn-danger" id="confirm-remove">Remove</button>
-        </div>
-      </div>
-    </div>
+    <!-- showPopup()'s stack (see primitives.js) — a sibling of the page's main content so nothing
+         can clip it, same placement editor.html uses. -->
+    <div class="popup-stack" id="popup-stack"></div>
 
     <script src="primitives.js"></script>
     <script>
@@ -99,6 +58,35 @@
 
       let items = [];
       let selectedId = null;
+
+      contribute("popups", {
+        id: "remove-module",
+        sourceType: "host",
+        title: "Remove module?",
+        size: 340,
+        mount(container, ctx) {
+          const body = document.createElement("div");
+          body.className = "popup-body";
+          body.textContent = `This deletes "${ctx.target.name}" from disk. This can't be undone.`;
+          container.appendChild(body);
+
+          const actions = document.createElement("div");
+          actions.className = "popup-actions";
+          const cancelBtn = document.createElement("button");
+          cancelBtn.type = "button";
+          cancelBtn.className = "btn btn-md btn-ghost";
+          cancelBtn.textContent = "Cancel";
+          cancelBtn.addEventListener("click", () => ctx.close(false));
+          const removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.className = "btn btn-md btn-danger";
+          removeBtn.textContent = "Remove";
+          removeBtn.addEventListener("click", () => ctx.close(true));
+          actions.appendChild(cancelBtn);
+          actions.appendChild(removeBtn);
+          container.appendChild(actions);
+        },
+      });
 
       function reportError(err) {
         showToast({ variant: "error", message: String(err) });
@@ -209,19 +197,16 @@
         removeBtn.type = "button";
         removeBtn.className = "btn btn-sm btn-danger";
         removeBtn.textContent = "Remove";
-        removeBtn.addEventListener("click", () => {
-          document.getElementById("remove-popup-body").textContent = `This deletes "${item.name}" from disk. This can't be undone.`;
-          document.getElementById("confirm-remove").onclick = async () => {
-            try {
-              await invoke("remove_module", { id: item.id });
-              closePopup("remove-popup");
-              selectedId = null;
-              await loadItems();
-            } catch (err) {
-              reportError(err);
-            }
-          };
-          openPopup("remove-popup");
+        removeBtn.addEventListener("click", async () => {
+          const confirmed = await showPopup("remove-module", { name: item.name });
+          if (!confirmed) return;
+          try {
+            await invoke("remove_module", { id: item.id });
+            selectedId = null;
+            await loadItems();
+          } catch (err) {
+            reportError(err);
+          }
         });
         actions.appendChild(removeBtn);
 
@@ -231,10 +216,6 @@
       document.getElementById("item-list").addEventListener("tab-change", (e) => {
         selectedId = e.detail.value;
         renderDetail(items.find((i) => i.id === selectedId));
-      });
-
-      document.getElementById("view-tabs").addEventListener("tab-change", (e) => {
-        document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("is-active", p.id === `tab-panel-${e.detail.value}`));
       });
 
       async function loadItems() {
@@ -250,7 +231,7 @@
       }
 
       // ---------- Add ----------
-      document.getElementById("add-item").addEventListener("click", async () => {
+      async function addModule() {
         const sourceDir = await openDialog({ directory: true, title: "Choose a module folder to install" });
         if (!sourceDir) return;
 
@@ -262,16 +243,34 @@
         } catch (err) {
           reportError(err);
         }
+      }
+
+      // ---------- Popup header (Installed/Marketplace tabs + Add Module…, rendered by the popup
+      // shell itself — see setPopupHeaderControls()/onPopupHeaderAction() in primitives.js) ----------
+      setPopupHeaderControls({
+        tabs: [
+          { value: "installed", label: "Installed" },
+          { value: "marketplace", label: "Marketplace" },
+        ],
+        activeTab: "installed",
+        buttons: [
+          {
+            id: "add-item",
+            label: "Add Module…",
+            icon: '<svg viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>',
+          },
+        ],
+      });
+      onPopupHeaderAction({
+        onTabChange: (value) => {
+          document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("is-active", p.id === `tab-panel-${value}`));
+        },
+        onButtonClick: (id) => {
+          if (id === "add-item") addModule();
+        },
       });
 
-      // ---------- Chrome ----------
-      document.getElementById("close").addEventListener("click", () => {
-        window.history.back();
-      });
-
-      initPopups();
       initTooltips();
-      initWindowControls();
       initTabs();
       loadItems();
     </script>

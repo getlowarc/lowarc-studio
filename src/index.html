@@ -238,24 +238,9 @@
     </main>
     </div>
 
-    <div class="popup-backdrop" data-popup id="new-project-popup">
-      <div class="popup" style="width: 360px">
-        <div class="popup-header">
-          <h2>New project name</h2>
-          <button type="button" class="popup-close" data-popup-close data-tooltip="Close" aria-label="Close"><svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg></button>
-        </div>
-        <div class="popup-body">
-          <div class="field">
-            <input id="new-project-name" class="input" type="text" placeholder="my-game" autocomplete="off" />
-          </div>
-          <div id="new-project-error" class="field-hint" style="color: var(--danger); min-height: 16px; margin-top: 6px"></div>
-        </div>
-        <div class="popup-actions">
-          <button type="button" class="btn btn-md btn-ghost" data-popup-close>Cancel</button>
-          <button type="button" class="btn btn-md btn-confirm" id="new-project-create">Create</button>
-        </div>
-      </div>
-    </div>
+    <!-- showPopup()'s stack (see primitives.js) — a sibling of the page's main content so nothing
+         can clip it, same placement editor.html uses. -->
+    <div class="popup-stack" id="popup-stack"></div>
 
     <script src="primitives.js"></script>
     <script src="startup.js"></script>
