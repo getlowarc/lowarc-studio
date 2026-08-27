@@ -173,6 +173,24 @@ pub const HARNESS_JS: &str = r#"(function () {
         window.parent.postMessage({ type: "host", action: "getSettings", id }, "*");
       });
     },
+    // Debugger primitives — generic, not scoped to any one plugin (any plugin could build a run
+    // monitor, not just the first-party Debugger one). Fire-and-forget, same reasoning as
+    // requestClose/markDirty: a failure (e.g. "no run is active") has nothing for the caller
+    // itself to branch on, so the host just surfaces it as its own toast. setBreakpoints always
+    // sends the WHOLE list — same "frontend always resends everything" convention plugin
+    // settings/commands already use, one fewer state-sync mechanism to get wrong.
+    pauseRun() {
+      window.parent.postMessage({ type: "host", action: "pauseRun" }, "*");
+    },
+    resumeRun() {
+      window.parent.postMessage({ type: "host", action: "resumeRun" }, "*");
+    },
+    stepRun(count) {
+      window.parent.postMessage({ type: "host", action: "stepRun", count: count || 1 }, "*");
+    },
+    setBreakpoints(breakpoints) {
+      window.parent.postMessage({ type: "host", action: "setBreakpoints", breakpoints: breakpoints || [] }, "*");
+    },
   };
 })();
 "#;

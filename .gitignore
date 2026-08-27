@@ -23,6 +23,7 @@ dist/
 !/plugins/file-explorer/
 !/plugins/monaco/
 !/plugins/terminal/
+!/plugins/debugger/
 # The two backend binaries under those are Cargo build output (see AppPaths::
 # ensure_builtin_plugin_binaries(), which copies them here automatically at startup from
 # target/) — never commit the binary itself, only the plugin source around it.

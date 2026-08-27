@@ -1125,6 +1125,15 @@
             </button>
           </div>
 
+          <!-- Only shown while "__run" (Run) is active — see activateConsoleTab(). Every other
+               console tab already owns its own way to clear itself (Debug's own Clear button;
+               Terminal is a live shell, not a log, so clearing doesn't apply there at all) — this
+               is specifically for the one console tab with no plugin/UI of its own to put a Clear
+               control in. -->
+          <button type="button" class="btn btn-icon-only btn-xs btn-ghost-warning" id="console-clear-run" data-tooltip="Clear" aria-label="Clear" style="display: none">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M3 5h10M6.5 5V3.5a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1V5M4.5 5l.5 8a1 1 0 0 0 1 .9h4a1 1 0 0 0 1-.9l.5-8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          </button>
+
           <div class="console-header-divider"></div>
 
           <!-- Permanent, like Close — not scoped to any one console tab. -->
@@ -1893,12 +1902,16 @@
       initReorderable(document.getElementById("console-tabs"), { axis: "x", onReorder: (order) => saveTabOrder("console-tabs", order) });
 
       // ---------- Transport controls (Run/Pause/Stop) ----------
-      // Real now: Run calls start_dev_run, Stop calls stop_dev_run, and dev-run-log/dev-run-ended
-      // (see lib.rs) feed the console's Run tab. isRunning is authoritative from dev-run-ended,
-      // not just set optimistically on click — a run can end on its own, not only via Stop.
-      // Pause has no backend counterpart at all (the runtime has no pause concept, just
-      // start/frame/stop) so it stays a toast — there's nothing dishonest to wire it to.
+      // Real now: Run calls start_dev_run, Stop calls stop_dev_run, Pause toggles pause_dev_run/
+      // resume_dev_run, and dev-run-log/dev-run-ended/dev-run-frame (see lib.rs) feed the console's
+      // Run tab and any plugin listening for lowarc:devRunFrame/lowarc:devRunEnded (the Debugger
+      // plugin, so far — see broadcastToPlugins below). isRunning is authoritative from
+      // dev-run-ended, not just set optimistically on click — a run can end on its own, not only
+      // via Stop. isPaused IS set optimistically on a successful pause/resume call, since unlike
+      // starting a run there's no meaningfully different "it didn't actually happen" outcome to
+      // wait for — the call either fails outright (already caught) or the flag flips.
       let isRunning = false;
+      let isPaused = false;
 
       function updateTransportButtons() {
         const runBtn = document.getElementById("run-btn");
@@ -1967,29 +1980,78 @@
         }
 
         isRunning = true;
+        isPaused = false;
         updateTransportButtons();
         appendConsoleLine("info", `Run started (entry: ${entry}).`);
         activateConsoleTab("__run");
         setPanelOpen("console", true);
+        broadcastRunState();
       }
 
       function stopRun() {
         invoke("stop_dev_run").catch((err) => showToast({ variant: "error", message: String(err) }));
       }
 
+      // The single place isPaused actually changes and gets announced — called after EITHER the
+      // toolbar's own Pause button or a plugin's pauseRun()/resumeRun() successfully flips the
+      // backend flag, so a plugin's own displayed state (the Debug plugin, so far) stays accurate
+      // no matter which control was actually used. `log` is false for a plugin-triggered change
+      // only to avoid double-logging when the plugin itself might want to say something more
+      // specific than a generic line — today nothing does, but the option costs nothing to keep.
+      function setRunPaused(paused, { log = true } = {}) {
+        isPaused = paused;
+        if (log) appendConsoleLine("info", paused ? "Run paused." : "Run resumed.");
+        broadcastRunState();
+      }
+
+      function togglePause() {
+        if (!isRunning) return;
+        invoke(isPaused ? "resume_dev_run" : "pause_dev_run")
+          .then(() => setRunPaused(!isPaused))
+          .catch((err) => showToast({ variant: "error", message: String(err) }));
+      }
+
+      // Pushed to every mounted plugin any time isRunning/isPaused actually changes (run start,
+      // either Pause control, run end) — see broadcastToPlugins below. Lets a plugin's own status
+      // display (e.g. the Debug plugin's toolbar text) stay correct even when it had nothing to do
+      // with causing the change itself, the same reasoning lowarc:fileStatus already follows for
+      // dirty/error state.
+      function broadcastRunState() {
+        broadcastToPlugins("lowarc:devRunState", { running: isRunning, paused: isPaused });
+      }
+
       document.getElementById("run-btn").addEventListener("click", startRun);
       document.getElementById("stop-btn").addEventListener("click", stopRun);
-      document.getElementById("pause-btn").addEventListener("click", () => {
-        showToast({ variant: "info", message: "Pausing isn't something the runtime can do — it only has start/stop." });
-      });
+      document.getElementById("pause-btn").addEventListener("click", togglePause);
+
+      // Broadcasts one event into every currently-mounted plugin iframe — same shape as
+      // broadcastFileStatus(), just generalized into its own helper since dev-run-frame/
+      // dev-run-ended both need the exact same "every mounted panel, not just one" relay.
+      function broadcastToPlugins(event, payload) {
+        const message = { type: "emit", event, payload };
+        for (const entry of pluginPanels.values()) {
+          if (entry.iframe) entry.iframe.contentWindow.postMessage(message, "*");
+        }
+      }
 
       window.__TAURI__.event.listen("dev-run-log", (event) => {
         appendConsoleLine(event.payload.level, event.payload.message);
       });
 
+      // Never fired during a normal free-running loop (see spawn_and_run's on_frame gate in
+      // process_module.rs) — only while paused, stepping, or right as a breakpoint fires — so this
+      // is safe to relay unthrottled; it's already rare by construction, not something that needs
+      // debouncing here too.
+      window.__TAURI__.event.listen("dev-run-frame", (event) => {
+        broadcastToPlugins("lowarc:devRunFrame", event.payload);
+      });
+
       window.__TAURI__.event.listen("dev-run-ended", (event) => {
         isRunning = false;
+        isPaused = false;
         updateTransportButtons();
+        broadcastToPlugins("lowarc:devRunEnded", event.payload);
+        broadcastRunState();
         if (event.payload.ok) {
           appendConsoleLine("info", "Run ended.");
         } else {
@@ -2129,6 +2191,9 @@
       }
 
       document.getElementById("console-close").addEventListener("click", () => setPanelOpen("console", false));
+      document.getElementById("console-clear-run").addEventListener("click", () => {
+        document.getElementById("console-run-panel").querySelectorAll(".line").forEach((el) => el.remove());
+      });
       document.getElementById("right-panel-close").addEventListener("click", () => setPanelOpen("right", false));
       document.getElementById("toggle-console").addEventListener("click", () => togglePanel("console"));
       document.getElementById("toggle-right").addEventListener("click", () => togglePanel("right"));
@@ -2569,6 +2634,7 @@
         // active — "__run" has no pluginPanels entry at all, so it falls through to hidden too.
         const entry = key !== "__run" ? pluginPanels.get(key) : null;
         document.getElementById("console-session-controls").style.display = entry && entry.session ? "flex" : "none";
+        document.getElementById("console-clear-run").style.display = key === "__run" ? "flex" : "none";
       }
 
       // ---------- Terminal's "new instance" controls (host chrome, not the plugin's own UI —
@@ -3314,19 +3380,22 @@
       // message payload itself claims. A second branch below handles "host" messages
       // (lowarc.markDirty/requestClose) the same way, just routed to a tab instead of a process.
       //
-      // The harness's own postMessage calls all target "*" (window.parent's exact origin isn't
-      // something a sandboxed iframe — no allow-same-origin — can read to specify it precisely,
-      // and guessing Tauri's own webview origin wrong here would silently break every plugin
-      // interaction rather than fail loudly). This is the other side of that: reject anything NOT
-      // actually from the plugin asset server's own origin before trusting it at all, on top of
-      // (not instead of) windowToPlugin's per-message identity check below. event.origin is a
-      // browser-enforced property a sending page's own JS cannot spoof, regardless of what target
-      // origin it specified when it sent the message.
-      const pluginOriginPromise = pluginAssetPort().then((port) => `http://127.0.0.1:${port}`);
+      // CORRECTED (2026-08-27): this used to compare event.origin against the plugin asset
+      // server's real "http://127.0.0.1:<port>" origin, on the theory that a sandboxed iframe's
+      // messages would report it. That's wrong — sandbox="allow-scripts" without
+      // allow-same-origin forces the iframe into a genuinely opaque origin, and every browser
+      // reports that as the literal string "null" on postMessage, regardless of what URL actually
+      // served the content. The dynamic-origin comparison could therefore never once match, and
+      // was silently rejecting every plugin-to-host action from every plugin the whole time it
+      // existed — confirmed live (event.origin really is the string "null"). Checking for that
+      // literal instead is what a legitimately-sandboxed plugin iframe's message actually looks
+      // like; the real per-plugin identity check remains windowToPlugin/windowToFilePath below
+      // (keyed by the unforgeable event.source), unchanged and doing the actual trust work here —
+      // this origin check only ever added defense-in-depth on top of that, never replaced it.
       window.addEventListener("message", async (event) => {
         const data = event.data;
         if (!data || typeof data !== "object") return;
-        if (event.origin !== (await pluginOriginPromise)) return;
+        if (event.origin !== "null") return;
 
         if (data.type === "host") {
           // openFile isn't "about" a file that's already open the way markDirty/requestClose
@@ -3450,6 +3519,34 @@
               invoke("get_plugin_settings", { id: pluginId })
                 .then((result) => event.source.postMessage({ type: "reply", id: data.id, ok: true, result }, "*"))
                 .catch((err) => event.source.postMessage({ type: "reply", id: data.id, ok: false, error: String(err) }, "*"));
+            }
+            return;
+          }
+          // window.lowarc.pauseRun/resumeRun/stepRun/setBreakpoints() — see plugin_assets.rs's
+          // harness. Generic, like every other action here: any mounted plugin can call these, not
+          // just the first-party Debugger one. Fire-and-forget; a failure (most commonly "no run
+          // is active") surfaces as the host's own toast, same as startSession's error handling.
+          if (data.action === "pauseRun") {
+            if (windowToPlugin.get(event.source)) {
+              invoke("pause_dev_run").then(() => setRunPaused(true)).catch((err) => showToast({ variant: "error", message: String(err) }));
+            }
+            return;
+          }
+          if (data.action === "resumeRun") {
+            if (windowToPlugin.get(event.source)) {
+              invoke("resume_dev_run").then(() => setRunPaused(false)).catch((err) => showToast({ variant: "error", message: String(err) }));
+            }
+            return;
+          }
+          if (data.action === "stepRun") {
+            if (windowToPlugin.get(event.source)) {
+              invoke("step_dev_run", { count: Number(data.count) || 1 }).catch((err) => showToast({ variant: "error", message: String(err) }));
+            }
+            return;
+          }
+          if (data.action === "setBreakpoints") {
+            if (windowToPlugin.get(event.source) && Array.isArray(data.breakpoints)) {
+              invoke("set_breakpoints", { breakpoints: data.breakpoints }).catch((err) => showToast({ variant: "error", message: String(err) }));
             }
             return;
           }

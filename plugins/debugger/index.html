@@ -1,0 +1,241 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #1e1e1e; overflow: hidden; font-family: -apple-system, "Segoe UI", sans-serif; font-size: 12px; color: #d4d4d4; }
+
+  .layout { display: flex; height: 100%; }
+
+  .debugger-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+  .toolbar {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-bottom: 1px solid #2d2d2d;
+  }
+  .toolbar button {
+    all: unset;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    background: #2d2d2d;
+    color: #d4d4d4;
+    font-size: 12px;
+  }
+  .toolbar button:hover { background: #3c3c3c; }
+  .toolbar input[type="number"] {
+    width: 46px;
+    background: #1e1e1e;
+    border: 1px solid #3c3c3c;
+    color: #d4d4d4;
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-size: 12px;
+  }
+  .toolbar-spacer { flex: 1; }
+  .status-indicator {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #888;
+    white-space: nowrap;
+    padding-bottom: 3px;
+    border-bottom: 2px solid #555;
+  }
+  .status-indicator.is-paused { color: #e2b93b; border-bottom-color: #e2b93b; }
+
+  .trace-log { flex: 1; overflow-y: auto; padding: 6px 10px; }
+  .trace-empty { color: #888; padding: 8px 0; }
+
+  .trace-entry summary {
+    cursor: pointer;
+    padding: 4px 0;
+    list-style: none;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .trace-entry summary::-webkit-details-marker { display: none; }
+  /* A relied-on Unicode triangle (U+25B8/U+25BE) rendered as essentially nothing in this font —
+     an actual drawn chevron, same convention as .plugin-manager-row-chevron elsewhere in the app
+     (an inline SVG, rotated on open), isn't at the mercy of font glyph coverage. */
+  .trace-entry summary::before {
+    content: "";
+    flex: none;
+    width: 8px;
+    height: 8px;
+    background: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 3l5 5-5 5' fill='none' stroke='%23888' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    transition: transform 0.08s ease;
+  }
+  .trace-entry[open] summary::before { transform: rotate(90deg); }
+  .trace-entry .frame-index { color: #4fc1ff; font-weight: 600; }
+  .trace-entry .frame-delta { color: #888; }
+  .trace-entry .frame-triggered { color: #e2b93b; }
+  .trace-entry pre {
+    margin: 0 0 8px 18px;
+    padding: 8px;
+    background: #161616;
+    border-radius: 4px;
+    font-family: Consolas, "Cascadia Mono", Menlo, monospace;
+    font-size: 11px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .trace-entry .module-name { color: #9cdcfe; }
+  .trace-entry .module-duration { color: #888; }
+
+  .debugger-sidebar {
+    flex: none;
+    width: 260px;
+    border-left: 1px solid #2d2d2d;
+    display: flex;
+    flex-direction: column;
+    /* The whole sidebar scrolls as one unit — the list used to be the only scrollable piece
+       (flex:1 + overflow-y:auto) with the add-breakpoint form pinned below it at a fixed size, so
+       whenever the console was short enough that the list AND form together didn't fit, the form
+       just got clipped by this container's own overflow:hidden with no way to reach it. Letting
+       this whole column scroll instead means the form is always reachable, at the cost of the list
+       and form no longer having independent scroll regions — an acceptable trade for "everything
+       stays reachable no matter how short the console gets". */
+    overflow-y: auto;
+  }
+  .sidebar-section-title {
+    flex: none;
+    padding: 8px 10px 4px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #888;
+  }
+  .breakpoint-list { flex: none; padding: 0 6px; }
+  .breakpoint-item { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 4px; }
+  .breakpoint-item:hover { background: #2a2d2e; }
+  .breakpoint-item-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .breakpoint-item-delete {
+    all: unset;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    flex: none;
+    border-radius: 4px;
+    color: #ababab;
+    cursor: pointer;
+  }
+  .breakpoint-item-delete:hover { background: #3c3c3c; color: #fff; }
+  .breakpoint-item-delete svg { width: 10px; height: 10px; }
+  .breakpoint-empty { color: #888; padding: 4px 6px 8px; }
+
+  .breakpoint-form { flex: none; border-top: 1px solid #2d2d2d; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .breakpoint-form label { font-size: 11px; color: #888; }
+  .breakpoint-form select,
+  .breakpoint-form input {
+    width: 100%;
+    background: #1e1e1e;
+    border: 1px solid #3c3c3c;
+    color: #d4d4d4;
+    border-radius: 4px;
+    padding: 4px 6px;
+    font-size: 12px;
+  }
+  .bp-field-group { display: flex; flex-direction: column; gap: 6px; }
+  .bp-field-group.is-hidden { display: none; }
+  .breakpoint-form button {
+    all: unset;
+    text-align: center;
+    padding: 5px;
+    border-radius: 4px;
+    background: #0e639c;
+    color: #fff;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .breakpoint-form button:hover { background: #1177bb; }
+</style>
+</head>
+<body>
+  <script src="__lowarc.js"></script>
+
+  <div class="layout">
+    <div class="debugger-main">
+      <div class="toolbar">
+        <button type="button" id="pause-resume-btn">Pause</button>
+        <button type="button" id="step-btn">Step</button>
+        <input type="number" id="step-count" min="1" value="1" />
+        <button type="button" id="clear-trace-btn">Clear</button>
+        <div class="toolbar-spacer"></div>
+        <span class="status-indicator" id="status-indicator"><span id="status-text">Idle</span></span>
+      </div>
+      <div class="trace-log" id="trace-log">
+        <div class="trace-empty" id="trace-empty">No frames captured.</div>
+      </div>
+    </div>
+
+    <div class="debugger-sidebar">
+      <div class="sidebar-section-title">Breakpoints</div>
+      <div class="breakpoint-list" id="breakpoint-list">
+        <div class="breakpoint-empty" id="breakpoint-empty">None set.</div>
+      </div>
+      <div class="breakpoint-form">
+        <label for="bp-kind">Add breakpoint</label>
+        <select id="bp-kind">
+          <option value="moduleStart">Module started</option>
+          <option value="moduleError">Module error</option>
+          <option value="logLevel">Log severity</option>
+          <option value="frameCount">Frame count</option>
+          <option value="jsonMatch">JSON match</option>
+        </select>
+
+        <div class="bp-field-group" data-fields-for="moduleStart">
+          <label for="bp-module-start-name">Module ID</label>
+          <input type="text" id="bp-module-start-name" list="known-modules" />
+        </div>
+
+        <div class="bp-field-group is-hidden" data-fields-for="moduleError">
+          <label for="bp-module-error-name">Module ID</label>
+          <input type="text" id="bp-module-error-name" list="known-modules" />
+        </div>
+
+        <div class="bp-field-group is-hidden" data-fields-for="logLevel">
+          <label for="bp-log-level">Severity</label>
+          <select id="bp-log-level">
+            <option value="error">Error</option>
+            <option value="warn">Warn</option>
+            <option value="info">Info</option>
+          </select>
+          <label for="bp-log-level-module">Module ID</label>
+          <input type="text" id="bp-log-level-module" list="known-modules" />
+        </div>
+
+        <div class="bp-field-group is-hidden" data-fields-for="frameCount">
+          <label for="bp-frame-count">Frame number</label>
+          <input type="number" id="bp-frame-count" min="1" />
+        </div>
+
+        <div class="bp-field-group is-hidden" data-fields-for="jsonMatch">
+          <label for="bp-json-module">Module ID</label>
+          <input type="text" id="bp-json-module" list="known-modules" />
+          <label for="bp-json-path">JSON Pointer path</label>
+          <input type="text" id="bp-json-path" />
+          <label for="bp-json-equals">Equals (JSON)</label>
+          <input type="text" id="bp-json-equals" />
+        </div>
+
+        <datalist id="known-modules"></datalist>
+
+        <button type="button" id="bp-add-btn">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="debugger.js"></script>
+</body>
+</html>

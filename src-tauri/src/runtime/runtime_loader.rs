@@ -47,11 +47,15 @@ pub enum Breakpoint {
 }
 
 /// One module's request/reply for one frame, captured for the debugger — see
-/// `process_module::ProcessModule::frame`, the one place this is actually produced.
+/// `process_module::ProcessModule::frame`, the one place this is actually produced. `id` is the
+/// manifest's stable id (what a project's own project.json names this module by), deliberately
+/// NOT its decorative display `name` — a breakpoint's `module` field has to match something the
+/// user actually knows and controls, and only the id qualifies (a display name can even collide
+/// between modules; the id can't).
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FrameModuleTrace {
-    pub name: String,
+    pub id: String,
     pub request: Value,
     pub reply: Value,
     pub duration_ms: f64,

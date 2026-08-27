@@ -47,7 +47,15 @@ impl ProcessDescriptor {
 }
 
 pub struct ProcessModule {
+    /// The manifest's display name — for humans reading logs (`[{name}] ...`), never for matching
+    /// anything a caller configured. See `id` below for the field breakpoints/traces actually key
+    /// on; the two are deliberately kept separate rather than reusing one field for both jobs.
     pub name: String,
+    /// The manifest's stable id — the same string a project's project.json "requires" names this
+    /// module by, and the only sensible thing for a breakpoint's "module" field or a FrameTrace to
+    /// key on. A display name is decorative and not even guaranteed unique; the id is what a user
+    /// actually knows and controls.
+    pub id: String,
     pub wants_frames: bool,
     timeout: Duration,
     stdin: Mutex<ChildStdin>,
@@ -59,10 +67,12 @@ pub struct ProcessModule {
 }
 
 impl ProcessModule {
+    #[allow(clippy::too_many_arguments)]
     pub fn spawn(
         folder: &Path,
         desc: &ProcessDescriptor,
         name: String,
+        id: String,
         log: LogFn,
         stop_flag: Arc<AtomicBool>,
         breakpoints: Arc<Mutex<Vec<Breakpoint>>>,
@@ -77,11 +87,12 @@ impl ProcessModule {
         let dead = Arc::new(AtomicBool::new(false));
         let (tx, rx) = mpsc::channel::<Value>();
 
-        spawn_stdout_reader(stdout, tx, dead.clone(), log.clone(), name.clone(), stop_flag, breakpoints, pause_flag);
+        spawn_stdout_reader(stdout, tx, dead.clone(), log.clone(), name.clone(), id.clone(), stop_flag, breakpoints, pause_flag);
         spawn_stderr_reader(stderr, log.clone(), name.clone());
 
         Ok(Self {
             name,
+            id,
             wants_frames: desc.wants_frames,
             timeout: Duration::from_millis(desc.timeout_ms.max(1)),
             stdin: Mutex::new(stdin),
@@ -183,12 +194,14 @@ impl ProcessModule {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn spawn_stdout_reader(
     stdout: std::process::ChildStdout,
     replies: mpsc::Sender<Value>,
     dead: Arc<AtomicBool>,
     log: LogFn,
     name: String,
+    id: String,
     stop_flag: Arc<AtomicBool>,
     breakpoints: Arc<Mutex<Vec<Breakpoint>>>,
     pause_flag: Arc<AtomicBool>,
@@ -216,7 +229,7 @@ fn spawn_stdout_reader(
                 // LogLevel breakpoint's triggering data actually exists. No matching FrameTrace
                 // accompanies this kind of pause (there's no frame to attach it to); the log line
                 // just above already says what happened.
-                if runtime_loader::check_log_level_breakpoint(&breakpoints, level, &name).is_some() {
+                if runtime_loader::check_log_level_breakpoint(&breakpoints, level, &id).is_some() {
                     pause_flag.store(true, Ordering::SeqCst);
                     log(LogLevel::Info, &format!("Breakpoint hit: [{name}] logged at {level:?} severity — pausing."));
                 }
@@ -261,6 +274,7 @@ pub fn spawn_and_run(descriptors: Vec<(&ModuleInfo, ProcessDescriptor)>, ctx: &R
             &info.folder,
             desc,
             info.manifest.name.clone(),
+            info.manifest.id.clone(),
             ctx.log.clone(),
             ctx.stop_flag.clone(),
             ctx.debug.breakpoints.clone(),
@@ -296,7 +310,7 @@ pub fn spawn_and_run(descriptors: Vec<(&ModuleInfo, ProcessDescriptor)>, ctx: &R
     // the flag before its first tick the same as any other, so "paused from frame zero" falls out
     // of the existing gate for free rather than needing a special case.
     for m in &started {
-        if runtime_loader::check_module_start_breakpoint(&ctx.debug.breakpoints, &m.name).is_some() {
+        if runtime_loader::check_module_start_breakpoint(&ctx.debug.breakpoints, &m.id).is_some() {
             ctx.debug.pause_flag.store(true, Ordering::SeqCst);
             (ctx.log)(LogLevel::Info, &format!("Breakpoint hit: module \"{}\" started — pausing before the first frame.", m.name));
         }
@@ -311,9 +325,9 @@ pub fn spawn_and_run(descriptors: Vec<(&ModuleInfo, ProcessDescriptor)>, ctx: &R
         for m in &started {
             let Some((request, reply, duration_ms)) = m.frame(delta) else { continue };
             if triggered.is_none() {
-                triggered = runtime_loader::check_frame_breakpoints(&ctx.debug.breakpoints, &m.name, &reply);
+                triggered = runtime_loader::check_frame_breakpoints(&ctx.debug.breakpoints, &m.id, &reply);
             }
-            modules_trace.push(FrameModuleTrace { name: m.name.clone(), request, reply, duration_ms });
+            modules_trace.push(FrameModuleTrace { id: m.id.clone(), request, reply, duration_ms });
         }
 
         if triggered.is_none() {
