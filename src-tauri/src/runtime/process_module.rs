@@ -218,6 +218,55 @@ fn spawn_stderr_reader(stderr: std::process::ChildStderr, log: LogFn, name: Stri
     });
 }
 
+/// Spawns one ProcessModule per `(info, descriptor)` pair, then drives them through the standard
+/// compile→start→frame-loop→stop lifecycle, sorted by each module's own manifest.load_order.
+/// Shared by ProcessLoader (real process.json modules) and NativeLoader (native.json modules
+/// bridged through the native_module_host helper process — see that file for why: it needs the
+/// exact same spawn/start/frame/stop shape a real process module gets, just with a synthetic
+/// descriptor pointing at the helper instead of one read from disk). The "compile" phase is a
+/// harmless no-op for a native-bridging module — native_module_host answers it immediately with
+/// no work to do — so this lifecycle doesn't need to know which kind of module it's driving.
+pub fn spawn_and_run(descriptors: Vec<(&ModuleInfo, ProcessDescriptor)>, ctx: &RunContext) -> Result<(), String> {
+    let mut spawned: Vec<ProcessModule> = Vec::new();
+    for (info, desc) in &descriptors {
+        match ProcessModule::spawn(&info.folder, desc, info.manifest.name.clone(), ctx.log.clone(), ctx.stop_flag.clone()) {
+            Ok(m) => spawned.push(m),
+            Err(e) => (ctx.log)(LogLevel::Error, &format!("Module \"{}\" failed to start its process — skipped. {e}", info.manifest.name)),
+        }
+    }
+
+    let load_order_rank: std::collections::HashMap<&str, i32> =
+        descriptors.iter().map(|(i, _)| (i.manifest.name.as_str(), i.manifest.load_order)).collect();
+    spawned.sort_by_key(|m| load_order_rank.get(m.name.as_str()).copied().unwrap_or(i32::MAX));
+
+    if spawned.is_empty() {
+        return Err("No runnable modules — nothing to run.".into());
+    }
+
+    let mut started: Vec<ProcessModule> = Vec::new();
+    for mut m in spawned {
+        if m.compile(ctx.source_code, &ctx.source_path.to_string_lossy()) {
+            started.push(m);
+        }
+    }
+
+    started.retain(|m| m.start(&ctx.settings));
+    if started.is_empty() {
+        return Err("Every module failed to start.".into());
+    }
+
+    crate::runtime::driver::run(ctx.target_fps, &ctx.stop_flag, |delta| {
+        for m in &started {
+            m.frame(delta);
+        }
+    });
+
+    for m in &started {
+        m.stop_and_kill();
+    }
+    Ok(())
+}
+
 /// Every module runs as its own child process, driven by the default paced loop — no CLR
 /// touched. Only matches a set where EVERY module has process.json, same reasoning as Bootstrap's
 /// ProcessLoader: a run mixing in a native-kind module has to go through NativeLoader instead.
@@ -235,47 +284,14 @@ impl RuntimeLoader for ProcessLoader {
     fn run(&self, modules: Vec<ModuleInfo>, ctx: &RunContext) -> Result<(), String> {
         let load_order = order_by_requires(modules);
 
-        let mut spawned: Vec<ProcessModule> = Vec::new();
+        let mut descriptors = Vec::new();
         for info in &load_order {
-            let Some(desc) = ProcessDescriptor::read(&info.folder) else {
-                (ctx.log)(LogLevel::Error, &format!("Module folder \"{}\" has no readable process.json — skipped.", info.folder.display()));
-                continue;
-            };
-            match ProcessModule::spawn(&info.folder, &desc, info.manifest.name.clone(), ctx.log.clone(), ctx.stop_flag.clone()) {
-                Ok(m) => spawned.push(m),
-                Err(e) => (ctx.log)(LogLevel::Error, &format!("Module \"{}\" failed to start its process — skipped. {e}", info.manifest.name)),
+            match ProcessDescriptor::read(&info.folder) {
+                Some(desc) => descriptors.push((info, desc)),
+                None => (ctx.log)(LogLevel::Error, &format!("Module folder \"{}\" has no readable process.json — skipped.", info.folder.display())),
             }
         }
 
-        let load_order_rank: std::collections::HashMap<&str, i32> =
-            load_order.iter().map(|i| (i.manifest.name.as_str(), i.manifest.load_order)).collect();
-        spawned.sort_by_key(|m| load_order_rank.get(m.name.as_str()).copied().unwrap_or(i32::MAX));
-
-        if spawned.is_empty() {
-            return Err("No runnable modules — nothing to run.".into());
-        }
-
-        let mut started: Vec<ProcessModule> = Vec::new();
-        for mut m in spawned {
-            if m.compile(ctx.source_code, &ctx.source_path.to_string_lossy()) {
-                started.push(m);
-            }
-        }
-
-        started.retain(|m| m.start(&ctx.settings));
-        if started.is_empty() {
-            return Err("Every module failed to start.".into());
-        }
-
-        crate::runtime::driver::run(ctx.target_fps, &ctx.stop_flag, |delta| {
-            for m in &started {
-                m.frame(delta);
-            }
-        });
-
-        for m in &started {
-            m.stop_and_kill();
-        }
-        Ok(())
+        spawn_and_run(descriptors, ctx)
     }
 }
