@@ -8,6 +8,10 @@
      log, the status indicator, the breakpoint list rows, the sidebar layout) stays custom below. -->
 <link rel="stylesheet" href="__lowarc.css" />
 <link rel="stylesheet" href="__lowarc-primitives.css" />
+<!-- Last on purpose — its :root overrides win via source order (same specificity as __lowarc.css's
+     own default dark :root, so whichever comes later in the cascade wins). Computed server-side
+     from whatever theme is actually active, unlike the other two (always the default dark palette). -->
+<link rel="stylesheet" href="__lowarc-theme.css" />
 <style>
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; font-size: 12px; }

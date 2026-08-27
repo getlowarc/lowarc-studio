@@ -97,6 +97,112 @@ fn preset_path(dir: &Path, name: &str) -> PathBuf {
     dir.join(format!("{}.json", slug(name)))
 }
 
+// ---------- Theme resolution for plugins (see plugin_asset_server.rs's __lowarc-theme.css) ----------
+// theme.js does this same resolution client-side for the host's own pages, but it calls Tauri
+// commands (get_settings, list_theme_presets) a sandboxed plugin has no access to — this is the
+// server-side equivalent, computed fresh per request so a freshly-mounted/reloaded plugin panel
+// always reflects whatever's currently active. Values below are copied verbatim from theme.js's own
+// DARK_THEME/LIGHT_THEME constants — kept as functions, not `const`, since ThemeColors' fields are
+// owned Strings, not const-evaluable &'static str.
+
+fn dark_theme() -> ThemeColors {
+    ThemeColors {
+        bg: "#1e1e1e".into(),
+        bg_raised: "#252526".into(),
+        bg_hover: "#2a2d2e".into(),
+        border: "#3c3c3c".into(),
+        fg: "#d4d4d4".into(),
+        fg_dim: "#8a8a8a".into(),
+        cyan: "#00ffff".into(),
+        cyan_dark: "#0096c8".into(),
+        cyan_dim: "#06272c".into(),
+        cyan_ink: "#04191b".into(),
+        yellow: "#ffff00".into(),
+        yellow_dark: "#e8960a".into(),
+        yellow_dim: "#332b00".into(),
+        yellow_ink: "#1a1600".into(),
+        danger: "#ff3b30".into(),
+        success: "#00e676".into(),
+    }
+}
+
+fn light_theme() -> ThemeColors {
+    ThemeColors {
+        bg: "#f5f5f7".into(),
+        bg_raised: "#ffffff".into(),
+        bg_hover: "#ececee".into(),
+        border: "#dcdce0".into(),
+        fg: "#1c1c1e".into(),
+        fg_dim: "#6c6c70".into(),
+        cyan: "#0097a8".into(),
+        cyan_dark: "#00707d".into(),
+        cyan_dim: "#e3f6f8".into(),
+        cyan_ink: "#ffffff".into(),
+        yellow: "#a87900".into(),
+        yellow_dark: "#7a5800".into(),
+        yellow_dim: "#fbf0d9".into(),
+        yellow_ink: "#ffffff".into(),
+        danger: "#ff3b30".into(),
+        success: "#00e676".into(),
+    }
+}
+
+enum Resolved {
+    /// "system" (or a themeMode pointing at a since-deleted preset, matching theme.js's own
+    /// fallback for that case) — reacts live to the OS's own light/dark preference via a CSS media
+    /// query, so no Rust-side "what does the OS currently prefer" lookup is needed at all, unlike
+    /// theme.js's own JS-side matchMedia listener.
+    FollowSystem,
+    Fixed(ThemeColors),
+}
+
+fn resolve(theme_mode: &str) -> Resolved {
+    match theme_mode {
+        "system" => Resolved::FollowSystem,
+        "light" => Resolved::Fixed(light_theme()),
+        "dark" => Resolved::Fixed(dark_theme()),
+        name => match list_presets().into_iter().find(|p| p.name == name) {
+            Some(preset) => Resolved::Fixed(preset.colors),
+            None => Resolved::FollowSystem,
+        },
+    }
+}
+
+fn root_block(colors: &ThemeColors) -> String {
+    format!(
+        ":root {{ --bg:{}; --bg-raised:{}; --bg-hover:{}; --border:{}; --fg:{}; --fg-dim:{}; --cyan:{}; --cyan-dark:{}; --cyan-dim:{}; --cyan-ink:{}; --yellow:{}; --yellow-dark:{}; --yellow-dim:{}; --yellow-ink:{}; --danger:{}; --success:{}; --accent: var(--cyan); }}",
+        colors.bg,
+        colors.bg_raised,
+        colors.bg_hover,
+        colors.border,
+        colors.fg,
+        colors.fg_dim,
+        colors.cyan,
+        colors.cyan_dark,
+        colors.cyan_dim,
+        colors.cyan_ink,
+        colors.yellow,
+        colors.yellow_dark,
+        colors.yellow_dim,
+        colors.yellow_ink,
+        colors.danger,
+        colors.success,
+    )
+}
+
+/// The CSS text for `__lowarc-theme.css`. `Resolved::FollowSystem` emits a dark `:root` block plus
+/// a `@media (prefers-color-scheme: light)` override — both rules have identical specificity, so
+/// the media block wins whenever its condition is true purely from coming later in source order,
+/// exactly the override a plugin needs with zero JS of its own.
+pub fn resolved_css(theme_mode: &str) -> String {
+    match resolve(theme_mode) {
+        Resolved::Fixed(colors) => root_block(&colors),
+        Resolved::FollowSystem => {
+            format!("{}\n@media (prefers-color-scheme: light) {{ {} }}", root_block(&dark_theme()), root_block(&light_theme()))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -178,5 +284,35 @@ mod tests {
         let preset = ThemePreset { name: "   ".to_string(), colors: sample_colors() };
         let err = save_preset_in(&dir, &preset).expect_err("a blank preset name must be rejected");
         assert!(err.contains("empty"));
+    }
+
+    #[test]
+    fn dark_and_light_modes_resolve_to_one_fixed_root_block_each() {
+        let dark = resolved_css("dark");
+        assert!(dark.contains("--bg:#1e1e1e;"), "expected dark's own bg, got {dark}");
+        assert!(!dark.contains("@media"), "an explicit mode shouldn't emit a media-query fallback");
+
+        let light = resolved_css("light");
+        assert!(light.contains("--bg:#f5f5f7;"), "expected light's own bg, got {light}");
+        assert!(!light.contains("@media"));
+    }
+
+    #[test]
+    fn system_mode_emits_a_dark_default_plus_a_light_media_override() {
+        let css = resolved_css("system");
+        assert!(css.contains("--bg:#1e1e1e;"), "dark should still be the unconditional default");
+        assert!(css.contains("@media (prefers-color-scheme: light)"));
+        assert!(css.contains("--bg:#f5f5f7;"), "light values should appear inside the override");
+        // The override has to come AFTER the plain block for the cascade to actually favor it when
+        // the media condition is true — same specificity either way, so source order decides.
+        assert!(css.find("@media").unwrap() > css.find(":root").unwrap());
+    }
+
+    #[test]
+    fn a_theme_mode_naming_no_real_preset_falls_back_to_system() {
+        // Doesn't touch the real themes directory — "definitely-not-a-real-preset-name" can't
+        // collide with anything list_presets() might actually find on this machine, so this stays
+        // deterministic without needing an injectable themes dir just for this one case.
+        assert_eq!(resolved_css("definitely-not-a-real-preset-name"), resolved_css("system"));
     }
 }
