@@ -95,7 +95,13 @@ impl AppPaths {
     /// it would have no way to know about. Only runs for a source build; an installed copy gets its
     /// plugins a different way (bundled resources / the normal install flow), not this. Skips a
     /// binary that isn't built yet (e.g. `cargo test`'s own exe lives elsewhere) rather than erroring
-    /// — plugin binaries genuinely not existing yet is a normal state, not a failure.
+    /// — plugin binaries genuinely not existing yet is a normal state, not a failure. Also skips a
+    /// plugin folder with no plugin.json in it: on a fresh clone that's never true (plugin.json is
+    /// tracked source, checked out already — only the compiled binary is ever missing), so this
+    /// never blocks the intended fresh-clone-just-works case. But if a user has actually removed
+    /// one of these plugins (folder deleted, whether through the app's own Remove button or by
+    /// hand), an empty/missing folder is exactly what that looks like — resurrecting just the
+    /// binary into it on the next launch would silently undo a deliberate removal.
     pub fn ensure_builtin_plugin_binaries() -> std::io::Result<()> {
         if Self::dev_root().is_none() {
             return Ok(());
@@ -107,7 +113,9 @@ impl AppPaths {
                 continue;
             }
             let dest_dir = Self::plugins().join(plugin_dir);
-            std::fs::create_dir_all(&dest_dir)?;
+            if !dest_dir.join("plugin.json").is_file() {
+                continue;
+            }
             let dest = dest_dir.join(&file_name);
             if needs_copy(&src, &dest)? {
                 std::fs::copy(&src, &dest)?;

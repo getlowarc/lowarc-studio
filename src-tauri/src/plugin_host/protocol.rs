@@ -61,6 +61,44 @@ pub struct PluginDescriptor {
     pub session: bool,
     #[serde(default)]
     pub contributes: Contributes,
+    /// Config fields this plugin wants exposed generically in Settings, rendered off this schema
+    /// rather than the app hand-coding a UI control per plugin. Optional — most plugins won't
+    /// declare any. Values themselves live in Settings.plugin_settings, keyed by plugin id then by
+    /// each field's own `key`; a plugin reads its current values back via window.lowarc.getSettings()
+    /// (see plugin_assets.rs). No mechanism forces a plugin to use this over reading its own
+    /// plugin-specific config some other way — it's the generic option, not a requirement.
+    #[serde(default)]
+    pub settings: Vec<PluginSettingField>,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize, Clone)]
+#[serde(default, rename_all = "camelCase")]
+pub struct PluginSettingField {
+    /// This field's key within Settings.plugin_settings[pluginId] — stable identity, not shown to
+    /// the user (label is).
+    pub key: String,
+    pub label: String,
+    /// "text" | "checkbox" | "select" — anything else falls back to "text" on the frontend (see
+    /// settings.html's renderer), so an unrecognized value degrades gracefully rather than hiding
+    /// the field entirely.
+    #[serde(rename = "type", default = "default_setting_field_type")]
+    pub field_type: String,
+    /// Only meaningful for "select" — ignored otherwise.
+    #[serde(default)]
+    pub options: Vec<PluginSettingOption>,
+    pub hint: Option<String>,
+    pub placeholder: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize, Clone)]
+#[serde(default)]
+pub struct PluginSettingOption {
+    pub value: String,
+    pub label: String,
+}
+
+fn default_setting_field_type() -> String {
+    "text".to_string()
 }
 
 /// What a plugin declares up front, read fresh on every call (cheap — plugin.json is tiny) — the

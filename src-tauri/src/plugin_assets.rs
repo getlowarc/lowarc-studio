@@ -162,6 +162,17 @@ pub const HARNESS_JS: &str = r#"(function () {
         window.parent.postMessage({ type: "host", action: "openPopup", id: id_, popupId: id, target }, "*");
       });
     },
+    // This plugin's own currently-saved values for whatever it declared in its own plugin.json's
+    // `settings` (see PluginSettingField) — {key: value}, empty object if it hasn't declared any or
+    // none are saved yet. Read-only from here on purpose: values are set through the Settings page,
+    // not by a plugin writing its own config, so there's no setSettings() to go with this.
+    getSettings() {
+      return new Promise((resolve) => {
+        const id = nextId++;
+        pending.set(id, { resolve, reject: () => resolve({}) });
+        window.parent.postMessage({ type: "host", action: "getSettings", id }, "*");
+      });
+    },
   };
 })();
 "#;

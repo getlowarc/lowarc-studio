@@ -9,5 +9,14 @@
     "consoleTabs": [
       { "id": "main", "title": "Terminal", "entry": "index.html" }
     ]
-  }
+  },
+  "settings": [
+    {
+      "key": "shell",
+      "label": "Shell command",
+      "type": "text",
+      "placeholder": "Default",
+      "hint": "Command used to launch a new terminal. Default is PowerShell on Windows, $SHELL elsewhere. Anything on your PATH works, e.g. pwsh, bash, zsh, cmd."
+    }
+  ]
 }

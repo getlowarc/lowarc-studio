@@ -522,6 +522,72 @@
   background: none;
 }
 
+/* A small title, a line, then (only when that group actually has more than initSearchbar's
+   previewLimit) a chevron — one per category in a grouped searchbar result list (see
+   initSearchbar's `categories` option), never on its own without at least one matching option
+   under it. The chevron toggles that one category between truncated and fully shown, hence being a
+   real element here rather than the line's own ::after — something has to sit to its right. */
+.dropdown-menu-group-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 4px;
+}
+
+.dropdown-menu-group-label:first-child {
+  padding-top: 4px;
+}
+
+.dropdown-menu-group-title {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg-dim);
+  flex: none;
+}
+
+.dropdown-menu-group-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.dropdown-menu-group-chevron {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--fg-dim);
+  cursor: pointer;
+  border-radius: 3px;
+  transition: transform 0.15s ease;
+}
+
+.dropdown-menu-group-chevron svg {
+  width: 9px;
+  height: 9px;
+}
+
+.dropdown-menu-group-chevron:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.dropdown-menu-group-chevron.is-expanded {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dropdown-menu-group-chevron {
+    transition: none;
+  }
+}
+
 /* ---------- Searchbar ---------- */
 /* An input whose typed text filters into the same dropdown-menu popover — the menu only ever
    appears when the search has known options to suggest from. */
@@ -837,6 +903,19 @@
   max-height: 88vh;
 }
 
+/* Opt-in via the `growToContent` contribution flag (showPopup()) — NOT the default, since most
+   popups (a confirm dialog, a short form) want their normal small/fixed width instead. Grows to
+   fit whatever mount() actually renders, up to near the window's own size, then scrolls internally
+   beyond that (.popup-body's flex:1/min-height:0/overflow-y:auto already does the scrolling part
+   for height — .popup's plain lack of a fixed height already made height behave this way for every
+   popup; this class is really only changing WIDTH from a small fixed default to that same
+   auto-grow-then-cap shape height already had). */
+.popup.popup-grow {
+  width: auto;
+  max-width: 90vw;
+  max-height: 90vh;
+}
+
 /* contributeIframePopup()'s mount() appends this directly as a flex child of .popup (a sibling of
    .popup-header, not wrapped in .popup-body — an embedded page supplies its own scrolling, so
    there's no need for .popup-body's overflow-y:auto here) — flex:1/min-height:0 is what lets it
@@ -1139,5 +1218,115 @@
 @media (prefers-reduced-motion: reduce) {
   .tooltip-popup {
     transition: none;
+  }
+}
+
+/* ---------- Progress bar ---------- */
+/* No fixed width of its own — sizes to whatever a caller sets (inline style, a wrapper, a flex
+   item's own basis), so one primitive covers a full-width bar or a small footer indicator alike.
+   Fill width and color are both driven from JS (see setProgress() in primitives.js): color isn't a
+   fixed danger/warning/success — it travels red->yellow->green as the fraction climbs, since this
+   is for "how far along," not "what state," which the fixed status colors elsewhere already
+   handle correctly for their own case. */
+.progress {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.progress-fill {
+  position: absolute;
+  inset: 0;
+  width: 0%;
+  border-radius: inherit;
+  background: var(--danger);
+  transition: width 0.2s ease, background-color 0.2s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-fill {
+    transition: none;
+  }
+}
+
+/* ---------- Setting row ---------- */
+/* One repeatable shape for "a single configurable value" — control on the left, label+description
+   on the right, full width — used for every settings surface that isn't Appearance (General,
+   Plugins, and the search view all render off this SAME primitive; see renderSettingRow() in
+   primitives.js). The point is exactly that it's boring and uniform: no page hand-builds its own
+   field markup any more, so a plugin's declared setting and a core one look identical. */
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.setting-row:last-child {
+  border-bottom: none;
+}
+
+.setting-row-control {
+  flex: none;
+  width: 220px;
+  min-width: 0;
+}
+
+/* A checkbox row's control IS its own label — nothing to duplicate on the right, so the whole row
+   collapses to just the control column plus the description growing to fill the rest. */
+.setting-row-control .checkbox-row {
+  width: fit-content;
+}
+
+.setting-row-desc {
+  flex: 1;
+  min-width: 0;
+}
+
+.setting-row-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.setting-row-source {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--fg-dim);
+  margin-left: 6px;
+}
+
+.setting-row-hint {
+  font-size: 12px;
+  color: var(--fg-dim);
+  margin-top: 3px;
+  line-height: 1.45;
+}
+
+/* Briefly highlights the row a search selection landed on (see settings.html's ?search= handling)
+   — fades on its own, not dismissed by any interaction, since there's nothing to click to dismiss
+   a background color. */
+.setting-row.is-highlighted {
+  background: var(--cyan-dim);
+  animation: setting-row-highlight-fade 2.4s ease forwards;
+}
+
+@keyframes setting-row-highlight-fade {
+  0%, 60% {
+    background: var(--cyan-dim);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .setting-row.is-highlighted {
+    animation: none;
+    background: transparent;
   }
 }

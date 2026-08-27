@@ -237,8 +237,8 @@ document.getElementById("open-project").addEventListener("click", async () => {
 });
 
 contributeIframePopup("settings", { title: "Settings" });
-contributeIframePopup("modules", { title: "Modules" });
-contributeIframePopup("plugins", { title: "Plugins" });
+contributeIframePopup("modules", { title: "Modules", forwardEvents: ["install-progress"] });
+contributeIframePopup("plugins", { title: "Plugins", forwardEvents: ["install-progress"] });
 
 document.getElementById("open-settings").addEventListener("click", () => {
   showPopup("settings", { url: "settings.html" });

@@ -1,5 +1,6 @@
 mod app_paths;
-mod dylib;
+pub mod dylib;
+pub mod export;
 mod installs;
 pub mod plugin_host;
 mod plugin_asset_server;
@@ -18,7 +19,7 @@ use settings::Settings;
 use theme::ThemePreset;
 use std::collections::HashSet;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -27,6 +28,12 @@ use tauri::{AppHandle, Emitter, Manager, State};
 /// user decide" rather than guessing what they meant.
 #[derive(Default)]
 struct RunState(Mutex<Option<Arc<AtomicBool>>>);
+
+/// Whether an export is currently running — no stop flag, unlike RunState: nothing about a
+/// cargo-build-then-copy-files export is safely cancellable mid-step, so this only guards against
+/// a second export starting while one's already in flight.
+#[derive(Default)]
+struct ExportState(Mutex<bool>);
 
 fn log_level_str(level: LogLevel) -> &'static str {
     match level {
@@ -122,12 +129,39 @@ fn entry_file_exists(project_dir: String, entry: String) -> bool {
     PathBuf::from(project_dir).join(entry).is_file()
 }
 
+/// A sanity backstop, not a full capability boundary — these two commands are reachable by any
+/// code that can invoke a Tauri command, and this app's editor legitimately opens/saves files
+/// anywhere the user has picked via a native dialog, so there's no "must be inside X" allowlist to
+/// enforce without breaking real usage. "Is this specific plugin allowed to touch this specific
+/// file" still lives where it has to — editor.html's own windowToFilePath map, checked before a
+/// plugin's saveFile request ever reaches invoke() at all — since only the host knows which iframe
+/// asked and what path it was actually opened for; Rust has no visibility into that session state
+/// and isn't trying to fake it. What THIS catches: an empty path, a relative one (every real
+/// caller already has an absolute one — a file explorer entry or a native dialog result, never a
+/// bare relative string), and a parent directory that doesn't genuinely resolve to what it claims
+/// (canonicalizing it collapses any `..`/symlink misdirection in the directory portion, then the
+/// file name — which doesn't need to exist yet, for a save of new content — is rejoined as-is).
+fn validate_file_path(path: &str) -> Result<PathBuf, String> {
+    if path.trim().is_empty() {
+        return Err("No file path given.".into());
+    }
+    let path = PathBuf::from(path);
+    if !path.is_absolute() {
+        return Err(format!("\"{}\" isn't an absolute path.", path.display()));
+    }
+    let parent = path.parent().ok_or_else(|| format!("\"{}\" has no parent directory.", path.display()))?;
+    let canonical_parent = parent.canonicalize().map_err(|e| format!("\"{}\": {e}", parent.display()))?;
+    let file_name = path.file_name().ok_or_else(|| format!("\"{}\" has no file name.", path.display()))?;
+    Ok(canonical_parent.join(file_name))
+}
+
 /// Reads an open file's contents so the host can push them into whichever viewer plugin claimed
 /// that extension — a viewer's own sandboxed iframe has no filesystem access of its own, on
 /// purpose, so this has to happen host-side rather than the plugin reading the file itself.
 #[tauri::command]
 fn read_text_file(path: String) -> Result<String, String> {
-    std::fs::read_to_string(&path).map_err(|e| format!("Could not read {path}: {e}"))
+    let path = validate_file_path(&path)?;
+    std::fs::read_to_string(&path).map_err(|e| format!("Could not read {}: {e}", path.display()))
 }
 
 /// The other half of read_text_file — invoked host-side in response to a viewer plugin's
@@ -135,7 +169,46 @@ fn read_text_file(path: String) -> Result<String, String> {
 /// has no filesystem access of its own.
 #[tauri::command]
 fn write_text_file(path: String, contents: String) -> Result<(), String> {
-    std::fs::write(&path, contents).map_err(|e| format!("Could not save {path}: {e}"))
+    let path = validate_file_path(&path)?;
+    std::fs::write(&path, contents).map_err(|e| format!("Could not save {}: {e}", path.display()))
+}
+
+#[cfg(test)]
+mod file_path_tests {
+    use super::*;
+
+    fn temp_dir(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("lowarc_studio_file_path_test_{name}_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn accepts_an_absolute_path_whose_parent_exists() {
+        let dir = temp_dir("ok");
+        let path = dir.join("file.txt");
+        let resolved = validate_file_path(&path.to_string_lossy()).expect("a real absolute path should be accepted");
+        assert_eq!(resolved.file_name().unwrap(), "file.txt");
+    }
+
+    #[test]
+    fn rejects_an_empty_path() {
+        assert!(validate_file_path("").is_err());
+        assert!(validate_file_path("   ").is_err());
+    }
+
+    #[test]
+    fn rejects_a_relative_path() {
+        assert!(validate_file_path("src/main.rs").is_err());
+    }
+
+    #[test]
+    fn rejects_a_path_whose_parent_does_not_exist() {
+        let dir = temp_dir("missing_parent");
+        let path = dir.join("does-not-exist-at-all").join("file.txt");
+        assert!(validate_file_path(&path.to_string_lossy()).is_err());
+    }
 }
 
 /// Lets editor.html (the host page, not a plugin's own iframe) read one of a plugin's static
@@ -271,6 +344,58 @@ fn stop_dev_run(state: State<'_, RunState>) -> Result<(), String> {
     }
 }
 
+/// Folder-mode export only for now — see export::export_folder's own header for why a folder is a
+/// real, complete output shape rather than a stopgap. Runs on its own thread (the runtime build
+/// step alone can take real time) and reports progress the same way dev-run does: `export-log`
+/// events while it runs, one `export-ended` event when it's done either way.
+#[tauri::command]
+fn start_export(app: AppHandle, state: State<'_, ExportState>, project_dir: String, output_dir: String, name: String, diagnostics_log: bool) -> Result<(), String> {
+    {
+        let mut guard = state.0.lock().unwrap();
+        if *guard {
+            return Err("An export is already in progress — wait for it to finish before starting another.".into());
+        }
+        *guard = true;
+    }
+
+    // Each of build_bootstrap's and export_folder's own log(...) calls is one fixed, known stage
+    // announced in a fixed order — 1 from build_bootstrap, 5 from export_folder today — so a plain
+    // running count against that fixed total is a real (if coarse) progress fraction, not a guess.
+    // Keep EXPORT_TOTAL_STEPS in sync if either function's own count of log(...) calls changes.
+    const EXPORT_TOTAL_STEPS: u32 = 6;
+    let step = Arc::new(AtomicU32::new(0));
+    let log_handle = app.clone();
+    let log: Arc<dyn Fn(&str) + Send + Sync> = Arc::new(move |message: &str| {
+        let current = step.fetch_add(1, Ordering::SeqCst) + 1;
+        let _ = log_handle.emit("export-log", serde_json::json!({"message": message, "step": current, "total": EXPORT_TOTAL_STEPS}));
+    });
+
+    let options = export::ExportOptions {
+        project_dir: PathBuf::from(project_dir),
+        modules_dir: AppPaths::modules(),
+        output_dir: PathBuf::from(output_dir),
+        name,
+        diagnostics_log,
+        target_fps: settings::load().dev_run_target_fps,
+    };
+
+    let done_handle = app.clone();
+    std::thread::spawn(move || {
+        let result = export::bootstrap_source::build_bootstrap(&*log)
+            .map_err(|e| vec![e])
+            .and_then(|bootstrap_exe| export::export_folder(&options, &bootstrap_exe, &*log));
+
+        *done_handle.state::<ExportState>().0.lock().unwrap() = false;
+        let payload = match &result {
+            Ok(path) => serde_json::json!({"ok": true, "path": path.to_string_lossy()}),
+            Err(errors) => serde_json::json!({"ok": false, "errors": errors}),
+        };
+        let _ = done_handle.emit("export-ended", payload);
+    });
+
+    Ok(())
+}
+
 #[tauri::command]
 fn list_installed_modules() -> Vec<ModuleListItem> {
     let disabled: HashSet<String> = settings::load().disabled_modules.into_iter().collect();
@@ -278,8 +403,10 @@ fn list_installed_modules() -> Vec<ModuleListItem> {
 }
 
 #[tauri::command]
-fn install_module(source_dir: String) -> Result<String, String> {
-    installs::install_module(&AppPaths::modules(), &PathBuf::from(source_dir))
+fn install_module(app: AppHandle, source_dir: String) -> Result<String, String> {
+    installs::install_module(&AppPaths::modules(), &PathBuf::from(source_dir), &mut |done, total| {
+        let _ = app.emit("install-progress", serde_json::json!({"kind": "module", "bytesDone": done, "totalBytes": total}));
+    })
 }
 
 #[tauri::command]
@@ -336,10 +463,12 @@ fn invoke_plugin(app: AppHandle, id: String, method: String, params: serde_json:
 /// Starts one instance of a "session": true plugin's backend (see plugin_session.rs) — idempotent
 /// per session_id (a frontend-generated id, e.g. a UUID; Terminal mints one per open terminal
 /// tab), so re-requesting an already-running session_id is a harmless no-op rather than a second
-/// process. `shell` is Terminal-specific (a per-instance shell override, from its "..." menu) but
-/// kept generic here as "the one extra launch arg a session might want" rather than hardcoding
-/// Terminal's name into the host — falls back to Settings.terminalShell, then to the plugin's own
-/// platform default, when not given.
+/// process. `shell` is one extra launch arg a session might want (Terminal's per-instance override,
+/// from its "..." menu) — genuinely generic, not Terminal-specific: whatever the frontend passes is
+/// pushed verbatim, with no Rust-side knowledge of what it means or which plugin asked for it. A
+/// plugin that wants a persisted default (like Terminal's own shell setting) reads it itself via
+/// get_plugin_settings/window.lowarc.getSettings() and passes the resolved value here — this
+/// command no longer reaches into Settings on any plugin's behalf.
 #[tauri::command]
 fn start_plugin_session(app: AppHandle, id: String, session_id: String, shell: Option<String>, sessions: State<plugin_session::SessionRegistry>) -> Result<(), String> {
     if settings::load().disabled_plugins.iter().any(|p| p == &id) {
@@ -347,7 +476,7 @@ fn start_plugin_session(app: AppHandle, id: String, session_id: String, shell: O
     }
     let folder = AppPaths::plugins().join(&id);
     let mut desc = plugin_host::protocol::PluginDescriptor::read(&folder).ok_or_else(|| format!("No readable plugin.json for \"{id}\"."))?;
-    if let Some(shell) = shell.or_else(|| settings::load().terminal_shell) {
+    if let Some(shell) = shell {
         desc.args.push(shell);
     }
     sessions.start(&app, &folder, &desc, &id, &session_id)
@@ -367,8 +496,10 @@ fn stop_plugin_session(session_id: String, sessions: State<plugin_session::Sessi
 }
 
 #[tauri::command]
-fn install_plugin(source_dir: String) -> Result<String, String> {
-    installs::install_plugin(&AppPaths::plugins(), &PathBuf::from(source_dir))
+fn install_plugin(app: AppHandle, source_dir: String) -> Result<String, String> {
+    installs::install_plugin(&AppPaths::plugins(), &PathBuf::from(source_dir), &mut |done, total| {
+        let _ = app.emit("install-progress", serde_json::json!({"kind": "plugin", "bytesDone": done, "totalBytes": total}));
+    })
 }
 
 #[tauri::command]
@@ -386,6 +517,26 @@ fn set_plugin_enabled(id: String, enabled: bool) -> Result<(), String> {
     settings::save(&settings)
 }
 
+/// A plugin's own currently-saved values for whatever it declared in plugin.json's `settings` —
+/// see window.lowarc.getSettings() in plugin_assets.rs, the harness call this backs. Empty map for
+/// a plugin with no saved values yet (including one that's never declared any settings at all);
+/// the schema itself lives in plugin.json, not here, so there's nothing to validate a key against
+/// on this side — a plugin only ever asks for its own values back, never another plugin's.
+#[tauri::command]
+fn get_plugin_settings(id: String) -> std::collections::HashMap<String, String> {
+    settings::load().plugin_settings.get(&id).cloned().unwrap_or_default()
+}
+
+/// Sets one (id, key) -> value in Settings.plugin_settings, leaving every other plugin's — and
+/// this plugin's own other fields' — values untouched. Called from the Settings UI, not from a
+/// plugin itself (a plugin only ever reads its own settings, never writes them for itself).
+#[tauri::command]
+fn set_plugin_setting(id: String, key: String, value: String) -> Result<(), String> {
+    let mut settings = settings::load();
+    settings.plugin_settings.entry(id).or_default().insert(key, value);
+    settings::save(&settings)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   // Started before the builder even runs, so the port is already known by the time editor.html's
@@ -395,7 +546,7 @@ pub fn run() {
   // window-state must be registered here, before .run() creates the config-declared "main"
   // window, not inside .setup() — its on_window_ready hook only fires for windows created after
   // the plugin is registered, and by the time setup() runs, "main" already exists.
-  let builder = tauri::Builder::default().manage(RunState::default()).manage(plugin_session::SessionRegistry::default());
+  let builder = tauri::Builder::default().manage(RunState::default()).manage(ExportState::default()).manage(plugin_session::SessionRegistry::default());
   #[cfg(desktop)]
   let builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
 
@@ -405,6 +556,7 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       start_dev_run,
       stop_dev_run,
+      start_export,
       get_project_preset,
       set_project_entry,
       entry_file_exists,
@@ -430,6 +582,8 @@ pub fn run() {
       install_plugin,
       remove_plugin,
       set_plugin_enabled,
+      get_plugin_settings,
+      set_plugin_setting,
       invoke_plugin,
       start_plugin_session,
       send_to_plugin_session,

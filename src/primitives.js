@@ -272,33 +272,122 @@ function initReorderable(container, { itemSelector = "[data-tab-value]", keyAttr
   );
 }
 
-// Wires a plain text input to filter `options` ({value, label}[]) into the shared dropdown-menu
-// popover. The popover only ever appears when there's something to suggest — an empty query or a
-// query with no matches keeps it closed, per "only show a dropdown when the searchbar can show
-// options."
-function initSearchbar(el, { options, onSelect } = {}) {
+// Wires a plain text input to filter `options` ({value, label, category?}[]) into the shared
+// dropdown-menu popover.
+//
+// `categories` (optional): an ORDERED [{id, label, browsable?}] list — when given, matches are
+// grouped under a labeled divider per category, in this fixed order, rather than one flat list. A
+// category with nothing in it just doesn't render its divider at all; nothing pads the list out to
+// show every category every time. An option whose `category` doesn't name any listed id falls into
+// one final ungrouped, unlabeled bucket at the end, rather than being silently dropped.
+//
+// Two distinct states, not one: focusing an EMPTY bar opens a "browse" view — every browsable
+// category (browsable: false opts a category out, e.g. an in-file-search category has nothing
+// meaningful to show with no query typed) shown truncated to `previewLimit`, with a chevron on any
+// category that actually has more than that to reveal. Typing a real query switches to normal
+// filtered results instead — full, ungrouped-by-truncation matches, not a preview of anything.
+// Clearing back to empty (or blurring away and refocusing) returns to a fresh, re-collapsed browse
+// view — an expand a user triggered doesn't linger past the search that was open when they did it.
+function initSearchbar(el, { options, onSelect, categories, previewLimit = 5 } = {}) {
   const input = el.querySelector("input");
   const menu = el.querySelector("[data-dropdown-menu]");
   const clearBtn = el.querySelector(".searchbar-clear");
+  const expanded = new Set();
 
-  const render = (matches) => {
-    menu.innerHTML = "";
-    matches.forEach((opt) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "dropdown-option";
-      button.dataset.value = opt.value;
-      button.textContent = opt.label;
-      menu.appendChild(button);
+  const renderOption = (opt) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "dropdown-option";
+    button.setAttribute("data-dropdown-option", ""); // the click handler below matches on this attribute, not the class
+    button.dataset.value = opt.value;
+    button.textContent = opt.label;
+    return button;
+  };
+
+  // The chevron is always shown, not just when a group overflows previewLimit — a category with
+  // fewer items (or none at all, e.g. Command Palette before there's a real command registry) still
+  // renders its divider and chevron. The point is the section exists and is discoverable now; what
+  // populates it is a separate, later concern. Expanding one with nothing to reveal is a harmless
+  // no-op, not something worth special-casing away.
+  const renderGroup = (id, label, items, truncatable) => {
+    const isExpanded = expanded.has(id);
+    const overflowing = truncatable && items.length > previewLimit;
+    const shown = overflowing && !isExpanded ? items.slice(0, previewLimit) : items;
+
+    const labelEl = document.createElement("div");
+    labelEl.className = "dropdown-menu-group-label";
+    const title = document.createElement("span");
+    title.className = "dropdown-menu-group-title";
+    title.textContent = label;
+    labelEl.appendChild(title);
+    const line = document.createElement("span");
+    line.className = "dropdown-menu-group-line";
+    labelEl.appendChild(line);
+
+    const chevron = document.createElement("button");
+    chevron.type = "button";
+    chevron.className = "dropdown-menu-group-chevron" + (isExpanded ? " is-expanded" : "");
+    chevron.setAttribute("aria-label", isExpanded ? "Show fewer" : "Show more");
+    chevron.innerHTML = '<svg viewBox="0 0 10 10" fill="none"><path d="M2.5 4l2.5 2.5L7.5 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /></svg>';
+    chevron.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (isExpanded) expanded.delete(id);
+      else expanded.add(id);
+      renderBrowse();
     });
+    labelEl.appendChild(chevron);
+
+    menu.appendChild(labelEl);
+    shown.forEach((opt) => menu.appendChild(renderOption(opt)));
+  };
+
+  // `cats`: the exact ordered category list to render — every one of them, whether or not it has
+  // any current matches (Command Palette shows up empty until there's a real command registry
+  // behind it; that's the point, not a bug to gate around). truncatable: whether overflowing
+  // groups get capped-with-a-chevron (browse view) or shown in full (a real search's actual
+  // results — nothing to truncate there, a query is already the user narrowing things down
+  // themselves).
+  const renderGrouped = (matches, cats, truncatable) => {
+    menu.innerHTML = "";
+    if (!cats) {
+      matches.forEach((opt) => menu.appendChild(renderOption(opt)));
+      return;
+    }
+    for (const { id, label } of cats) {
+      renderGroup(id, label, matches.filter((o) => o.category === id), truncatable);
+    }
+    const known = new Set(cats.map((c) => c.id));
+    matches.filter((o) => !known.has(o.category)).forEach((opt) => menu.appendChild(renderOption(opt)));
+  };
+
+  // browsable: false (e.g. in-file search, before there's a query to search with) is the one thing
+  // that's STILL excluded here — a category with genuinely no meaning yet versus one that's simply
+  // unpopulated are different states, and only the latter is what this update stopped hiding.
+  const renderBrowse = () => {
+    const browsableCats = (categories || []).filter((c) => c.browsable !== false);
+    const browsableIds = new Set(browsableCats.map((c) => c.id));
+    const items = categories ? options.filter((o) => browsableIds.has(o.category)) : options;
+    renderGrouped(items, categories ? browsableCats : null, true);
+    el.dataset.open = (categories ? browsableCats.length > 0 : items.length > 0) ? "true" : "false";
+  };
+
+  const renderResults = (matches) => {
+    renderGrouped(matches, categories, false);
+    el.dataset.open = (categories ? categories.length > 0 : matches.length > 0) ? "true" : "false";
   };
 
   input.addEventListener("input", () => {
     const query = input.value.trim().toLowerCase();
-    const matches = query ? options.filter((o) => o.label.toLowerCase().includes(query)) : [];
-    render(matches);
     el.classList.toggle("has-value", input.value.length > 0);
-    el.dataset.open = matches.length > 0 ? "true" : "false";
+    if (!query) {
+      renderBrowse();
+      return;
+    }
+    renderResults(options.filter((o) => o.label.toLowerCase().includes(query)));
+  });
+
+  input.addEventListener("focus", () => {
+    if (!input.value.trim()) renderBrowse();
   });
 
   menu.addEventListener("click", (e) => {
@@ -311,13 +400,16 @@ function initSearchbar(el, { options, onSelect } = {}) {
 
   clearBtn.addEventListener("click", () => {
     input.value = "";
-    el.dataset.open = "false";
     el.classList.remove("has-value");
+    renderBrowse();
     input.focus();
   });
 
   document.addEventListener("click", (e) => {
-    if (!e.target.closest(".searchbar")) el.dataset.open = "false";
+    if (!e.target.closest(".searchbar")) {
+      el.dataset.open = "false";
+      expanded.clear();
+    }
   });
 }
 
@@ -392,6 +484,11 @@ function getNotificationHistory() {
 
 function clearNotificationHistory() {
   notificationHistory.length = 0;
+}
+
+function removeNotificationHistoryEntry(id) {
+  const index = notificationHistory.findIndex((n) => n.id === id);
+  if (index !== -1) notificationHistory.splice(index, 1);
 }
 
 const TOAST_ICON_PATHS = {
@@ -567,8 +664,11 @@ function showPopup(id, target) {
     backdrop.style.zIndex = String(POPUP_Z_FLOOR + depth * 10);
 
     const box = document.createElement("div");
-    box.className = "popup" + (contribution.large ? " popup-large" : "");
-    if (contribution.size) box.style.width = `${contribution.size}px`;
+    box.className = "popup" + (contribution.large ? " popup-large" : "") + (contribution.growToContent ? " popup-grow" : "");
+    // growToContent replaces the width story entirely (auto, capped near the viewport — see
+    // .popup-grow) rather than layering on top of a fixed one, so an explicit `size` is ignored
+    // when it's set; the two are different answers to the same question, not compatible together.
+    if (contribution.size && !contribution.growToContent) box.style.width = `${contribution.size}px`;
 
     const header = document.createElement("div");
     header.className = "popup-header";
@@ -640,6 +740,207 @@ document.addEventListener("keydown", (e) => {
   if (top && top.closeOnEscape) top.close(null);
 });
 
+// ---------- Progress bar ----------
+// setProgress(el, fraction) is the only way callers should touch a .progress element — it owns
+// both the fill width and the red->yellow->green color together, so nothing else has to re-derive
+// that color logic per caller. Reads --danger/--yellow/--success from computed style rather than
+// hard-coding their RGB values, so this automatically follows whatever theme (including a custom
+// saved preset) is actually active instead of assuming the default palette.
+function readThemeRgb(varName) {
+  const hex = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [128, 128, 128];
+}
+
+// Two segments (red->yellow, then yellow->green) rather than one gradient sampled at a point — a
+// straight three-stop RGB blend muddies through brown around the midpoint, which reads as neither
+// "warning" nor "progressing." Segmenting keeps every point along the way looking like an actual
+// traffic-light color, not an interpolated smear between them.
+function progressColorFor(fraction) {
+  const t = Math.max(0, Math.min(1, fraction));
+  const red = readThemeRgb("--danger");
+  const yellow = readThemeRgb("--yellow");
+  const green = readThemeRgb("--success");
+  const [from, to, localT] = t < 0.5 ? [red, yellow, t / 0.5] : [yellow, green, (t - 0.5) / 0.5];
+  const mix = (a, b) => Math.round(a + (b - a) * localT);
+  return `rgb(${mix(from[0], to[0])}, ${mix(from[1], to[1])}, ${mix(from[2], to[2])})`;
+}
+
+function setProgress(el, fraction) {
+  const fill = el.classList.contains("progress-fill") ? el : el.querySelector(".progress-fill");
+  if (!fill) return;
+  const clamped = Math.max(0, Math.min(1, fraction));
+  fill.style.width = `${clamped * 100}%`;
+  fill.style.backgroundColor = progressColorFor(clamped);
+}
+
+// ---------- Settings registry (shared metadata for General + Plugins + search) ----------
+// Core (non-plugin) settings have no dynamic schema source the way a plugin's plugin.json does, so
+// this is the one hand-maintained list — add here as new core settings are introduced. Shape
+// matches plugin_host::protocol::PluginSettingField (key/label/type/hint/placeholder/options) so
+// both flow through the exact same renderSettingRow() below; nothing downstream needs to know
+// "core" and "plugin" are different origins.
+const CORE_SETTINGS_SCHEMA = [
+  {
+    key: "devRunTargetFps",
+    label: "Dev run target FPS",
+    type: "number",
+    hint: "Frame rate used when running a project from the editor.",
+    placeholder: "60",
+  },
+];
+
+// Flat list of every searchable setting — core + every installed plugin's declared fields — as
+// pure metadata (id/label/hint/type/tab/source/category), no get/set. Any page with `invoke`
+// available can call this (editor.html for the header search, settings.html for its own
+// rendering); neither needs the other's document, since each layers its own value-plumbing on top
+// by id. `category: "settings"` is this list's own contribution to the header search's grouped
+// results (see initSearchbar's `categories` option) — distinct from `tab`, which is which
+// settings.html tab an entry belongs to, a completely different grouping for a different UI.
+async function buildSearchableSettingsList() {
+  const { invoke } = window.__TAURI__.core;
+  const entries = CORE_SETTINGS_SCHEMA.map((field) => ({
+    id: `core:${field.key}`,
+    key: field.key,
+    label: field.label,
+    hint: field.hint,
+    type: field.type,
+    options: field.options || [],
+    placeholder: field.placeholder,
+    tab: "general",
+    source: null,
+    category: "settings",
+  }));
+
+  let plugins = [];
+  try {
+    plugins = await invoke("list_installed_plugins");
+  } catch (err) {
+    // A page that can't reach the plugin list (shouldn't happen) just gets core settings only —
+    // better than throwing and losing search entirely.
+  }
+  for (const plugin of plugins) {
+    for (const field of plugin.settings || []) {
+      entries.push({
+        id: `plugin:${plugin.id}:${field.key}`,
+        key: field.key,
+        label: field.label,
+        hint: field.hint,
+        type: field.type,
+        options: field.options || [],
+        placeholder: field.placeholder,
+        tab: "plugins",
+        source: plugin.name,
+        pluginId: plugin.id,
+        category: "settings",
+      });
+    }
+  }
+  return entries;
+}
+
+// The one repeatable control+description row every settings surface renders (see .setting-row in
+// primitives.css) — General, Plugins, and the search view all call this, never hand-build their
+// own field markup. `value` is the field's current string value; onCommit(newValue) fires on
+// change/blur — settings rows commit immediately, there's no separate "unsaved" state to track.
+// Callers must re-run initDropdowns()/initNumericInputs() after inserting rows with select/number
+// fields — same as any other dynamically-inserted primitive markup in this app.
+function renderSettingRow(entry, value, onCommit) {
+  const row = document.createElement("div");
+  row.className = "setting-row";
+  row.dataset.settingId = entry.id;
+
+  const controlWrap = document.createElement("div");
+  controlWrap.className = "setting-row-control";
+
+  if (entry.type === "checkbox") {
+    const rowLabel = document.createElement("label");
+    rowLabel.className = "checkbox-row";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = value === "true";
+    const box = document.createElement("span");
+    box.className = "checkbox-box";
+    box.innerHTML = '<svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>';
+    const text = document.createElement("span");
+    text.textContent = entry.label;
+    rowLabel.appendChild(checkbox);
+    rowLabel.appendChild(box);
+    rowLabel.appendChild(text);
+    checkbox.addEventListener("change", () => onCommit(String(checkbox.checked)));
+    controlWrap.appendChild(rowLabel);
+  } else if (entry.type === "select") {
+    const dropdown = document.createElement("div");
+    dropdown.className = "dropdown dropdown-full";
+    dropdown.dataset.dropdown = "";
+    dropdown.dataset.open = "false";
+    dropdown.innerHTML =
+      '<button type="button" class="dropdown-trigger" data-dropdown-trigger><span class="dropdown-value" data-dropdown-value></span><span class="dropdown-chevron">▾</span></button><div class="dropdown-menu" data-dropdown-menu></div>';
+    const menu = dropdown.querySelector("[data-dropdown-menu]");
+    (entry.options || []).forEach((opt) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "dropdown-option";
+      btn.setAttribute("data-dropdown-option", "");
+      btn.dataset.value = opt.value;
+      btn.dataset.label = opt.label;
+      btn.textContent = opt.label;
+      menu.appendChild(btn);
+    });
+    const valueEl = dropdown.querySelector("[data-dropdown-value]");
+    const matched = (entry.options || []).find((o) => o.value === value) || entry.options[0];
+    if (matched) {
+      valueEl.textContent = matched.label;
+      dropdown.dataset.value = matched.value;
+      menu.querySelectorAll("[data-dropdown-option]").forEach((o) => o.classList.toggle("is-selected", o.dataset.value === matched.value));
+    }
+    dropdown.addEventListener("dropdown-change", () => onCommit(dropdown.dataset.value));
+    controlWrap.appendChild(dropdown);
+  } else if (entry.type === "number") {
+    const wrap = document.createElement("div");
+    wrap.className = "numeric-input";
+    wrap.innerHTML =
+      '<input type="text" inputmode="numeric" /><div class="numeric-steppers"><button type="button" class="stepper-up" aria-label="Increase">▲</button><button type="button" class="stepper-down" aria-label="Decrease">▼</button></div>';
+    const input = wrap.querySelector("input");
+    input.value = value;
+    if (entry.placeholder) input.placeholder = entry.placeholder;
+    input.addEventListener("change", () => onCommit(input.value.trim()));
+    controlWrap.appendChild(wrap);
+  } else {
+    const input = document.createElement("input");
+    input.className = "input";
+    input.type = "text";
+    input.autocomplete = "off";
+    input.value = value;
+    if (entry.placeholder) input.placeholder = entry.placeholder;
+    input.addEventListener("change", () => onCommit(input.value.trim()));
+    controlWrap.appendChild(input);
+  }
+  row.appendChild(controlWrap);
+
+  const desc = document.createElement("div");
+  desc.className = "setting-row-desc";
+  const label = document.createElement("div");
+  label.className = "setting-row-label";
+  label.textContent = entry.label;
+  if (entry.source) {
+    const source = document.createElement("span");
+    source.className = "setting-row-source";
+    source.textContent = entry.source;
+    label.appendChild(source);
+  }
+  desc.appendChild(label);
+  if (entry.hint) {
+    const hint = document.createElement("div");
+    hint.className = "setting-row-hint";
+    hint.textContent = entry.hint;
+    desc.appendChild(hint);
+  }
+  row.appendChild(desc);
+
+  return row;
+}
+
 // For a page substantial enough to stay its own separate, unsandboxed document (Settings/Modules/
 // Plugins use real Tauri APIs directly, unlike a plugin's own sandboxed panel) rather than being
 // folded inline — registers a large popup (see the `large` contribution flag above) whose body is
@@ -662,7 +963,15 @@ document.addEventListener("keydown", (e) => {
 // render, this renders real controls into ctx.header, and posts clicks back down for the page's own
 // existing handlers to react to — the page's tab/button LOGIC never moves out of its own script,
 // only where the buttons themselves are drawn.
-function contributeIframePopup(id, { title }) {
+// forwardEvents (optional): names of backend (Tauri) events this popup's iframe needs to react to
+// while it's open — e.g. a long-running export's progress. Every OTHER Tauri event listener in
+// this app lives in a top-level document (editor.html itself); an iframe is a separate document,
+// and relying on it to receive window.__TAURI__.event.listen() directly there is untested,
+// unproven territory this app has never actually relied on anywhere else. Relaying through
+// postMessage sidesteps that entirely — it's the exact same mechanism popup-tab-change/
+// popup-button-click already use below, proven to reach the iframe reliably, so a page's own
+// script just listens for `window.addEventListener("message", ...)` instead of a raw Tauri event.
+function contributeIframePopup(id, { title, forwardEvents }) {
   contribute("popups", {
     id,
     sourceType: "host",
@@ -701,6 +1010,15 @@ function contributeIframePopup(id, { title }) {
       };
       window.addEventListener("message", onMessage);
       ctx.onClose(() => window.removeEventListener("message", onMessage));
+
+      const unlistenPromises = (forwardEvents || []).map((eventName) =>
+        window.__TAURI__.event.listen(eventName, (event) => {
+          iframe.contentWindow.postMessage({ type: "tauri-event", event: eventName, payload: event.payload }, "*");
+        })
+      );
+      ctx.onClose(() => {
+        unlistenPromises.forEach((p) => p.then((unlisten) => unlisten()));
+      });
     },
   });
 }
@@ -1006,9 +1324,38 @@ function createManagerPage(config) {
   }
 
   // ---------- Add ----------
+  // Progress lives in the page body, not next to the "Add …" button — that button is actually
+  // rendered by the POPUP's own header (a different document, see contributeIframePopup/
+  // setPopupHeaderControls below), so a bar can't sit beside it without extending that relay
+  // protocol just for this. Still worth having: a folder like Monaco's vendored ~24MB is genuinely
+  // not instant to copy.
+  const progressEl = document.createElement("div");
+  progressEl.className = "progress";
+  progressEl.style.margin = "0 0 12px";
+  progressEl.style.display = "none";
+  progressEl.innerHTML = '<div class="progress-fill"></div>';
+  document.querySelector(".manage-list").prepend(progressEl);
+
+  let installing = false;
+
+  // Relayed by contributeIframePopup's forwardEvents (see primitives.js's own contributeIframePopup)
+  // — this page is loaded inside an iframe, so it can't reliably listen for the raw Tauri event
+  // itself (see that function's header comment for why).
+  window.addEventListener("message", (e) => {
+    if (!e.data || e.data.type !== "tauri-event" || e.data.event !== "install-progress") return;
+    const payload = e.data.payload;
+    if (payload.kind !== config.nounSingular.toLowerCase()) return;
+    setProgress(progressEl, payload.totalBytes ? payload.bytesDone / payload.totalBytes : 0);
+  });
+
   async function addItem() {
+    if (installing) return;
     const sourceDir = await openDialog({ directory: true, title: config.installDialogTitle });
     if (!sourceDir) return;
+
+    installing = true;
+    progressEl.style.display = "";
+    setProgress(progressEl, 0);
 
     try {
       const id = await invoke(config.installCommand, { sourceDir });
@@ -1017,6 +1364,9 @@ function createManagerPage(config) {
       await loadItems();
     } catch (err) {
       reportError(err);
+    } finally {
+      installing = false;
+      progressEl.style.display = "none";
     }
   }
 

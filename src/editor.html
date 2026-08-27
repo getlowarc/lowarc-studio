@@ -101,53 +101,32 @@
          side of it stays draggable. No explicit height — .menu-bar's own align-items:stretch
          fills the full row height, matching every other control in this bar instead of sitting
          inset like a smaller inline widget would. */
-      .menu-bar-command-center {
-        all: unset;
-        box-sizing: border-box;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        flex: 0 1 280px;
-        min-width: 32px;
-        max-width: 40%;
-        padding: 0 10px;
-        border-radius: 5px;
-        background: var(--bg);
-        color: var(--fg-dim);
+      /* A real .searchbar (primitives.css), not a button that opens something else — sized into
+         the same slot the old look-alike button sat in, just with a usable min-width instead of
+         one that could shrink to icon-only (an actual text input can't collapse to nothing the
+         way a button's label could). */
+      .menu-bar-search {
+        flex: 0 1 320px;
+        min-width: 140px;
+        max-width: 45%;
+        height: 26px;
+        align-self: center;
+      }
+
+      .menu-bar-search input {
+        height: 100%;
+        padding-top: 0;
+        padding-bottom: 0;
         font-size: 12px;
-        cursor: pointer;
-        overflow: hidden;
+        border-radius: 5px;
       }
 
-      .menu-bar-command-center:hover {
-        background: var(--bg-hover);
-        color: var(--fg);
-      }
-
-      .menu-bar-command-center svg {
-        width: 13px;
-        height: 13px;
-        flex: none;
-      }
-
-      .menu-bar-command-center span {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      /* Below this, there isn't room for a labeled pill without crowding the menu/transport
-         controls on either side — drop to an icon-only button, same idea as VS Code's own Command
-         Center collapsing at narrow widths. */
+      /* Below this, there isn't room for the full-size bar without crowding the menu/transport
+         controls on either side. */
       @media (max-width: 700px) {
-        .menu-bar-command-center {
-          flex: 0 0 auto;
-          min-width: 0;
-          padding: 0 8px;
-        }
-        .menu-bar-command-center span {
-          display: none;
+        .menu-bar-search {
+          flex: 0 1 160px;
+          min-width: 90px;
         }
       }
 
@@ -321,6 +300,7 @@
         flex-direction: column;
         gap: 2px;
         min-width: 0;
+        flex: 1;
       }
 
       .notif-row-message {
@@ -333,6 +313,37 @@
       .notif-row-meta {
         font-size: 11px;
         color: var(--fg-dim);
+      }
+
+      /* Same visual language as .notif-panel-clear's own hover (muted -> danger-tinted on hover) —
+         hidden until the row is hovered so the list doesn't read as a wall of X's at rest. */
+      .notif-row-dismiss {
+        all: unset;
+        box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        flex: none;
+        color: var(--fg-dim);
+        cursor: pointer;
+        border-radius: 4px;
+        opacity: 0;
+      }
+
+      .notif-row-dismiss svg {
+        width: 11px;
+        height: 11px;
+      }
+
+      .notif-row:hover .notif-row-dismiss {
+        opacity: 1;
+      }
+
+      .notif-row-dismiss:hover {
+        background: var(--bg-hover);
+        color: var(--danger);
       }
 
       /* .sidebar-tab (primitives.css) is shared with the Modules/Plugins pages' wider, labelled
@@ -894,6 +905,8 @@
               <button type="button" class="menu-dropdown-item" id="file-modules-item">Modules…</button>
               <button type="button" class="menu-dropdown-item" id="file-plugins-item">Plugins…</button>
               <div class="menu-dropdown-divider"></div>
+              <button type="button" class="menu-dropdown-item" id="file-export-item">Export…</button>
+              <div class="menu-dropdown-divider"></div>
               <button type="button" class="menu-dropdown-item" id="back-to-start">Back to Start</button>
               <div class="menu-dropdown-divider"></div>
               <button type="button" class="menu-dropdown-item" id="exit-item">Exit</button>
@@ -963,10 +976,14 @@
 
         <div class="menu-bar-drag" data-tauri-drag-region></div>
 
-        <button type="button" class="menu-bar-command-center" id="command-center-btn" data-tooltip="Search">
-          <svg viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.6" /><path d="M11 11L14.5 14.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
-          <span>Search</span>
-        </button>
+        <div class="searchbar dropdown menu-bar-search" id="command-center-search" data-open="false">
+          <span class="searchbar-icon">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.6" /><path d="M11 11L14.5 14.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
+          </span>
+          <input type="text" class="input" placeholder="Search" autocomplete="off" />
+          <button type="button" class="searchbar-clear" data-tooltip="Clear" aria-label="Clear">✕</button>
+          <div class="dropdown-menu" data-dropdown-menu></div>
+        </div>
 
         <div class="menu-bar-drag" data-tauri-drag-region></div>
 
@@ -1476,8 +1493,51 @@
       // The url passed to each showPopup() call below is what actually varies per trigger (e.g.
       // settings.html's own ?tab=appearance), not the registration itself.
       contributeIframePopup("settings", { title: "Settings" });
-      contributeIframePopup("modules", { title: "Modules" });
-      contributeIframePopup("plugins", { title: "Plugins" });
+      contributeIframePopup("modules", { title: "Modules", forwardEvents: ["install-progress"] });
+      contributeIframePopup("plugins", { title: "Plugins", forwardEvents: ["install-progress"] });
+      contributeIframePopup("export", { title: "Export", forwardEvents: ["export-log", "export-ended"] });
+
+      // ---------- Header search ----------
+      // A real searchbar now, not a button that opens one — types in place, shows matches in the
+      // same dropdown popover initSearchbar() already drives everywhere else. Sourced from
+      // buildSearchableSettingsList() (primitives.js) — right now that only covers settings, but
+      // this bar itself isn't a "settings search," it's the app's one general search entry point;
+      // more sources (open files, commands, whatever comes later) fold into the same options list
+      // this passes to initSearchbar, not a second search UI.
+      //
+      // HEADER_SEARCH_CATEGORIES is the fixed, ordered set of result groups this bar knows about —
+      // a category with nothing matching a given query just doesn't render its divider (see
+      // initSearchbar's `categories` option), so "results"/"commands" having no source yet today is
+      // invisible, not a placeholder gap. "results" (in-open-file text search) is deliberately not
+      // built here — that becomes the Monaco plugin's own contribution once it exists, not core's
+      // business. "commands" (Command Palette — the term predates VS Code, from Sublime Text, and
+      // is the industry-standard name for "searchable list of actions" across editors generally, so
+      // it's kept rather than invented fresh) has no registry to search yet either — only "settings"
+      // actually has entries right now.
+      const HEADER_SEARCH_CATEGORIES = [
+        // browsable: false — in-file text search has nothing meaningful to preview with no query
+        // typed yet, unlike Settings/Command Palette, which are real fixed lists worth browsing.
+        { id: "results", label: "Results", browsable: false },
+        { id: "commands", label: "Command Palette" },
+        { id: "settings", label: "Settings" },
+      ];
+
+      const commandCenterSearch = document.getElementById("command-center-search");
+      const commandCenterInput = commandCenterSearch.querySelector("input");
+
+      buildSearchableSettingsList().then((entries) => {
+        initSearchbar(commandCenterSearch, {
+          options: entries.map((e) => ({ value: e.id, label: e.label, category: e.category })),
+          categories: HEADER_SEARCH_CATEGORIES,
+          onSelect: (value) => {
+            const entry = entries.find((e) => e.id === value);
+            commandCenterInput.value = "";
+            commandCenterSearch.classList.remove("has-value");
+            if (!entry) return;
+            showPopup("settings", { url: `settings.html?search=${encodeURIComponent(entry.label)}&id=${encodeURIComponent(entry.id)}` }).catch(reportError);
+          },
+        });
+      });
 
       // ---------- Notification bell ----------
       // Reads the exact same history every showToast() call (host chrome's own, and any plugin's
@@ -1550,6 +1610,18 @@
           meta.textContent = formatNotificationTime(entry.time) + (entry.source ? ` · ${entry.source}` : "");
           body.appendChild(meta);
           row.appendChild(body);
+
+          const dismissBtn = document.createElement("button");
+          dismissBtn.type = "button";
+          dismissBtn.className = "notif-row-dismiss";
+          dismissBtn.setAttribute("aria-label", "Dismiss");
+          dismissBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>';
+          dismissBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            removeNotificationHistoryEntry(entry.id);
+            renderNotificationList(list);
+          });
+          row.appendChild(dismissBtn);
 
           list.appendChild(row);
         }
@@ -1630,6 +1702,10 @@
         showPopup("plugins", { url: "plugins.html" });
       });
 
+      document.getElementById("file-export-item").addEventListener("click", () => {
+        showPopup("export", { url: "export.html?project=" + encodeURIComponent(projectPath) });
+      });
+
       document.getElementById("exit-item").addEventListener("click", () => {
         window.__TAURI__.window.getCurrentWindow().close();
       });
@@ -1684,13 +1760,6 @@
       // ---------- Help menu ----------
       document.getElementById("help-docs-item").addEventListener("click", () => {
         openUrl("https://lowarc.com");
-      });
-
-      // Looks like a searchbar, isn't one — same as VS Code's own Command Center, it's a button
-      // that opens a separate overlay rather than something you type into in place. Nothing to
-      // search yet (no open files, no registered commands), so there's no overlay to open either.
-      document.getElementById("command-center-btn").addEventListener("click", () => {
-        showToast({ variant: "info", message: "Command palette isn't wired up yet." });
       });
 
       document.getElementById("help-about-item").addEventListener("click", async () => {
@@ -2251,9 +2320,29 @@
           addBtn.type = "button";
           addBtn.className = "btn btn-sm btn-outline";
           addBtn.innerHTML = `<svg viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg> Add ${config.nounSingular}…`;
+
+          const progressEl = document.createElement("div");
+          progressEl.className = "progress";
+          progressEl.style.flex = "1";
+          progressEl.style.display = "none";
+          progressEl.innerHTML = '<div class="progress-fill"></div>';
+
+          // This panel lives in editor.html's own top-level document (not an iframe, unlike the
+          // standalone Modules/Plugins pages), so listening for the raw Tauri event directly here
+          // is the proven pattern — no postMessage relay needed, same as dev-run-log/dev-run-ended.
+          window.__TAURI__.event.listen("install-progress", (event) => {
+            if (event.payload.kind !== config.nounSingular.toLowerCase()) return;
+            setProgress(progressEl, event.payload.totalBytes ? event.payload.bytesDone / event.payload.totalBytes : 0);
+          });
+
           addBtn.addEventListener("click", async () => {
             const sourceDir = await openDialog({ directory: true, title: `Choose a ${config.nounSingular.toLowerCase()} folder to install` });
             if (!sourceDir) return;
+
+            addBtn.disabled = true;
+            progressEl.style.display = "";
+            setProgress(progressEl, 0);
+
             try {
               const id = await invoke(config.installCommand, { sourceDir });
               showToast({ variant: "success", message: `Installed "${id}".` });
@@ -2261,9 +2350,13 @@
               await load();
             } catch (err) {
               showToast({ variant: "error", message: String(err) });
+            } finally {
+              addBtn.disabled = false;
+              progressEl.style.display = "none";
             }
           });
           toolbar.appendChild(addBtn);
+          toolbar.appendChild(progressEl);
           el.appendChild(toolbar);
 
           listEl = document.createElement("div");
@@ -3116,9 +3209,20 @@
       // actual sending window, not something a message can lie about — never from anything the
       // message payload itself claims. A second branch below handles "host" messages
       // (lowarc.markDirty/requestClose) the same way, just routed to a tab instead of a process.
+      //
+      // The harness's own postMessage calls all target "*" (window.parent's exact origin isn't
+      // something a sandboxed iframe — no allow-same-origin — can read to specify it precisely,
+      // and guessing Tauri's own webview origin wrong here would silently break every plugin
+      // interaction rather than fail loudly). This is the other side of that: reject anything NOT
+      // actually from the plugin asset server's own origin before trusting it at all, on top of
+      // (not instead of) windowToPlugin's per-message identity check below. event.origin is a
+      // browser-enforced property a sending page's own JS cannot spoof, regardless of what target
+      // origin it specified when it sent the message.
+      const pluginOriginPromise = pluginAssetPort().then((port) => `http://127.0.0.1:${port}`);
       window.addEventListener("message", async (event) => {
         const data = event.data;
         if (!data || typeof data !== "object") return;
+        if (event.origin !== (await pluginOriginPromise)) return;
 
         if (data.type === "host") {
           // openFile isn't "about" a file that's already open the way markDirty/requestClose
@@ -3228,6 +3332,18 @@
           if (data.action === "openPopup") {
             if (windowToPlugin.get(event.source) && typeof data.popupId === "string") {
               showPopup(data.popupId, data.target)
+                .then((result) => event.source.postMessage({ type: "reply", id: data.id, ok: true, result }, "*"))
+                .catch((err) => event.source.postMessage({ type: "reply", id: data.id, ok: false, error: String(err) }, "*"));
+            }
+            return;
+          }
+          // window.lowarc.getSettings() — see plugin_assets.rs's harness. windowToPlugin is the
+          // trust boundary: a plugin only ever gets ITS OWN saved settings back, since pluginId
+          // here comes from the map this iframe was mounted under, never from the message itself.
+          if (data.action === "getSettings") {
+            const pluginId = windowToPlugin.get(event.source);
+            if (pluginId) {
+              invoke("get_plugin_settings", { id: pluginId })
                 .then((result) => event.source.postMessage({ type: "reply", id: data.id, ok: true, result }, "*"))
                 .catch((err) => event.source.postMessage({ type: "reply", id: data.id, ok: false, error: String(err) }, "*"));
             }

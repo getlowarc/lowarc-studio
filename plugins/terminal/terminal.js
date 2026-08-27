@@ -11,6 +11,13 @@ const sessions = new Map(); // sessionId -> { term, fitAddon, container, sidebar
 let activeSessionId = null;
 let instanceCounter = 0;
 
+// This plugin's own configured default shell (Settings > Plugins > Terminal, see plugin.json's
+// `settings` declaration) — read once at load via window.lowarc.getSettings(), the generic
+// per-plugin settings mechanism. Only used when an instance isn't given an explicit per-instance
+// override (the console header's "..." menu); the host itself no longer knows or cares about this
+// value at all, unlike before.
+let configuredShell = null;
+
 // Not just crypto.randomUUID() directly — this only needs to be unique within one running app
 // instance, not cryptographically unguessable, and a sandboxed iframe without allow-same-origin
 // is an untested enough environment for the Web Crypto API that a fallback is worth having rather
@@ -124,9 +131,10 @@ function createInstance(shell) {
 
   term.onData((data) => window.lowarc.sendSession(sessionId, { type: "input", data }));
 
-  sessions.set(sessionId, { term, fitAddon, container, sidebarItem: null, label: `${instanceCounter}: ${shell || "Default"}` });
+  const resolvedShell = shell || configuredShell || null;
+  sessions.set(sessionId, { term, fitAddon, container, sidebarItem: null, label: `${instanceCounter}: ${resolvedShell || "Default"}` });
   updateEmptyState();
-  window.lowarc.startSession(sessionId, shell);
+  window.lowarc.startSession(sessionId, resolvedShell);
   switchTo(sessionId);
 }
 
@@ -173,4 +181,11 @@ new ResizeObserver(() => {
   if (activeSessionId) refit(activeSessionId);
 }).observe(mainEl);
 
-createInstance(null);
+// The very first instance waits for the configured-shell fetch so it launches with the right
+// default immediately, instead of starting on "Default" and only respecting the setting from the
+// second instance on. A slow/failed fetch still can't hang this — getSettings() always resolves
+// (falls back to {} on the host side), so this is a short real delay, never an indefinite one.
+window.lowarc.getSettings().then((settings) => {
+  configuredShell = (settings && settings.shell) || null;
+  createInstance(null);
+});

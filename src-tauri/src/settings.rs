@@ -31,14 +31,16 @@ pub struct Settings {
     pub disabled_modules: Vec<String>,
     #[serde(default)]
     pub disabled_plugins: Vec<String>,
-    /// The shell command a session-mode plugin (Terminal) should launch — None means "use that
-    /// plugin's own platform-appropriate default" (see terminal_backend.rs's default_shell()),
-    /// Some(cmd) is a straight override, e.g. "pwsh", "bash", "zsh", "cmd". Deliberately just a
-    /// free-text command string, not an enum — resolved via the same PATH lookup every other
-    /// plugin command already goes through, so anything on the user's PATH works without this
-    /// needing to know it exists.
+    /// Values for whatever config fields a plugin has declared in its own plugin.json's `settings`
+    /// (see plugin_host::protocol::PluginSettingField) — keyed by plugin id, then by that plugin's
+    /// own field key. The generic mechanism any plugin can opt into; superseded the old one-off
+    /// `terminal_shell` field, which was this exact same idea (a persisted per-user override for
+    /// one plugin's launch behavior) hand-coded for a single plugin instead of expressed through a
+    /// schema every plugin can use. Plain strings, not typed values — a checkbox field's value is
+    /// "true"/"false", matching how per-module settings (runtime/'s own `settings: HashMap<String,
+    /// String>`) already keep this simple rather than modeling a real type system for it.
     #[serde(default)]
-    pub terminal_shell: Option<String>,
+    pub plugin_settings: HashMap<String, HashMap<String, String>>,
     /// User-dragged item order for the handful of tab/rail strips that opt into reordering (see
     /// editor.html's initReorderable — only a strip explicitly marked data-reorderable ever writes
     /// here). Keyed by the strip's own DOM id ("rail-tabs", "tab-bar-tabs-0", "console-tabs", ...),
@@ -74,7 +76,7 @@ impl Default for Settings {
             editor_panels: PanelLayout::default(),
             disabled_modules: Vec::new(),
             disabled_plugins: Vec::new(),
-            terminal_shell: None,
+            plugin_settings: HashMap::new(),
             tab_order: HashMap::new(),
             regions: HashMap::new(),
         }
@@ -237,6 +239,18 @@ mod tests {
         save_to(&path, &settings).unwrap();
         let loaded = load_from(&path);
         assert_eq!(loaded.tab_order, settings.tab_order);
+    }
+
+    #[test]
+    fn plugin_settings_round_trip_and_default_empty() {
+        assert!(Settings::default().plugin_settings.is_empty());
+
+        let path = temp_file("plugin_settings");
+        let mut settings = Settings::default();
+        settings.plugin_settings.insert("terminal".to_string(), HashMap::from([("shell".to_string(), "pwsh".to_string())]));
+        save_to(&path, &settings).unwrap();
+        let loaded = load_from(&path);
+        assert_eq!(loaded.plugin_settings, settings.plugin_settings);
     }
 
     #[test]

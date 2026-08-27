@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <script src="theme.js"></script>
+    <title>LowArc Studio — Export</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="primitives.css" />
+    <style>
+      .export-field {
+        max-width: 420px;
+      }
+
+      .export-output-row {
+        display: flex;
+        gap: 8px;
+      }
+
+      .export-output-row .input {
+        flex: 1;
+      }
+
+      .export-log {
+        display: none;
+        margin-top: 20px;
+        max-width: 640px;
+        max-height: 220px;
+        overflow: auto;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 10px 12px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        line-height: 1.5;
+        color: var(--fg-dim);
+      }
+
+      .export-log .is-error {
+        color: var(--danger);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- No titlebar, no page title/close — this page exists only as popup content (see
+         contributeIframePopup() in primitives.js); the popup shell supplies title/close chrome.
+         Folder-mode only for now — see export::export_folder's own header in the Rust backend for
+         why that's a real, complete output shape and not a stopgap. Single-file/bundle packaging
+         and the icon/target-platform fields are a later addition to this same page, not a
+         different page. -->
+    <div class="page">
+      <div class="page-body">
+        <div class="field export-field">
+          <label class="field-label" for="export-name">App name</label>
+          <input id="export-name" class="input" type="text" placeholder="MyGame" autocomplete="off" />
+          <div class="field-hint">Used as the exported folder and runtime executable's name.</div>
+        </div>
+
+        <div class="field export-field">
+          <label class="field-label">Output folder</label>
+          <div class="export-output-row">
+            <input id="export-output" class="input" type="text" readonly placeholder="Choose a folder…" />
+            <button type="button" class="btn btn-md btn-outline" id="choose-output">Browse…</button>
+          </div>
+          <div class="field-hint">A new, non-colliding folder is created here — nothing already in it is touched.</div>
+        </div>
+
+        <label class="checkbox-row">
+          <input type="checkbox" id="export-diagnostics" />
+          <span class="checkbox-box">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          </span>
+          <span>Write a log file if the exported app fails</span>
+        </label>
+
+        <div class="export-log" id="export-log"></div>
+      </div>
+      <div class="page-header" style="border-bottom: none; border-top: 1px solid var(--border)">
+        <div class="header-spacer"></div>
+        <button type="button" class="btn btn-md btn-confirm" id="export-btn">Export</button>
+        <div class="progress" id="export-progress" style="width: 140px; display: none"><div class="progress-fill"></div></div>
+      </div>
+    </div>
+
+    <!-- showPopup()'s stack (see primitives.js) — a sibling of the page's main content so nothing
+         can clip it, same placement editor.html uses. -->
+    <div class="popup-stack" id="popup-stack"></div>
+
+    <script src="primitives.js"></script>
+    <script>
+      const { invoke } = window.__TAURI__.core;
+      const { open: openDialog } = window.__TAURI__.dialog;
+
+      const projectDir = new URLSearchParams(window.location.search).get("project") || "";
+
+      const nameInput = document.getElementById("export-name");
+      const outputInput = document.getElementById("export-output");
+      const diagnosticsCheckbox = document.getElementById("export-diagnostics");
+      const exportBtn = document.getElementById("export-btn");
+      const logEl = document.getElementById("export-log");
+
+      document.getElementById("choose-output").addEventListener("click", async () => {
+        const picked = await openDialog({ directory: true, title: "Choose a folder to export into" });
+        if (picked) outputInput.value = picked;
+      });
+
+      function appendLog(message, isError) {
+        logEl.style.display = "block";
+        const line = document.createElement("div");
+        if (isError) line.className = "is-error";
+        line.textContent = message;
+        logEl.appendChild(line);
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+
+      let exporting = false;
+      const progressEl = document.getElementById("export-progress");
+
+      function setExporting(active) {
+        exporting = active;
+        exportBtn.disabled = active;
+        if (active) {
+          progressEl.style.display = "";
+          setProgress(progressEl, 0);
+        }
+      }
+
+      async function startExport() {
+        if (exporting) return;
+
+        const name = nameInput.value.trim();
+        if (!name) {
+          showToast({ variant: "error", message: "Give the export a name first." });
+          return;
+        }
+        const outputDir = outputInput.value.trim();
+        if (!outputDir) {
+          showToast({ variant: "error", message: "Choose an output folder first." });
+          return;
+        }
+
+        logEl.innerHTML = "";
+        setExporting(true);
+
+        try {
+          await invoke("start_export", { projectDir, outputDir, name, diagnosticsLog: diagnosticsCheckbox.checked });
+        } catch (err) {
+          setExporting(false);
+          showToast({ variant: "error", message: String(err) });
+        }
+      }
+
+      exportBtn.addEventListener("click", startExport);
+
+      // Relayed by contributeIframePopup's forwardEvents (see primitives.js) — a raw
+      // window.__TAURI__.event.listen() here would be untested territory for a document loaded
+      // inside an iframe, unlike this postMessage relay, which is the same proven mechanism the
+      // popup-header tab/button relay already uses.
+      window.addEventListener("message", (e) => {
+        if (!e.data || e.data.type !== "tauri-event") return;
+        const payload = e.data.payload;
+        if (e.data.event === "export-log") {
+          appendLog(payload.message);
+          if (typeof payload.step === "number" && payload.total) setProgress(progressEl, payload.step / payload.total);
+        } else if (e.data.event === "export-ended") {
+          if (payload.ok) {
+            setProgress(progressEl, 1);
+            appendLog(`Done — exported to ${payload.path}`);
+            showToast({ variant: "success", message: "Export finished." });
+          } else {
+            progressEl.style.display = "none";
+            (payload.errors || []).forEach((err) => appendLog(err, true));
+            showToast({ variant: "error", message: "Export failed — see the log below." });
+          }
+          setExporting(false);
+        }
+      });
+
+      (() => {
+        initTooltips();
+        // A reasonable starting name, not a locked-in one — the project folder's own name, since
+        // there's nowhere else to source a default app name from yet.
+        const segments = projectDir.split(/[\\/]/).filter(Boolean);
+        if (segments.length) nameInput.value = segments[segments.length - 1];
+      })();
+    </script>
+  </body>
+</html>

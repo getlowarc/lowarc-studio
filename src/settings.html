@@ -7,10 +7,6 @@
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="primitives.css" />
     <style>
-      .settings-field {
-        max-width: 280px;
-      }
-
       .tab-panel {
         display: none;
       }
@@ -116,31 +112,30 @@
          setPopupHeaderControls() below). -->
     <div class="page">
       <div class="page-body">
-        <div class="tab-panel" id="tab-panel-general">
-          <div class="field settings-field">
-            <label class="field-label" for="target-fps">Dev run target FPS</label>
-            <div class="numeric-input">
-              <input id="target-fps" type="text" inputmode="numeric" min="1" max="1000" step="1" />
-              <div class="numeric-steppers">
-                <button type="button" class="stepper-up" aria-label="Increase">▲</button>
-                <button type="button" class="stepper-down" aria-label="Decrease">▼</button>
-              </div>
-            </div>
-            <div class="field-hint">Frame rate used when running a project from the editor.</div>
-          </div>
+        <!-- Always visible regardless of which tab is showing (Appearance included) — typing here
+             swaps the visible panel to #tab-panel-search, same showTab() every header tab already
+             uses, just never listed as one of ITS OWN clickable tabs. Clearing it restores whatever
+             tab was showing before. See the script below for why this is a plain wired input, not
+             initSearchbar() — that helper is built for a type-and-pick-one autocomplete (the
+             command-center's job), not a live-filtered list view like this one. -->
+        <div class="searchbar" id="settings-search" style="margin-bottom: 18px">
+          <span class="searchbar-icon">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.6" /><path d="M11 11L14.5 14.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
+          </span>
+          <input type="text" class="input" placeholder="Search settings…" autocomplete="off" />
+          <button type="button" class="searchbar-clear" data-tooltip="Clear" aria-label="Clear">✕</button>
+        </div>
 
-          <div class="field settings-field">
-            <label class="field-label">Terminal shell</label>
-            <div class="dropdown dropdown-full" data-dropdown data-open="false" id="terminal-shell-dropdown">
-              <button type="button" class="dropdown-trigger" data-dropdown-trigger>
-                <span class="dropdown-value" data-dropdown-value>Default</span>
-                <span class="dropdown-chevron">▾</span>
-              </button>
-              <div class="dropdown-menu" data-dropdown-menu id="terminal-shell-dropdown-menu"></div>
-            </div>
-            <input id="terminal-shell-custom" class="input" type="text" placeholder="Custom shell command, e.g. fish" autocomplete="off" style="display: none; margin-top: 8px" />
-            <div class="field-hint">Command used to launch the integrated terminal. Default is PowerShell on Windows, $SHELL elsewhere.</div>
-          </div>
+        <div class="tab-panel" id="tab-panel-general">
+          <div id="general-settings-list"></div>
+        </div>
+
+        <div class="tab-panel" id="tab-panel-plugins">
+          <div id="plugin-settings-list"></div>
+        </div>
+
+        <div class="tab-panel" id="tab-panel-search">
+          <div id="search-results-list"></div>
         </div>
 
         <div class="tab-panel" id="tab-panel-appearance">
@@ -177,10 +172,6 @@
           </div>
         </div>
       </div>
-      <div class="page-header" style="border-bottom: none; border-top: 1px solid var(--border)">
-        <div class="header-spacer"></div>
-        <button type="button" class="btn btn-md btn-confirm" id="save">Save</button>
-      </div>
     </div>
 
     <!-- showPopup()'s stack (see primitives.js) — a sibling of the page's main content so nothing
@@ -198,94 +189,178 @@
         document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("is-active", p.id === `tab-panel-${value}`));
       }
 
-      // ---------- General tab ----------
-      const targetFpsInput = document.getElementById("target-fps");
+      // ---------- Settings registry (General + Plugins, standardized) ----------
+      // Every configurable value except Appearance's (colors are their own thing — a live preview,
+      // not a single committed value, so they stay hand-built) renders off ONE shared shape now:
+      // buildSearchableSettingsList()/renderSettingRow() (primitives.js), the exact same functions
+      // the command-center's global search uses. General and Plugins are just two different FILTERS
+      // over the same flat list, not two different rendering paths — and the search tab below is a
+      // third filter over that same list, so there is genuinely only one way a setting ever renders
+      // anywhere in this app.
       let loadedSettings = null;
+      let registry = [];
 
-      // ---------- Terminal shell dropdown ----------
-      // A fixed list of common shells, plus "Custom…" for anything else — a plain free-text field
-      // covers every case but Nolan asked for a dropdown specifically, so the common case is one
-      // click and the escape hatch (a shell not on this list, or one with extra args) still works.
-      const TERMINAL_SHELL_OPTIONS = [
-        { value: "", label: "Default" },
-        { value: "powershell", label: "PowerShell" },
-        { value: "pwsh", label: "PowerShell 7 (pwsh)" },
-        { value: "cmd", label: "Command Prompt" },
-        { value: "bash", label: "Bash" },
-        { value: "zsh", label: "Zsh" },
-        { value: "__custom__", label: "Custom…" },
-      ];
-      const terminalShellCustomInput = document.getElementById("terminal-shell-custom");
-
-      function populateTerminalShellDropdown() {
-        const menu = document.getElementById("terminal-shell-dropdown-menu");
-        menu.innerHTML = "";
-        TERMINAL_SHELL_OPTIONS.forEach((opt) => menu.appendChild(makeOption(opt.value, opt.label)));
+      async function getEntryValue(entry) {
+        if (entry.tab === "general") return String(loadedSettings[entry.key]);
+        const values = await invoke("get_plugin_settings", { id: entry.pluginId });
+        return values[entry.key] || "";
       }
 
-      function selectTerminalShellOption(value) {
-        const dropdownEl = document.getElementById("terminal-shell-dropdown");
-        const valueEl = dropdownEl.querySelector("[data-dropdown-value]");
-        const options = Array.from(dropdownEl.querySelectorAll("[data-dropdown-option]"));
-        const matched = options.find((o) => o.dataset.value === value);
-        valueEl.textContent = matched ? matched.dataset.label : value;
-        options.forEach((o) => o.classList.toggle("is-selected", o === matched));
-        dropdownEl.dataset.value = value;
-        terminalShellCustomInput.style.display = value === "__custom__" ? "block" : "none";
-      }
-
-      // Settings only ever stores the actual command string (or null) — this maps that back onto
-      // the dropdown, falling to "Custom…" + the text field for a saved value that isn't one of
-      // the fixed options (someone had set a free-text value before this became a dropdown, say).
-      function setTerminalShellFromSavedValue(saved) {
-        const isKnown = TERMINAL_SHELL_OPTIONS.some((o) => o.value === saved && o.value !== "__custom__");
-        if (!saved) {
-          selectTerminalShellOption("");
-        } else if (isKnown) {
-          selectTerminalShellOption(saved);
-        } else {
-          selectTerminalShellOption("__custom__");
-          terminalShellCustomInput.value = saved;
+      async function commitEntryValue(entry, value) {
+        if (entry.tab === "general") {
+          if (entry.type === "number") {
+            const num = Number(value);
+            if (!Number.isInteger(num) || num < 1) {
+              showToast({ variant: "error", message: `${entry.label} must be a positive whole number.` });
+              return;
+            }
+            value = num;
+          }
+          // Preserve every other field — save_settings replaces the whole Settings object, so
+          // sending just the one changed key would silently reset the rest to their defaults.
+          loadedSettings = { ...loadedSettings, [entry.key]: value };
+          try {
+            await invoke("save_settings", { settings: loadedSettings });
+          } catch (err) {
+            showToast({ variant: "error", message: String(err) });
+          }
+          return;
         }
-      }
-
-      document.getElementById("terminal-shell-dropdown").addEventListener("dropdown-change", () => {
-        const value = document.getElementById("terminal-shell-dropdown").dataset.value;
-        terminalShellCustomInput.style.display = value === "__custom__" ? "block" : "none";
-      });
-
-      async function loadGeneral() {
         try {
-          loadedSettings = await invoke("get_settings");
-          targetFpsInput.value = loadedSettings.devRunTargetFps;
-          populateTerminalShellDropdown();
-          setTerminalShellFromSavedValue(loadedSettings.terminalShell || "");
+          await invoke("set_plugin_setting", { id: entry.pluginId, key: entry.key, value });
         } catch (err) {
           showToast({ variant: "error", message: String(err) });
         }
       }
 
-      document.getElementById("save").addEventListener("click", async () => {
-        const fps = Number(targetFpsInput.value);
-        if (!Number.isInteger(fps) || fps < 1) {
-          showToast({ variant: "error", message: "Target FPS must be a positive whole number." });
+      async function renderEntryInto(container, entry) {
+        const value = await getEntryValue(entry);
+        container.appendChild(renderSettingRow(entry, value, (newValue) => commitEntryValue(entry, newValue)));
+      }
+
+      async function loadGeneral() {
+        const container = document.getElementById("general-settings-list");
+        container.innerHTML = "";
+        try {
+          loadedSettings = await invoke("get_settings");
+        } catch (err) {
+          showToast({ variant: "error", message: String(err) });
+          return;
+        }
+        for (const entry of registry.filter((e) => e.tab === "general")) {
+          await renderEntryInto(container, entry);
+        }
+        initNumericInputs();
+        initDropdowns();
+      }
+
+      async function loadPluginSettings() {
+        const container = document.getElementById("plugin-settings-list");
+        container.innerHTML = "";
+        const entries = registry.filter((e) => e.tab === "plugins");
+
+        if (!entries.length) {
+          const empty = document.createElement("div");
+          empty.className = "manage-list-empty";
+          empty.textContent = "No installed plugins have any settings to configure.";
+          container.appendChild(empty);
           return;
         }
 
-        try {
-          // Preserve every other field (themeMode especially) — save_settings replaces the whole
-          // Settings object, so sending just { devRunTargetFps } would silently reset the rest to
-          // their defaults.
-          const shellDropdownValue = document.getElementById("terminal-shell-dropdown").dataset.value;
-          const terminalShell = shellDropdownValue === "__custom__" ? terminalShellCustomInput.value.trim() || null : shellDropdownValue || null;
-          const settings = { ...(loadedSettings || (await invoke("get_settings"))), devRunTargetFps: fps, terminalShell };
-          await invoke("save_settings", { settings });
-          loadedSettings = settings;
-          showToast({ variant: "success", message: "Settings saved." });
-        } catch (err) {
-          showToast({ variant: "error", message: String(err) });
+        // Grouped by plugin, same visual shape as before (a heading per plugin) — the row shape
+        // underneath each heading is the only thing that's actually standardized now, the grouping
+        // itself is still meaningful (these fields belong to a plugin, that's real context to keep).
+        const bySource = new Map();
+        for (const entry of entries) {
+          if (!bySource.has(entry.source)) bySource.set(entry.source, []);
+          bySource.get(entry.source).push(entry);
         }
+        for (const [source, group] of bySource) {
+          const section = document.createElement("div");
+          section.className = "section";
+          const heading = document.createElement("h2");
+          heading.textContent = source;
+          section.appendChild(heading);
+          for (const entry of group) {
+            await renderEntryInto(section, { ...entry, source: null }); // heading already says the source, don't repeat it per-row
+          }
+          container.appendChild(section);
+        }
+        initDropdowns();
+      }
+
+      // ---------- Search ----------
+      // Not initSearchbar() — that helper is a type-and-pick-ONE autocomplete (right for the
+      // command-center overlay in editor.html, which searches this exact same list), whereas this
+      // is a live-filtered VIEW: every match renders as a real, immediately-editable row, not a
+      // suggestion you select before anything happens.
+      const searchEl = document.getElementById("settings-search");
+      const searchInput = searchEl.querySelector("input");
+      let previousTab = "general";
+
+      async function renderSearchResults(query) {
+        const container = document.getElementById("search-results-list");
+        container.innerHTML = "";
+        const lower = query.toLowerCase();
+        const matches = registry.filter((e) => e.label.toLowerCase().includes(lower) || (e.hint || "").toLowerCase().includes(lower));
+
+        if (!matches.length) {
+          const empty = document.createElement("div");
+          empty.className = "manage-list-empty";
+          empty.textContent = `No settings match "${query}".`;
+          container.appendChild(empty);
+          return;
+        }
+        for (const entry of matches) {
+          await renderEntryInto(container, entry);
+        }
+        initNumericInputs();
+        initDropdowns();
+        return matches;
+      }
+
+      searchInput.addEventListener("input", async () => {
+        const query = searchInput.value.trim();
+        searchEl.classList.toggle("has-value", query.length > 0);
+        if (!query) {
+          showTab(previousTab);
+          return;
+        }
+        if (!document.getElementById("tab-panel-search").classList.contains("is-active")) {
+          previousTab = Array.from(document.querySelectorAll(".tab-panel")).find((p) => p.classList.contains("is-active"))?.id.replace("tab-panel-", "") || "general";
+        }
+        showTab("search");
+        await renderSearchResults(query);
       });
+
+      searchEl.querySelector(".searchbar-clear").addEventListener("click", () => {
+        searchInput.value = "";
+        searchEl.classList.remove("has-value");
+        showTab(previousTab);
+        searchInput.focus();
+      });
+
+      // ?search=<label text> — how editor.html's command-center overlay hands off a selected
+      // setting: pre-fills and runs the same search this box would if typed, then scrolls to and
+      // briefly highlights (see .setting-row.is-highlighted) the one row it's actually about, since
+      // the query text alone might still match more than one row.
+      async function applyUrlSearch() {
+        const params = new URLSearchParams(window.location.search);
+        const query = params.get("search");
+        const entryId = params.get("id");
+        if (!query) return;
+        searchInput.value = query;
+        searchEl.classList.add("has-value");
+        showTab("search");
+        await renderSearchResults(query);
+        if (entryId) {
+          const row = document.querySelector(`.setting-row[data-setting-id="${CSS.escape(entryId)}"]`);
+          if (row) {
+            row.scrollIntoView({ block: "center" });
+            row.classList.add("is-highlighted");
+          }
+        }
+      }
 
       // ---------- Appearance tab (moved in from the former appearance.html verbatim) ----------
       let currentColors = { ...DARK_THEME };
@@ -533,21 +608,33 @@
 
       (async () => {
         initTooltips();
-        initNumericInputs();
 
         const requestedTab = new URLSearchParams(window.location.search).get("tab");
-        const initialTab = requestedTab === "appearance" ? "appearance" : "general";
+        const initialTab = ["appearance", "plugins"].includes(requestedTab) ? requestedTab : "general";
+        previousTab = initialTab;
         showTab(initialTab);
         setPopupHeaderControls({
           tabs: [
             { value: "general", label: "General" },
             { value: "appearance", label: "Appearance" },
+            { value: "plugins", label: "Plugins" },
           ],
           activeTab: initialTab,
         });
-        onPopupHeaderAction({ onTabChange: showTab });
+        // Clicking a real header tab while a search is active should behave like clearing the
+        // search box, not layer a tab switch underneath a still-visible search results view.
+        onPopupHeaderAction({
+          onTabChange: (value) => {
+            previousTab = value;
+            searchInput.value = "";
+            searchEl.classList.remove("has-value");
+            showTab(value);
+          },
+        });
 
-        await Promise.all([loadGeneral(), loadAppearance()]);
+        registry = await buildSearchableSettingsList();
+        await Promise.all([loadGeneral(), loadAppearance(), loadPluginSettings()]);
+        await applyUrlSearch();
       })();
     </script>
   </body>
