@@ -18,5 +18,8 @@
       "placeholder": "Default",
       "hint": "Command used to launch a new terminal. Default is PowerShell on Windows, $SHELL elsewhere. Anything on your PATH works, e.g. pwsh, bash, zsh, cmd."
     }
+  ],
+  "commands": [
+    { "id": "new-terminal", "label": "Terminal: New Terminal", "hint": "Opens a new terminal instance using your configured (or default) shell." }
   ]
 }

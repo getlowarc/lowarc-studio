@@ -1500,20 +1500,19 @@
       // ---------- Header search ----------
       // A real searchbar now, not a button that opens one — types in place, shows matches in the
       // same dropdown popover initSearchbar() already drives everywhere else. Sourced from
-      // buildSearchableSettingsList() (primitives.js) — right now that only covers settings, but
-      // this bar itself isn't a "settings search," it's the app's one general search entry point;
-      // more sources (open files, commands, whatever comes later) fold into the same options list
-      // this passes to initSearchbar, not a second search UI.
+      // buildSearchableSettingsList() (primitives.js) plus this file's own command registry below —
+      // this bar isn't a "settings search," it's the app's one general search entry point; more
+      // sources (open files, whatever comes later) fold into the same options list, not a second
+      // search UI.
       //
       // HEADER_SEARCH_CATEGORIES is the fixed, ordered set of result groups this bar knows about —
       // a category with nothing matching a given query just doesn't render its divider (see
-      // initSearchbar's `categories` option), so "results"/"commands" having no source yet today is
-      // invisible, not a placeholder gap. "results" (in-open-file text search) is deliberately not
-      // built here — that becomes the Monaco plugin's own contribution once it exists, not core's
-      // business. "commands" (Command Palette — the term predates VS Code, from Sublime Text, and
-      // is the industry-standard name for "searchable list of actions" across editors generally, so
-      // it's kept rather than invented fresh) has no registry to search yet either — only "settings"
-      // actually has entries right now.
+      // initSearchbar's `categories` option), so "results" having no source yet today is invisible,
+      // not a placeholder gap. "results" (in-open-file text search) is deliberately not built here
+      // — that becomes the Monaco plugin's own contribution once it exists, not core's business.
+      // "commands" (Command Palette — the term predates VS Code, from Sublime Text, and is the
+      // industry-standard name for "searchable list of actions" across editors generally, so it's
+      // kept rather than invented fresh) is populated below.
       const HEADER_SEARCH_CATEGORIES = [
         // browsable: false — in-file text search has nothing meaningful to preview with no query
         // typed yet, unlike Settings/Command Palette, which are real fixed lists worth browsing.
@@ -1522,10 +1521,97 @@
         { id: "settings", label: "Settings" },
       ];
 
+      // Command Palette registry, half of it anyway — the host-owned half. Every ENABLED item in
+      // the File/Edit/View/Run/Help menu bar is already a real DOM element with a label and a
+      // click handler; scanning it rather than hand-maintaining a second list is what keeps this
+      // from drifting out of sync with the actual menu the moment someone adds an item and forgets
+      // the palette entry. Disabled placeholders (Save, Undo, Command Palette's own menu label
+      // wouldn't be one of these anyway) are skipped — nothing to run yet.
+      function buildHostMenuCommands() {
+        const commands = [];
+        document.querySelectorAll(".menu-dropdown-item").forEach((btn) => {
+          if (btn.disabled) return;
+          const label = btn.textContent.trim();
+          if (!label) return;
+          commands.push({ id: `command:host:${btn.id}`, label, category: "commands", kind: "command", run: () => btn.click() });
+        });
+        return commands;
+      }
+
+      // The other half — plugin-declared. A sandboxed plugin's content can't be introspected the
+      // way the host's own menu bar can, so it has to say what it offers itself, via plugin.json's
+      // `commands` array (same shape/spirit as `settings` — see PluginCommand in protocol.rs).
+      async function buildPluginCommands() {
+        let plugins = [];
+        try {
+          plugins = await invoke("list_installed_plugins");
+        } catch (err) {
+          return [];
+        }
+        const commands = [];
+        for (const plugin of plugins) {
+          for (const cmd of plugin.commands || []) {
+            commands.push({
+              id: `command:plugin:${plugin.id}:${cmd.id}`,
+              label: cmd.label,
+              hint: cmd.hint,
+              category: "commands",
+              kind: "command",
+              run: () => runPluginCommand(plugin.id, cmd.id),
+            });
+          }
+        }
+        return commands;
+      }
+
+      // Opens whichever slot `pluginId` actually contributes (sidebar panel, inspector, or console
+      // tab), mounting its iframe fresh if it wasn't already, and resolves once that iframe is
+      // genuinely ready to receive a message — not just once the element exists. A freshly-created
+      // iframe's own scripts (including whatever registers window.lowarc.on("lowarc:runCommand", ...))
+      // haven't run yet the instant mount() returns; waiting for the iframe's `load` event is what
+      // actually guarantees the plugin's own listener exists before anything gets sent to it. An
+      // already-mounted iframe's `load` already fired in the past, so it's returned immediately —
+      // attaching a new `load` listener to it here would just wait forever. Resolves null for a
+      // plugin with no panel/console-tab contribution at all (e.g. viewer-only) — nothing to open.
+      function ensurePluginMounted(pluginId) {
+        for (const [key, entry] of pluginPanels) {
+          if (entry.pluginId !== pluginId) continue;
+          const wasMounted = Boolean(entry.iframe);
+          const location = entry.panel.location; // "sidebar" | "inspector" | undefined (a console tab)
+
+          if (location === "sidebar") {
+            showSlotTab("sidebar", "left-panel-body", key);
+            setPanelOpen("sidebar", true);
+          } else if (location === "inspector") {
+            // Inspector's single content slot is mounted once, unconditionally, at startup
+            // (renderSingleSlot) — opening it is purely making the panel visible, nothing to mount.
+            setPanelOpen("right", true);
+          } else {
+            setPanelOpen("console", true);
+            activateConsoleTab(key);
+          }
+
+          if (!entry.iframe) return Promise.resolve(null); // contribution registered but mount() itself failed
+          if (wasMounted) return Promise.resolve(entry.iframe);
+          return new Promise((resolve) => entry.iframe.addEventListener("load", () => resolve(entry.iframe), { once: true }));
+        }
+        return Promise.resolve(null);
+      }
+
+      async function runPluginCommand(pluginId, commandId) {
+        const iframe = await ensurePluginMounted(pluginId);
+        if (!iframe) {
+          showToast({ variant: "error", message: "That plugin has nothing to open — its command can't run." });
+          return;
+        }
+        iframe.contentWindow.postMessage({ type: "emit", event: "lowarc:runCommand", payload: { commandId } }, "*");
+      }
+
       const commandCenterSearch = document.getElementById("command-center-search");
       const commandCenterInput = commandCenterSearch.querySelector("input");
 
-      buildSearchableSettingsList().then((entries) => {
+      Promise.all([buildSearchableSettingsList(), buildPluginCommands()]).then(([settingEntries, pluginCommands]) => {
+        const entries = [...settingEntries, ...buildHostMenuCommands(), ...pluginCommands];
         initSearchbar(commandCenterSearch, {
           options: entries.map((e) => ({ value: e.id, label: e.label, category: e.category })),
           categories: HEADER_SEARCH_CATEGORIES,
@@ -1534,6 +1620,10 @@
             commandCenterInput.value = "";
             commandCenterSearch.classList.remove("has-value");
             if (!entry) return;
+            if (entry.kind === "command") {
+              entry.run();
+              return;
+            }
             showPopup("settings", { url: `settings.html?search=${encodeURIComponent(entry.label)}&id=${encodeURIComponent(entry.id)}` }).catch(reportError);
           },
         });
@@ -2103,6 +2193,7 @@
         if (!entry.iframe) {
           const iframe = document.createElement("iframe");
           iframe.className = "plugin-panel-frame";
+          iframe.dataset.pluginId = entry.pluginId; // lets a command look up this plugin's own mounted iframe by id, see runCommand()
           iframe.setAttribute("sandbox", "allow-scripts");
           container.appendChild(iframe);
           entry.iframe = iframe;
@@ -2844,6 +2935,18 @@
           onActivate: (contribution) => activateConsoleTab(contribution.id),
         });
 
+        // "__run" (Run) needs its one-time mount() — which reparents the static #console-run-panel
+        // out of console-body and into its own wrapper — to happen right now, unconditionally, not
+        // just whenever a user happens to click the Run tab first. Until that reparenting happens,
+        // #console-run-panel's own permanently-baked-in "is-active" class (see its static HTML)
+        // makes it render on its own regardless of any other tab's wrapper — a same-height phantom
+        // sibling stacking underneath whatever tab genuinely is active, which is exactly what showed
+        // up as unexplained extra scroll height the moment Terminal (or anything else) became active
+        // before Run ever had been. Doesn't open the console panel itself — activateConsoleTab()
+        // never does that — just establishes Run as the active tab underneath, matching what the
+        // static HTML already visually implied by default.
+        activateConsoleTab("__run");
+
         // [data-tabs] only marks .is-active in response to a real click (see initTabs() in
         // primitives.js) — it doesn't know about restoredSidebarActiveKey, the tab that was active
         // when this layout was last saved (see savePanelLayout/loadPanelLayout). Re-activate that
@@ -3088,6 +3191,7 @@
         const groupId = targetGroupId;
         const iframe = document.createElement("iframe");
         iframe.className = "plugin-panel-frame";
+        iframe.dataset.pluginId = viewer.pluginId; // lets a command look up this plugin's own mounted iframe by id, see runCommand()
         iframe.setAttribute("sandbox", "allow-scripts");
         iframe.src = await pluginAssetUrl(viewer.pluginId, viewer.viewer.entry, `path=${encodeURIComponent(path)}`);
         // A click inside a sandboxed iframe never bubbles to the parent document, so the

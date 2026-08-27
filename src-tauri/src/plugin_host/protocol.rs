@@ -69,6 +69,25 @@ pub struct PluginDescriptor {
     /// plugin-specific config some other way — it's the generic option, not a requirement.
     #[serde(default)]
     pub settings: Vec<PluginSettingField>,
+    /// Commands this plugin wants exposed in the app's Command Palette — the plugin-declared half
+    /// of that registry; host-owned menu items are the other half, auto-discovered from the menu
+    /// bar's own DOM rather than declared anywhere (see buildHostMenuCommands() in editor.html) —
+    /// a sandboxed plugin has no equivalent to introspect, so it has to say so itself. Selecting one
+    /// posts a `lowarc:runCommand` emit (payload `{commandId}`) into this plugin's own iframe if
+    /// it's currently mounted; if it isn't, the palette can't run it yet (no auto-mount today) and
+    /// says so rather than silently doing nothing.
+    #[serde(default)]
+    pub commands: Vec<PluginCommand>,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize, Clone)]
+#[serde(default, rename_all = "camelCase")]
+pub struct PluginCommand {
+    /// Passed back verbatim in the `lowarc:runCommand` emit's payload — this plugin's own business
+    /// to interpret, the host never looks inside it.
+    pub id: String,
+    pub label: String,
+    pub hint: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize, Serialize, Clone)]

@@ -6,7 +6,7 @@
 // Settings) — every function here just takes the current disabled-id set as a parameter, same
 // dependency-injection-for-testability shape as everywhere else in this codebase.
 
-use crate::plugin_host::protocol::{Contributes, PluginDescriptor, PluginSettingField};
+use crate::plugin_host::protocol::{Contributes, PluginCommand, PluginDescriptor, PluginSettingField};
 use crate::runtime::manifest::Manifest;
 use crate::runtime::project;
 use serde::Serialize;
@@ -48,6 +48,8 @@ pub struct PluginListItem {
     /// actual fields (and reading/writing their current values) is the Settings page's job, not
     /// this list's; this is just "does this plugin have any, and what do they look like."
     pub settings: Vec<PluginSettingField>,
+    /// This plugin's own declared Command Palette entries, if any — see PluginCommand.
+    pub commands: Vec<PluginCommand>,
 }
 
 /// Every installed module, unconditionally — unlike project::resolve, which only pulls in what one
@@ -102,6 +104,7 @@ pub fn list_plugins(plugins_dir: &Path, disabled: &HashSet<String>) -> Vec<Plugi
             session: desc.session,
             contributes: desc.contributes,
             settings: desc.settings,
+            commands: desc.commands,
         });
     }
     items.sort_by(|a, b| a.name.cmp(&b.name));

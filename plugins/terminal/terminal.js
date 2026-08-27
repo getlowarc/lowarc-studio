@@ -170,11 +170,18 @@ window.lowarc.on("lowarc:sessionOutput", (payload) => {
   }
 });
 
-// The host's console-header "+"/"..." controls (see editor.html) — this is the only way a new
-// instance ever gets created, including the very first one below, so there's exactly one code
-// path for "open a terminal" regardless of whether it's the first or the fifth.
+// The host's console-header "+"/"..." controls (see editor.html), and — since Command Palette
+// entries below — the Command Palette's "Terminal: New Terminal" both ultimately call this one
+// function, so there's exactly one code path for "open a terminal" regardless of which UI asked.
 window.lowarc.on("lowarc:newTerminal", (payload) => {
   createInstance(payload && payload.shell ? payload.shell : null);
+});
+
+// This plugin's own Command Palette entries (declared in plugin.json's `commands`) — the host
+// sends every command the same generic way (an emit carrying just the id back), so this is the
+// one place that maps "new-terminal" onto what it actually means for this plugin.
+window.lowarc.on("lowarc:runCommand", (payload) => {
+  if (payload && payload.commandId === "new-terminal") createInstance(null);
 });
 
 new ResizeObserver(() => {
