@@ -283,12 +283,14 @@ function initReorderable(container, { itemSelector = "[data-tab-value]", keyAttr
 //
 // Two distinct states, not one: focusing an EMPTY bar opens a "browse" view — every browsable
 // category (browsable: false opts a category out, e.g. an in-file-search category has nothing
-// meaningful to show with no query typed) shown truncated to `previewLimit`, with a chevron on any
-// category that actually has more than that to reveal. Typing a real query switches to normal
-// filtered results instead — full, ungrouped-by-truncation matches, not a preview of anything.
-// Clearing back to empty (or blurring away and refocusing) returns to a fresh, re-collapsed browse
-// view — an expand a user triggered doesn't linger past the search that was open when they did it.
-function initSearchbar(el, { options, onSelect, categories, previewLimit = 5 } = {}) {
+// meaningful to show with no query typed) starts fully collapsed to just its own divider+chevron
+// (previewLimit defaults to 0 — no partial preview, a category is purely a navigational heading
+// until a user actually opens it), expanding to show everything in it on click. Typing a real
+// query switches to normal filtered results instead — full, ungrouped-by-truncation matches, not a
+// preview of anything. Clearing back to empty (or blurring away and refocusing) returns to a
+// fresh, re-collapsed browse view — an expand a user triggered doesn't linger past the search that
+// was open when they did it.
+function initSearchbar(el, { options, onSelect, categories, previewLimit = 0 } = {}) {
   const input = el.querySelector("input");
   const menu = el.querySelector("[data-dropdown-menu]");
   const clearBtn = el.querySelector(".searchbar-clear");
