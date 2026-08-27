@@ -2987,7 +2987,12 @@
         });
       }
 
-      document.getElementById("rail-tabs").addEventListener("contextmenu", (e) => {
+      // Bound to the whole #rail nav, not just #rail-tabs — #rail-tabs is only as tall as its own
+      // icons (its own spacer, .rail-spacer, is a SIBLING outside it, unlike the console's own
+      // spacer which lives INSIDE #console-tabs and so already made that whole row clickable). A
+      // right-click below the last icon, or with every icon currently hidden, would otherwise hit
+      // #rail with nothing listening — exactly the case this menu most needs to be reachable from.
+      document.getElementById("rail").addEventListener("contextmenu", (e) => {
         e.preventDefault();
         e.stopPropagation();
         openSlotVisibilityMenu("sidebar", e.clientX, e.clientY);
