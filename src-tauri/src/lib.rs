@@ -23,11 +23,27 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager, State};
 
-/// The one active dev-run's stop flag, if any. A second start_dev_run while one is already
-/// running is refused rather than silently replacing it — mirrors "throw a visible error, let the
-/// user decide" rather than guessing what they meant.
+/// The debug-control handles for the one active dev-run, if any. A second start_dev_run while one
+/// is already running is refused rather than silently replacing it — mirrors "throw a visible
+/// error, let the user decide" rather than guessing what they meant.
+struct ActiveRun {
+    stop_flag: Arc<AtomicBool>,
+    pause_flag: Arc<AtomicBool>,
+    step_request: Arc<AtomicU32>,
+}
+
 #[derive(Default)]
-struct RunState(Mutex<Option<Arc<AtomicBool>>>);
+struct RunState(Mutex<Option<ActiveRun>>);
+
+/// Breakpoints deliberately live independently of any one run, not inside RunState/ActiveRun —
+/// configuring them before Start is pressed has to actually take effect from frame zero (a
+/// ModuleStart breakpoint is meaningless if it can only be set after the module already started),
+/// and a real debugger's breakpoints persisting across separate runs (like VS Code's do) is the
+/// expected behavior, not an accident. `set_breakpoints` works with or without an active run;
+/// `start_dev_run` just clones this same Arc into the new run's DebugHooks rather than starting
+/// from an empty list every time.
+#[derive(Default, Clone)]
+struct BreakpointState(Arc<Mutex<Vec<runtime::runtime_loader::Breakpoint>>>);
 
 /// Whether an export is currently running — no stop flag, unlike RunState: nothing about a
 /// cargo-build-then-copy-files export is safely cancellable mid-step, so this only guards against
@@ -54,16 +70,24 @@ fn plugin_log_fn(app: &AppHandle) -> plugin_host::protocol::LogFn {
 }
 
 #[tauri::command]
-fn start_dev_run(app: AppHandle, state: State<'_, RunState>, entry_file: String, project_dir: String) -> Result<(), String> {
-    let stop_flag = {
+fn start_dev_run(
+    app: AppHandle,
+    state: State<'_, RunState>,
+    breakpoint_state: State<'_, BreakpointState>,
+    entry_file: String,
+    project_dir: String,
+) -> Result<(), String> {
+    let stop_flag = Arc::new(AtomicBool::new(false));
+    let pause_flag = Arc::new(AtomicBool::new(false));
+    let step_request = Arc::new(AtomicU32::new(0));
+
+    {
         let mut guard = state.0.lock().unwrap();
         if guard.is_some() {
             return Err("A run is already active — stop it before starting another.".into());
         }
-        let flag = Arc::new(AtomicBool::new(false));
-        *guard = Some(flag.clone());
-        flag
-    };
+        *guard = Some(ActiveRun { stop_flag: stop_flag.clone(), pause_flag: pause_flag.clone(), step_request: step_request.clone() });
+    }
 
     // entry_file is stored (and passed in here) relative to the project root — see
     // ProjectPreset::entry's doc comment — so it has to be joined before it's an actually
@@ -77,13 +101,19 @@ fn start_dev_run(app: AppHandle, state: State<'_, RunState>, entry_file: String,
         let _ = log_handle.emit("dev-run-log", serde_json::json!({"level": log_level_str(level), "message": message}));
     });
 
+    let frame_handle = app.clone();
+    let on_frame: Arc<dyn Fn(runtime::runtime_loader::FrameTrace) + Send + Sync> = Arc::new(move |trace| {
+        let _ = frame_handle.emit("dev-run-frame", trace);
+    });
+
     let target_fps = settings::load().dev_run_target_fps;
+    let debug = runtime::runtime_loader::DebugHooks { pause_flag, step_request, breakpoints: breakpoint_state.0.clone(), on_frame };
 
     let done_handle = app.clone();
     std::thread::spawn(move || {
         // Per-module settings (the 4th arg) aren't sourced from anywhere real yet — that's config
         // handed to game modules at start, a separate concept from Studio's own settings.json.
-        let result = runtime::start_run(&entry, &project, &modules, target_fps, serde_json::json!({}), stop_flag, log);
+        let result = runtime::start_run(&entry, &project, &modules, target_fps, serde_json::json!({}), stop_flag, log, debug);
 
         *done_handle.state::<RunState>().0.lock().unwrap() = None;
         let payload = match &result {
@@ -94,6 +124,58 @@ fn start_dev_run(app: AppHandle, state: State<'_, RunState>, entry_file: String,
     });
 
     Ok(())
+}
+
+/// Pausing also zeroes any in-flight step request — otherwise a step queued right before a manual
+/// pause (unlikely from the UI, since Step is normally only enabled while already paused, but not
+/// impossible to race) would let one more tick slip through right after this call returns.
+#[tauri::command]
+fn pause_dev_run(state: State<'_, RunState>) -> Result<(), String> {
+    match state.0.lock().unwrap().as_ref() {
+        Some(active) => {
+            active.step_request.store(0, Ordering::SeqCst);
+            active.pause_flag.store(true, Ordering::SeqCst);
+            Ok(())
+        }
+        None => Err("No run is active.".into()),
+    }
+}
+
+#[tauri::command]
+fn resume_dev_run(state: State<'_, RunState>) -> Result<(), String> {
+    match state.0.lock().unwrap().as_ref() {
+        Some(active) => {
+            active.step_request.store(0, Ordering::SeqCst);
+            active.pause_flag.store(false, Ordering::SeqCst);
+            Ok(())
+        }
+        None => Err("No run is active.".into()),
+    }
+}
+
+/// Only valid while already paused — stepping a freely-running loop has no well-defined meaning
+/// (step to where, exactly, if it's already advancing on its own?), so this refuses rather than
+/// silently pausing-then-stepping on the caller's behalf.
+#[tauri::command]
+fn step_dev_run(state: State<'_, RunState>, count: Option<u32>) -> Result<(), String> {
+    match state.0.lock().unwrap().as_ref() {
+        Some(active) => {
+            if !active.pause_flag.load(Ordering::SeqCst) {
+                return Err("Pause the run before stepping.".into());
+            }
+            active.step_request.fetch_add(count.unwrap_or(1).max(1), Ordering::SeqCst);
+            Ok(())
+        }
+        None => Err("No run is active.".into()),
+    }
+}
+
+/// Works with or without an active run — see BreakpointState's own doc comment for why. Replaces
+/// the whole set rather than adding/removing one at a time, same "frontend always resends
+/// everything" convention plugin settings/commands already use.
+#[tauri::command]
+fn set_breakpoints(state: State<'_, BreakpointState>, breakpoints: Vec<runtime::runtime_loader::Breakpoint>) {
+    *state.0.lock().unwrap() = breakpoints;
 }
 
 #[tauri::command]
@@ -336,8 +418,8 @@ fn delete_theme_preset(name: String) -> Result<(), String> {
 #[tauri::command]
 fn stop_dev_run(state: State<'_, RunState>) -> Result<(), String> {
     match state.0.lock().unwrap().as_ref() {
-        Some(flag) => {
-            flag.store(true, Ordering::SeqCst);
+        Some(active) => {
+            active.stop_flag.store(true, Ordering::SeqCst);
             Ok(())
         }
         None => Err("No run is active.".into()),
@@ -546,7 +628,11 @@ pub fn run() {
   // window-state must be registered here, before .run() creates the config-declared "main"
   // window, not inside .setup() — its on_window_ready hook only fires for windows created after
   // the plugin is registered, and by the time setup() runs, "main" already exists.
-  let builder = tauri::Builder::default().manage(RunState::default()).manage(ExportState::default()).manage(plugin_session::SessionRegistry::default());
+  let builder = tauri::Builder::default()
+    .manage(RunState::default())
+    .manage(BreakpointState::default())
+    .manage(ExportState::default())
+    .manage(plugin_session::SessionRegistry::default());
   #[cfg(desktop)]
   let builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
 
@@ -556,6 +642,10 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       start_dev_run,
       stop_dev_run,
+      pause_dev_run,
+      resume_dev_run,
+      step_dev_run,
+      set_breakpoints,
       start_export,
       get_project_preset,
       set_project_entry,

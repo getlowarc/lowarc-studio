@@ -12,7 +12,7 @@ pub mod process_module;
 pub mod project;
 pub mod runtime_loader;
 
-use runtime_loader::{LogLevel, RunContext};
+use runtime_loader::{DebugHooks, LogLevel, RunContext};
 use serde_json::Value;
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
@@ -31,6 +31,7 @@ pub fn start_run(
     settings: Value,
     stop_flag: Arc<AtomicBool>,
     log: Arc<dyn Fn(LogLevel, &str) + Send + Sync>,
+    debug: DebugHooks,
 ) -> Result<(), Vec<String>> {
     let preset = project::ProjectPreset::load(project_dir).map_err(|e| vec![e])?;
     let modules = project::resolve(&preset, modules_dir)?;
@@ -46,6 +47,6 @@ pub fn start_run(
         )]
     })?;
 
-    let ctx = RunContext { source_code: &source_code, source_path: entry_file, target_fps, settings, stop_flag, log };
+    let ctx = RunContext { source_code: &source_code, source_path: entry_file, target_fps, settings, stop_flag, log, debug };
     loader.run(modules, &ctx).map_err(|e| vec![e])
 }

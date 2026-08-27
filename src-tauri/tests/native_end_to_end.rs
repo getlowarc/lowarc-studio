@@ -52,7 +52,7 @@ fn runs_a_native_module_end_to_end_via_dlopen() {
     };
     let stop_flag = Arc::new(AtomicBool::new(false));
 
-    let result = runtime::start_run(&entry, &project_dir, &modules_dir, 30, serde_json::json!({}), stop_flag, log);
+    let result = runtime::start_run(&entry, &project_dir, &modules_dir, 30, serde_json::json!({}), stop_flag, log, runtime::runtime_loader::DebugHooks::disabled());
     std::env::remove_var("LOWARC_STUDIO_TEST_TRACE");
 
     assert!(result.is_ok(), "expected the run to complete cleanly, got {result:?}");

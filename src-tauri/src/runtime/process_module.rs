@@ -14,11 +14,11 @@ use std::process::{Child, ChildStdin};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::runtime::child_process::{parse_log_severity, resolve_command, spawn_piped, STDERR_LOG_TRUNCATE_CHARS};
 use crate::runtime::manifest::{order_by_requires, ModuleInfo};
-use crate::runtime::runtime_loader::{LogLevel, RunContext, RuntimeLoader};
+use crate::runtime::runtime_loader::{self, Breakpoint, FrameModuleTrace, FrameTrace, LogLevel, RunContext, RuntimeLoader};
 
 pub const DESCRIPTOR_NAME: &str = "process.json";
 
@@ -59,7 +59,15 @@ pub struct ProcessModule {
 }
 
 impl ProcessModule {
-    pub fn spawn(folder: &Path, desc: &ProcessDescriptor, name: String, log: LogFn, stop_flag: Arc<AtomicBool>) -> std::io::Result<Self> {
+    pub fn spawn(
+        folder: &Path,
+        desc: &ProcessDescriptor,
+        name: String,
+        log: LogFn,
+        stop_flag: Arc<AtomicBool>,
+        breakpoints: Arc<Mutex<Vec<Breakpoint>>>,
+        pause_flag: Arc<AtomicBool>,
+    ) -> std::io::Result<Self> {
         let exe = resolve_command(folder, &desc.command);
         let mut child = spawn_piped(exe, &desc.args, folder)?;
         let stdin = child.stdin.take().expect("piped stdin");
@@ -69,7 +77,7 @@ impl ProcessModule {
         let dead = Arc::new(AtomicBool::new(false));
         let (tx, rx) = mpsc::channel::<Value>();
 
-        spawn_stdout_reader(stdout, tx, dead.clone(), log.clone(), name.clone(), stop_flag);
+        spawn_stdout_reader(stdout, tx, dead.clone(), log.clone(), name.clone(), stop_flag, breakpoints, pause_flag);
         spawn_stderr_reader(stderr, log.clone(), name.clone());
 
         Ok(Self {
@@ -134,16 +142,24 @@ impl ProcessModule {
         Self::ok(&reply)
     }
 
-    pub fn frame(&self, delta_seconds: f64) {
+    /// Returns the raw request/reply pair and how long the round-trip took — `spawn_and_run` needs
+    /// all three to build this tick's `FrameModuleTrace` and to evaluate ModuleError/JsonMatch
+    /// breakpoints against the reply. A module that doesn't want frames, or is already dead,
+    /// contributes nothing to the trace rather than a fabricated empty one.
+    pub fn frame(&self, delta_seconds: f64) -> Option<(Value, Value, f64)> {
         if !self.wants_frames || self.dead.load(Ordering::SeqCst) {
-            return;
+            return None;
         }
-        let reply = self.request(json!({"phase": "frame", "delta": delta_seconds}));
+        let request = json!({"phase": "frame", "delta": delta_seconds});
+        let started = Instant::now();
+        let reply = self.request(request.clone());
+        let duration_ms = started.elapsed().as_secs_f64() * 1000.0;
         if !Self::ok(&reply) {
             (self.log)(LogLevel::Error, &format!(
                 "[{}] OnFrame threw: {}", self.name, reply.get("error").and_then(|e| e.as_str()).unwrap_or("")
             ));
         }
+        Some((request, reply, duration_ms))
     }
 
     pub fn stop_and_kill(&self) {
@@ -174,6 +190,8 @@ fn spawn_stdout_reader(
     log: LogFn,
     name: String,
     stop_flag: Arc<AtomicBool>,
+    breakpoints: Arc<Mutex<Vec<Breakpoint>>>,
+    pause_flag: Arc<AtomicBool>,
 ) {
     std::thread::spawn(move || {
         let reader = BufReader::new(stdout);
@@ -190,8 +208,18 @@ fn spawn_stdout_reader(
 
             if let Some(l) = obj.get("log").and_then(|l| l.as_object()) {
                 let severity = l.get("severity").and_then(|s| s.as_str()).unwrap_or("info");
+                let level = parse_log_severity(severity);
                 let message = l.get("message").and_then(|m| m.as_str()).unwrap_or("");
-                log(parse_log_severity(severity), &format!("[{name}] {message}"));
+                log(level, &format!("[{name}] {message}"));
+                // Evaluated right here rather than back in the frame loop — a module can log at
+                // any time, not just from inside a frame reply, so this is the one place a
+                // LogLevel breakpoint's triggering data actually exists. No matching FrameTrace
+                // accompanies this kind of pause (there's no frame to attach it to); the log line
+                // just above already says what happened.
+                if runtime_loader::check_log_level_breakpoint(&breakpoints, level, &name).is_some() {
+                    pause_flag.store(true, Ordering::SeqCst);
+                    log(LogLevel::Info, &format!("Breakpoint hit: [{name}] logged at {level:?} severity — pausing."));
+                }
                 continue;
             }
             if obj.get("requestStop").and_then(|r| r.as_bool()) == Some(true) {
@@ -229,7 +257,15 @@ fn spawn_stderr_reader(stderr: std::process::ChildStderr, log: LogFn, name: Stri
 pub fn spawn_and_run(descriptors: Vec<(&ModuleInfo, ProcessDescriptor)>, ctx: &RunContext) -> Result<(), String> {
     let mut spawned: Vec<ProcessModule> = Vec::new();
     for (info, desc) in &descriptors {
-        match ProcessModule::spawn(&info.folder, desc, info.manifest.name.clone(), ctx.log.clone(), ctx.stop_flag.clone()) {
+        match ProcessModule::spawn(
+            &info.folder,
+            desc,
+            info.manifest.name.clone(),
+            ctx.log.clone(),
+            ctx.stop_flag.clone(),
+            ctx.debug.breakpoints.clone(),
+            ctx.debug.pause_flag.clone(),
+        ) {
             Ok(m) => spawned.push(m),
             Err(e) => (ctx.log)(LogLevel::Error, &format!("Module \"{}\" failed to start its process — skipped. {e}", info.manifest.name)),
         }
@@ -255,9 +291,46 @@ pub fn spawn_and_run(descriptors: Vec<(&ModuleInfo, ProcessDescriptor)>, ctx: &R
         return Err("Every module failed to start.".into());
     }
 
-    crate::runtime::driver::run(ctx.target_fps, &ctx.stop_flag, |delta| {
+    // A ModuleStart breakpoint pauses before the very first frame — setting pause_flag here, right
+    // after start and before driver::run's loop ever begins, is all that's needed: the loop checks
+    // the flag before its first tick the same as any other, so "paused from frame zero" falls out
+    // of the existing gate for free rather than needing a special case.
+    for m in &started {
+        if runtime_loader::check_module_start_breakpoint(&ctx.debug.breakpoints, &m.name).is_some() {
+            ctx.debug.pause_flag.store(true, Ordering::SeqCst);
+            (ctx.log)(LogLevel::Info, &format!("Breakpoint hit: module \"{}\" started — pausing before the first frame.", m.name));
+        }
+    }
+
+    let mut frame_index: u64 = 0;
+    crate::runtime::driver::run(ctx.target_fps, &ctx.stop_flag, &ctx.debug.pause_flag, &ctx.debug.step_request, |delta| {
+        frame_index += 1;
+        let mut modules_trace = Vec::with_capacity(started.len());
+        let mut triggered: Option<Breakpoint> = None;
+
         for m in &started {
-            m.frame(delta);
+            let Some((request, reply, duration_ms)) = m.frame(delta) else { continue };
+            if triggered.is_none() {
+                triggered = runtime_loader::check_frame_breakpoints(&ctx.debug.breakpoints, &m.name, &reply);
+            }
+            modules_trace.push(FrameModuleTrace { name: m.name.clone(), request, reply, duration_ms });
+        }
+
+        if triggered.is_none() {
+            triggered = runtime_loader::check_frame_count_breakpoint(&ctx.debug.breakpoints, frame_index);
+        }
+        if let Some(bp) = &triggered {
+            ctx.debug.pause_flag.store(true, Ordering::SeqCst);
+            (ctx.log)(LogLevel::Info, &format!("Breakpoint hit: {bp:?} — pausing."));
+        }
+
+        // Fires for a manual step (pause_flag was already true going into this tick) and for a
+        // breakpoint that just fired (pause_flag only just became true above) alike — one gate,
+        // not two separate mechanisms for what's the same "show the user this tick" need. Stays
+        // silent for every tick of a normal free-running loop, where pause_flag is false
+        // throughout.
+        if ctx.debug.pause_flag.load(Ordering::SeqCst) {
+            (ctx.debug.on_frame)(FrameTrace { frame_index, delta_seconds: delta, modules: modules_trace, triggered });
         }
     });
 
