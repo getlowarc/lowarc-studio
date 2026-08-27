@@ -177,11 +177,19 @@ a {
   flex: 1;
 }
 
+/* position+z-index deliberately high enough to sit above every overlay in the app (popup
+   backdrops: 50, floating menus: 60, toasts: 100, tooltips: 300) — with decorations:false, these
+   ARE the window's own minimize/maximize/close, the one thing that should never be reachable-
+   blocked by whatever dialog happens to be open on top of the page content. A popup's own
+   backdrop (position:fixed; inset:0) would otherwise sit above these too, since they had no
+   stacking context of their own to compete with it before this. */
 .titlebar-controls {
   display: flex;
   align-items: stretch;
   flex: none;
   border-left: 1px solid var(--border);
+  position: relative;
+  z-index: 1000;
 }
 
 .titlebar-btn {

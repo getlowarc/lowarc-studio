@@ -3,10 +3,11 @@
 <head>
 <meta charset="utf-8" />
 <link rel="stylesheet" href="vendor/xterm.css" />
+<link rel="stylesheet" href="__lowarc.css" />
+<link rel="stylesheet" href="__lowarc-primitives.css" />
 <style>
-  :root { color-scheme: dark; }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: #1e1e1e; overflow: hidden; }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
 
   .layout { display: flex; height: 100%; }
 
@@ -19,8 +20,7 @@
     display: none;
     align-items: center;
     justify-content: center;
-    color: #888;
-    font-family: -apple-system, "Segoe UI", sans-serif;
+    color: var(--fg-dim);
     font-size: 13px;
   }
   .terminal-empty.is-visible { display: flex; }
@@ -30,11 +30,9 @@
   .terminal-sidebar {
     flex: none;
     width: 160px;
-    border-left: 1px solid #2d2d2d;
+    border-left: 1px solid var(--border);
     overflow-y: auto;
-    font-family: -apple-system, "Segoe UI", sans-serif;
     font-size: 12px;
-    color: #d4d4d4;
   }
 
   .terminal-sidebar-item {
@@ -46,25 +44,10 @@
     cursor: pointer;
     white-space: nowrap;
   }
-  .terminal-sidebar-item:hover { background: #2a2d2e; }
-  .terminal-sidebar-item.is-active { background: #37373d; }
+  .terminal-sidebar-item:hover { background: var(--bg-hover); }
+  .terminal-sidebar-item.is-active { background: var(--border); }
 
   .terminal-sidebar-item-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
-
-  .terminal-sidebar-item-delete {
-    all: unset;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 18px;
-    height: 18px;
-    flex: none;
-    border-radius: 4px;
-    color: #ababab;
-    cursor: pointer;
-  }
-  .terminal-sidebar-item-delete:hover { background: #3c3c3c; color: #fff; }
-  .terminal-sidebar-item-delete svg { width: 11px; height: 11px; }
 </style>
 </head>
 <body>

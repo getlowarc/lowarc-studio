@@ -511,6 +511,7 @@ function beginDelete(path) {
   actions.className = "banner-actions";
   const cancel = document.createElement("button");
   cancel.type = "button";
+  cancel.className = "btn btn-ghost btn-xs";
   cancel.textContent = "Cancel";
   cancel.addEventListener("click", () => {
     pendingDelete = null;
@@ -518,7 +519,7 @@ function beginDelete(path) {
   });
   const confirm = document.createElement("button");
   confirm.type = "button";
-  confirm.className = "danger";
+  confirm.className = "btn btn-danger btn-xs";
   confirm.textContent = "Delete";
   confirm.addEventListener("click", () => {
     pendingDelete = null;

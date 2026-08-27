@@ -54,7 +54,7 @@ function renderSidebar() {
 
     const del = document.createElement("button");
     del.type = "button";
-    del.className = "terminal-sidebar-item-delete";
+    del.className = "btn btn-icon-only btn-ghost-danger btn-xs";
     del.innerHTML = DELETE_SVG;
     del.setAttribute("aria-label", `Close ${instance.label}`);
     del.addEventListener("click", (e) => {

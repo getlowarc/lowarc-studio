@@ -58,6 +58,14 @@ pub struct Settings {
     /// onto the registry, at which point this replaces both for that region.
     #[serde(default)]
     pub regions: HashMap<String, RegionState>,
+    /// Ids hidden from one Base-system strip's own display, right-click-toggled per item (see
+    /// editor.html's openSlotVisibilityMenu) — keyed by slot name ("sidebar", "console"), valued by
+    /// the ids hidden in it. Purely a display filter: a hidden contribution is otherwise completely
+    /// unaffected (still enabled, still reachable through the Command Palette, its panel/tab just
+    /// doesn't show a button in that one strip). Scoped to sidebar/console only for now, not every
+    /// slot the registry knows about — Nolan: "Just the Console and Rail. Nowhere else for now."
+    #[serde(default)]
+    pub hidden_slot_items: HashMap<String, Vec<String>>,
 }
 
 fn default_target_fps() -> u32 {
@@ -79,6 +87,7 @@ impl Default for Settings {
             plugin_settings: HashMap::new(),
             tab_order: HashMap::new(),
             regions: HashMap::new(),
+            hidden_slot_items: HashMap::new(),
         }
     }
 }
@@ -251,6 +260,19 @@ mod tests {
         save_to(&path, &settings).unwrap();
         let loaded = load_from(&path);
         assert_eq!(loaded.plugin_settings, settings.plugin_settings);
+    }
+
+    #[test]
+    fn hidden_slot_items_round_trip_and_default_empty() {
+        assert!(Settings::default().hidden_slot_items.is_empty());
+
+        let path = temp_file("hidden_slot_items");
+        let mut settings = Settings::default();
+        settings.hidden_slot_items.insert("sidebar".to_string(), vec!["file-explorer::main".to_string()]);
+        settings.hidden_slot_items.insert("console".to_string(), vec!["terminal::main".to_string()]);
+        save_to(&path, &settings).unwrap();
+        let loaded = load_from(&path);
+        assert_eq!(loaded.hidden_slot_items, settings.hidden_slot_items);
     }
 
     #[test]

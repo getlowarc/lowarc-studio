@@ -205,6 +205,33 @@ pub const HARNESS_JS: &str = r#"(function () {
 // tofu/square glyphs instead of the real icons.
 pub const CSP: &str = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; worker-src 'self' blob:; connect-src 'none'";
 
+/// The host's own base stylesheet (root color-token variables, plus reset/scrollbar/titlebar
+/// rules) — the literal same file every host page (editor.html, settings.html, etc.) already
+/// links, via `include_str!` so this can never drift from it. Served at `__lowarc.css`.
+///
+/// A plugin opts in entirely on its own — nothing forces this on any plugin, first-party or not —
+/// by adding `<link rel="stylesheet" href="__lowarc.css">` to its own HTML, same convention as
+/// `<script src="__lowarc.js">`. Not theme-live: this bakes in style.css's own `:root` values
+/// (the app's default dark palette), not whatever theme.js resolves Settings.themeMode to at
+/// runtime — theme.js itself can't run inside a plugin (it calls Tauri commands a sandboxed plugin
+/// has no access to), so a plugin using this always renders in the default palette regardless of
+/// whether the IDE itself is currently on Light or a custom preset. A real fix for that would mean
+/// serving a theme-resolved stylesheet dynamically (a new Rust-side route mirroring theme.js's own
+/// resolution) — a deliberate, acknowledged scope cut, not an oversight.
+pub const SHARED_STYLE_CSS: &str = include_str!("../../src/style.css");
+
+/// The host's genuinely reusable component styles — buttons, text/numeric inputs, checkboxes, a
+/// progress bar, setting rows — split out of primitives.css specifically so it could be exposed
+/// here (see primitives-shared.css's own header for the full reasoning); `include_str!` again, one
+/// real file, never a copy. Served at `__lowarc-primitives.css`, same opt-in-only convention as
+/// `__lowarc.css` above — a plugin author links it, nothing forces it. Deliberately NOT the much
+/// larger primitives.css: that file is packed with host-chrome-specific classes (`.rail`,
+/// `.tab-bar`, `.manage-list`, dropdowns/toasts/popups/floating-menus) that assume the host's own
+/// DOM structure and JS-driven interaction — a plugin can't meaningfully reuse any of that without
+/// also reimplementing the JS behind it, so none of it is exposed. Depends on
+/// `__lowarc.css`'s tokens; a plugin using this should link both, `__lowarc.css` first.
+pub const SHARED_PRIMITIVES_CSS: &str = include_str!("../../src/primitives-shared.css");
+
 /// Resolves `<plugin_id>/<rel_path>` to a real file, refusing anything that canonicalizes outside
 /// that plugin's own folder — shared between plugin_asset_server.rs and `read_plugin_asset`
 /// (lib.rs), since both need the exact same path-traversal protection and there's no reason for

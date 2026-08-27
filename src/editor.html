@@ -5,6 +5,7 @@
     <script src="theme.js"></script>
     <title>LowArc Studio — Editor</title>
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="primitives-shared.css" />
     <link rel="stylesheet" href="primitives.css" />
     <style>
       /* ---------- Grid shell ---------- */
@@ -1300,8 +1301,13 @@
         });
       }
 
-      // items: [{label, value, disabled}], a divider is {divider: true}. Returns a Promise
-      // resolving to the chosen item's value, or null if the menu was dismissed without a choice.
+      const MENU_CHECK_SVG = '<svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>';
+
+      // items: [{label, value, disabled, checked}], a divider is {divider: true}. `checked` is
+      // optional — only present it for a genuinely checkable menu (see the Rail/Console visibility
+      // toggle below); omitting it on every item keeps an ordinary action menu (File/Edit/View, …)
+      // looking exactly as it always has, no reserved checkmark gutter. Returns a Promise resolving
+      // to the chosen item's value, or null if the menu was dismissed without a choice.
       function openMenuOverlay(items, anchor) {
         closeFloatingMenu();
         return new Promise((resolve) => {
@@ -1319,7 +1325,15 @@
             const btn = document.createElement("button");
             btn.type = "button";
             btn.className = "menu-dropdown-item";
-            btn.textContent = item.label;
+            if (item.checked !== undefined) {
+              const check = document.createElement("span");
+              check.className = "menu-dropdown-item-check";
+              if (item.checked) check.innerHTML = MENU_CHECK_SVG;
+              btn.appendChild(check);
+            }
+            const label = document.createElement("span");
+            label.textContent = item.label;
+            btn.appendChild(label);
             btn.disabled = Boolean(item.disabled);
             btn.addEventListener("click", (e) => {
               e.stopPropagation();
@@ -2788,7 +2802,11 @@
 
         container.querySelectorAll("[data-tab-value], .tab-bar-empty").forEach((el) => el.remove());
 
-        const contributions = getSlot(slot);
+        // Filtered here, not inside getSlot() itself — hiding a tab/icon is purely about whether
+        // it's SHOWN in this one strip, never about disabling the contribution. Every other
+        // consumer of getSlot() (showSlotTab, activateConsoleTab, ensurePluginMounted, the Command
+        // Palette, …) still needs to see and reach a hidden contribution exactly as before.
+        const contributions = getSlot(slot).filter((c) => !isSlotItemHidden(slot, c.id));
 
         if (!contributions.length && emptyText) {
           const empty = document.createElement("div");
@@ -2895,6 +2913,91 @@
         }
       }
 
+      // ---------- Rail/Console icon visibility (right-click to show/hide individual entries) ----------
+      // Purely a display filter, independent of whether a plugin/module is actually enabled — hiding
+      // an icon here only removes it from THIS strip; the underlying contribution (its panel, its
+      // other slots if it has any) is untouched and still reachable everywhere else (Command
+      // Palette, etc. — every OTHER getSlot() consumer besides renderTabStrip's own filter above
+      // still sees it). Scoped to Rail (sidebar) and Console only, per Nolan: "Just the Console and
+      // Rail. Nowhere else for now" — even though renderTabStrip's filter itself is generic enough
+      // to already work for any slot the moment a menu is wired up for one.
+      function isSlotItemHidden(slot, id) {
+        return (loadedSettings?.hiddenSlotItems?.[slot] || []).includes(id);
+      }
+
+      // renderTabStrip rebuilds its buttons from scratch on every call (see its own comment) — that
+      // means whichever one was is-active loses that class too, since it's a fresh element with no
+      // memory of it. The startup restore path (restoredSidebarActiveKey, below) already has to
+      // solve this same problem once; toggling hidden state re-solves it here every time instead of
+      // only at load. A now-hidden active item legitimately has nothing to re-highlight — that's
+      // correct, not a bug — its content stays open regardless (a plugin's own tab or panel is never
+      // unmounted by any of this, only the tab/icon that points at it stops rendering).
+      async function toggleSlotItemHidden(slot, id) {
+        await updateSettings((fresh) => {
+          const current = new Set(fresh.hiddenSlotItems?.[slot] || []);
+          if (current.has(id)) current.delete(id);
+          else current.add(id);
+          return { hiddenSlotItems: { ...(fresh.hiddenSlotItems || {}), [slot]: [...current] } };
+        });
+        if (slot === "sidebar") {
+          const activeKey = document.querySelector("#rail-tabs .sidebar-tab.is-active")?.dataset.tabValue;
+          renderRailTabs();
+          const btn = activeKey && document.querySelector(`#rail-tabs .sidebar-tab[data-tab-value="${activeKey}"]`);
+          if (btn) btn.classList.add("is-active");
+        } else if (slot === "console") {
+          renderConsoleTabs();
+          activateConsoleTab(activeConsoleTabKey);
+        }
+      }
+
+      function renderRailTabs() {
+        renderTabStrip(document.getElementById("rail-tabs"), "sidebar", {
+          itemClass: "sidebar-tab",
+          onActivate: (contribution) => {
+            showSlotTab("sidebar", "left-panel-body", contribution.id);
+            setPanelOpen("sidebar", true);
+          },
+          onToggleClose: (contribution, btn) => {
+            if (!PANELS.sidebar.open) return false;
+            btn.classList.remove("is-active");
+            setPanelOpen("sidebar", false);
+          },
+        });
+      }
+
+      function renderConsoleTabs() {
+        renderTabStrip(document.getElementById("console-tabs"), "console", {
+          itemClass: "console-tab",
+          iconBased: false,
+          anchorEl: document.querySelector(".console-tabs-spacer"),
+          onActivate: (contribution) => activateConsoleTab(contribution.id),
+        });
+      }
+
+      // Lists every contribution currently registered for `slot`, including hidden ones — the whole
+      // point of this menu is letting a hidden one be turned back on, so it can't just read what's
+      // already shown. One click toggles that item and closes the menu (right-click again for more),
+      // matching how every other menu in the app already behaves rather than inventing a
+      // stays-open-across-clicks variant just for this.
+      function openSlotVisibilityMenu(slot, x, y) {
+        const items = getSlot(slot).map((c) => ({ label: c.label, value: c.id, checked: !isSlotItemHidden(slot, c.id) }));
+        if (!items.length) return;
+        openMenuOverlay(items, { x, y }).then((id) => {
+          if (id) toggleSlotItemHidden(slot, id);
+        });
+      }
+
+      document.getElementById("rail-tabs").addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openSlotVisibilityMenu("sidebar", e.clientX, e.clientY);
+      });
+      document.getElementById("console-tabs").addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openSlotVisibilityMenu("console", e.clientX, e.clientY);
+      });
+
       // extension (lowercase, dot-included) -> { pluginId, viewer }. Same "first wins, no silent
       // override" rule as renderSingleSlot, for the same reason — two viewers silently fighting
       // over one file type would be worse than an honest, logged "already taken".
@@ -2978,28 +3081,12 @@
         // managers, registered earlier at top-level script scope, plus whatever this loop just
         // added) — applySavedOrder's drag-order pass happens inside renderTabStrip itself, so it
         // only needs applying once, now that every icon that could be in it actually exists.
-        renderTabStrip(document.getElementById("rail-tabs"), "sidebar", {
-          itemClass: "sidebar-tab",
-          onActivate: (contribution) => {
-            showSlotTab("sidebar", "left-panel-body", contribution.id);
-            setPanelOpen("sidebar", true);
-          },
-          onToggleClose: (contribution, btn) => {
-            if (!PANELS.sidebar.open) return false;
-            btn.classList.remove("is-active");
-            setPanelOpen("sidebar", false);
-          },
-        });
+        renderRailTabs();
 
         // Same "built once, from the registry" shape as the rail above, just text-labeled
         // (iconBased: false) and anchored before .console-tabs-spacer instead of nothing, since
         // this container also holds the maximize/close/new-terminal controls after its tabs.
-        renderTabStrip(document.getElementById("console-tabs"), "console", {
-          itemClass: "console-tab",
-          iconBased: false,
-          anchorEl: document.querySelector(".console-tabs-spacer"),
-          onActivate: (contribution) => activateConsoleTab(contribution.id),
-        });
+        renderConsoleTabs();
 
         // "__run" (Run) needs its one-time mount() — which reparents the static #console-run-panel
         // out of console-body and into its own wrapper — to happen right now, unconditionally, not

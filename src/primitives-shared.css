@@ -1,0 +1,482 @@
+/* LowArc Studio's genuinely reusable component primitives — buttons, text inputs, checkboxes, a
+   progress bar, and the settings-row layout. Depends on the tokens defined in style.css's :root;
+   load style.css first.
+
+   Split out of primitives.css on purpose (2026-08-27): this file is ALSO served to plugins
+   verbatim (see plugin_assets.rs's SHARED_STYLE_CSS/SHARED_PRIMITIVES_CSS, via include_str! —
+   there's exactly one copy of this file, never a drifting duplicate) so a plugin author can
+   `<link rel="stylesheet" href="__lowarc-primitives.css">` and get the exact same buttons/inputs/
+   checkboxes/progress-bar/setting-row look as the host, entirely opt-in, for close to zero styling
+   work of their own. Every section here works with nothing but plain markup and class names — no
+   host JS required — which is the actual bar for belonging in this file, not primitives.css:
+   .numeric-input/.numeric-steppers deliberately stayed OUT (moved back 2026-08-27) despite looking
+   like a natural fit, because its steppers are 100% JS-driven (initNumericInputs() in
+   primitives.js) with no native fallback — a plugin linking just this CSS would get buttons that
+   visibly do nothing on click, worse than no widget at all. primitives.css itself stays host-only
+   for the same reason at a larger scale: it's packed with chrome-specific classes (.rail, .tab-bar,
+   .console-tabs, .manage-list, ...) that assume the host's own DOM structure and JS-driven
+   interaction (dropdowns, drag-reorder, toasts, popups, floating menus). If a section doesn't work
+   standing alone with nothing but class names on arbitrary markup, it belongs in primitives.css,
+   not this file. */
+
+/* ---------- Buttons ---------- */
+/* One shape per size (.btn-xs/sm/md/lg/xl), one color scheme per type (.btn-main/sub/outline/
+   ghost/danger/confirm/warning, plus the ghost-tint family below). A button always gets exactly
+   one of each. .btn-md is the standard size. */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: inherit;
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease, filter 0.12s ease;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+  filter: none !important;
+}
+
+/* An icon inside a text button (icon + label) sizes off the button's own font-size, so it scales
+   with .btn-sm/md/lg/xl automatically. An icon-only button (.btn-icon-only) drops the text padding
+   for a square hit target instead, sized per size class below. */
+.btn svg {
+  width: 1em;
+  height: 1em;
+  flex: none;
+}
+
+.btn-icon-only {
+  padding: 0;
+  flex: none;
+}
+.btn-icon-only.btn-xs {
+  width: 22px;
+  height: 22px;
+}
+.btn-icon-only.btn-sm {
+  width: 28px;
+  height: 28px;
+}
+.btn-icon-only.btn-md {
+  width: 36px;
+  height: 36px;
+}
+.btn-icon-only.btn-lg {
+  width: 44px;
+  height: 44px;
+}
+.btn-icon-only.btn-xl {
+  width: 52px;
+  height: 52px;
+}
+.btn-icon-only.btn-xs svg {
+  width: 12px;
+  height: 12px;
+}
+.btn-icon-only.btn-sm svg {
+  width: 14px;
+  height: 14px;
+}
+.btn-icon-only.btn-md svg {
+  width: 16px;
+  height: 16px;
+}
+.btn-icon-only.btn-lg svg {
+  width: 18px;
+  height: 18px;
+}
+.btn-icon-only.btn-xl svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Below .btn-sm on the size ladder — for dense chrome rows (a panel header, a tab's own close
+   control) where even .btn-sm's 28px reads as too heavy sitting among several other icons at once. */
+.btn-xs {
+  padding: 2px 8px;
+  font-size: 11px;
+  border-radius: 3px;
+}
+
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 4px;
+}
+
+.btn-md {
+  padding: 8px 14px;
+  font-size: 14px;
+  border-radius: 6px;
+}
+
+.btn-lg {
+  padding: 10px 18px;
+  font-size: 15px;
+  border-radius: 7px;
+}
+
+.btn-xl {
+  padding: 14px 24px;
+  font-size: 17px;
+  border-radius: 8px;
+}
+
+.btn-main {
+  background: var(--cyan);
+  border-color: var(--cyan);
+  color: var(--cyan-ink);
+}
+.btn-main:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+.btn-main:active:not(:disabled) {
+  background: var(--cyan-dark);
+  border-color: var(--cyan-dark);
+  color: var(--fg);
+  filter: none;
+}
+
+.btn-sub {
+  background: var(--cyan-dark);
+  border-color: var(--cyan-dark);
+  color: var(--fg);
+}
+.btn-sub:hover:not(:disabled) {
+  filter: brightness(1.2);
+}
+.btn-sub:active:not(:disabled) {
+  filter: brightness(0.9);
+}
+
+.btn-outline {
+  background: transparent;
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+.btn-outline:hover:not(:disabled) {
+  background: var(--cyan-dim);
+}
+.btn-outline:active:not(:disabled) {
+  background: var(--cyan-dim);
+  filter: brightness(0.85);
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--fg-dim);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+.btn-ghost:active:not(:disabled) {
+  background: var(--border);
+}
+
+.btn-danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+.btn-danger:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.btn-danger:active:not(:disabled) {
+  filter: brightness(0.85);
+}
+
+.btn-confirm {
+  background: var(--success);
+  border-color: var(--success);
+  color: #fff;
+}
+.btn-confirm:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.btn-confirm:active:not(:disabled) {
+  filter: brightness(0.85);
+}
+
+/* Not one of the standard "always pick one of these six" types — reserved for state-driven
+   controls that turn yellow while something's in a caution/in-progress state (e.g. the editor's
+   Pause button while a run is active), not a general-purpose color choice. */
+.btn-warning {
+  background: var(--yellow);
+  border-color: var(--yellow);
+  color: var(--yellow-ink);
+}
+.btn-warning:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+.btn-warning:active:not(:disabled) {
+  background: var(--yellow-dark);
+  border-color: var(--yellow-dark);
+  color: var(--fg);
+  filter: none;
+}
+
+/* Ghost-shaped, but the color signals consequence only on hover rather than as a permanent fill —
+   for a dense row of always-visible icon buttons (a panel header, the console header, a file tab)
+   where every icon being solid-red/green/yellow/blue all the time would be loud, but the row still
+   needs "close reads red, adding reads green, opening a menu reads yellow, changing the IDE's own
+   layout reads blue" to actually be consistent instead of every icon defaulting to the same color
+   regardless of what it does. Transparent at rest, identical to .btn-ghost; only the hover color
+   differs per type. Pick exactly one, same as any other .btn type. */
+.btn-ghost-danger,
+.btn-ghost-confirm,
+.btn-ghost-warning,
+.btn-ghost-info {
+  background: transparent;
+  border-color: transparent;
+  color: var(--fg-dim);
+}
+.btn-ghost-danger:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--danger);
+}
+.btn-ghost-confirm:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--success);
+}
+.btn-ghost-warning:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--yellow);
+}
+.btn-ghost-info:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--info);
+}
+.btn-ghost-danger:active:not(:disabled),
+.btn-ghost-confirm:active:not(:disabled),
+.btn-ghost-warning:active:not(:disabled),
+.btn-ghost-info:active:not(:disabled) {
+  background: var(--border);
+}
+/* The "currently toggled on" look (e.g. the console's maximize button while maximized) — reuses
+   the app's one accent color for "this is active" everywhere else (the rail's selected item, a
+   file tab's active underline), deliberately NOT the hover-tint color, since "active" and "what
+   this button does on hover" are two different signals. */
+.btn-ghost-danger.is-active,
+.btn-ghost-confirm.is-active,
+.btn-ghost-warning.is-active,
+.btn-ghost-info.is-active {
+  background: var(--cyan-dim);
+  color: var(--cyan);
+}
+
+/* ---------- Focus ---------- */
+
+.btn:focus-visible,
+.input:focus-visible,
+.dropdown-trigger:focus-visible,
+.checkbox-row:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+/* ---------- Text / numeric inputs ---------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-label {
+  font-size: 13px;
+  color: var(--fg-dim);
+}
+
+.field-hint {
+  font-size: 12px;
+  color: var(--fg-dim);
+}
+
+.input {
+  font-family: inherit;
+  font-size: 14px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fg);
+  padding: 8px 10px;
+  width: 100%;
+}
+
+.input:hover {
+  border-color: #555;
+}
+
+.input::placeholder {
+  color: var(--fg-dim);
+}
+
+.input:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ---------- Checkbox ---------- */
+
+.checkbox-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.checkbox-box {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-raised);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkbox-row input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.checkbox-row input[type="checkbox"]:checked + .checkbox-box {
+  background: var(--cyan);
+  border-color: var(--cyan);
+}
+
+.checkbox-box svg {
+  width: 11px;
+  height: 11px;
+  opacity: 0;
+  color: var(--cyan-ink);
+}
+
+.checkbox-row input[type="checkbox"]:checked + .checkbox-box svg {
+  opacity: 1;
+}
+
+/* ---------- Progress bar ---------- */
+/* No fixed width of its own — sizes to whatever a caller sets (inline style, a wrapper, a flex
+   item's own basis), so one primitive covers a full-width bar or a small footer indicator alike.
+   Fill width and color are both driven from JS (see setProgress() in primitives.js): color isn't a
+   fixed danger/warning/success — it travels red->yellow->green as the fraction climbs, since this
+   is for "how far along," not "what state," which the fixed status colors elsewhere already
+   handle correctly for their own case. */
+.progress {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.progress-fill {
+  position: absolute;
+  inset: 0;
+  width: 0%;
+  border-radius: inherit;
+  background: var(--danger);
+  transition: width 0.2s ease, background-color 0.2s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-fill {
+    transition: none;
+  }
+}
+
+/* ---------- Setting row ---------- */
+/* One repeatable shape for "a single configurable value" — control on the left, label+description
+   on the right, full width — used for every settings surface that isn't Appearance (General,
+   Plugins, and the search view all render off this SAME primitive; see renderSettingRow() in
+   primitives.js). The point is exactly that it's boring and uniform: no page hand-builds its own
+   field markup any more, so a plugin's declared setting and a core one look identical. */
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.setting-row:last-child {
+  border-bottom: none;
+}
+
+.setting-row-control {
+  flex: none;
+  width: 220px;
+  min-width: 0;
+}
+
+/* A checkbox row's control IS its own label — nothing to duplicate on the right, so the whole row
+   collapses to just the control column plus the description growing to fill the rest. */
+.setting-row-control .checkbox-row {
+  width: fit-content;
+}
+
+.setting-row-desc {
+  flex: 1;
+  min-width: 0;
+}
+
+.setting-row-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.setting-row-source {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--fg-dim);
+  margin-left: 6px;
+}
+
+.setting-row-hint {
+  font-size: 12px;
+  color: var(--fg-dim);
+  margin-top: 3px;
+  line-height: 1.45;
+}
+
+/* Briefly highlights the row a search selection landed on (see settings.html's ?search= handling)
+   — fades on its own, not dismissed by any interaction, since there's nothing to click to dismiss
+   a background color. */
+.setting-row.is-highlighted {
+  background: var(--cyan-dim);
+  animation: setting-row-highlight-fade 2.4s ease forwards;
+}
+
+@keyframes setting-row-highlight-fade {
+  0%, 60% {
+    background: var(--cyan-dim);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .setting-row.is-highlighted {
+    animation: none;
+    background: transparent;
+  }
+}

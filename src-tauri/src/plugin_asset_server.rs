@@ -13,7 +13,7 @@
 // regardless of the URL's real origin. Isolation comes from the sandbox attribute, not from this
 // server, so nothing extra is needed here for that.
 
-use crate::plugin_assets::{resolve_asset_path, CSP, HARNESS_JS};
+use crate::plugin_assets::{resolve_asset_path, CSP, HARNESS_JS, SHARED_PRIMITIVES_CSS, SHARED_STYLE_CSS};
 use std::sync::atomic::{AtomicU16, Ordering};
 
 static PORT: AtomicU16 = AtomicU16::new(0);
@@ -54,9 +54,20 @@ fn handle(request: tiny_http::Request) {
     let plugin_id = parts.next().unwrap_or_default();
     let rel_path = parts.next().unwrap_or_default();
 
-    // The one file the host serves itself, regardless of what's actually on disk for this plugin.
+    // Files the host serves itself, regardless of what's actually on disk for this plugin — the
+    // harness script every plugin loads unconditionally, plus two opt-in stylesheets (see
+    // plugin_assets.rs's SHARED_STYLE_CSS/SHARED_PRIMITIVES_CSS) a plugin can link if it wants to
+    // look like the IDE.
     if rel_path == "__lowarc.js" {
         respond(request, 200, "text/javascript", HARNESS_JS.as_bytes().to_vec());
+        return;
+    }
+    if rel_path == "__lowarc.css" {
+        respond(request, 200, "text/css", SHARED_STYLE_CSS.as_bytes().to_vec());
+        return;
+    }
+    if rel_path == "__lowarc-primitives.css" {
+        respond(request, 200, "text/css", SHARED_PRIMITIVES_CSS.as_bytes().to_vec());
         return;
     }
 
