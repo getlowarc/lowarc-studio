@@ -286,8 +286,8 @@ pub fn spawn_and_run(descriptors: Vec<(&ModuleInfo, ProcessDescriptor)>, ctx: &R
     }
 
     let load_order_rank: std::collections::HashMap<&str, i32> =
-        descriptors.iter().map(|(i, _)| (i.manifest.name.as_str(), i.manifest.load_order)).collect();
-    spawned.sort_by_key(|m| load_order_rank.get(m.name.as_str()).copied().unwrap_or(i32::MAX));
+        descriptors.iter().map(|(i, _)| (i.manifest.id.as_str(), i.manifest.load_order)).collect();
+    spawned.sort_by_key(|m| load_order_rank.get(m.id.as_str()).copied().unwrap_or(i32::MAX));
 
     if spawned.is_empty() {
         return Err("No runnable modules — nothing to run.".into());

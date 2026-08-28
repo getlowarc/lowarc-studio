@@ -63,22 +63,55 @@ pub const HARNESS_JS: &str = r#"(function () {
       if (!listeners.has(event)) listeners.set(event, []);
       listeners.get(event).push(handler);
     },
+    // A multi-document viewer plugin (Monaco is the first) manages several open files inside ONE
+    // mounted iframe instead of getting a fresh iframe per file — cheaper, and it's what lets a
+    // widget's own view state (scroll/cursor/folds) survive a tab switch the same way a real
+    // editor's undo history already does, without the host needing to know anything about that
+    // internal state. The host drives this with three emits a plugin listens for via on(), not new
+    // methods here — there was nothing to add to the call surface, only new events to handle:
+    //   lowarc:openFile   {path, contents} — a file was opened; create whatever internal state
+    //                      this file needs (e.g. a model) if it doesn't exist yet. Not necessarily
+    //                      the one to show — activateFile is the separate "make this visible" step.
+    //   lowarc:activateFile {path} — switch to showing this already-opened path.
+    //   lowarc:closeFile  {path} — dispose whatever was created for this path; it won't be
+    //                      referenced again unless a fresh lowarc:openFile arrives for it later.
+    // The host can also ask for a path's current (possibly unsaved) content — e.g. when moving a
+    // file to the other editor group, where re-reading from disk would silently drop unsaved
+    // edits. This is the one case where a HOST-initiated request needs a reply, the reverse of
+    // every other request/reply pair in this file — there's no dedicated method for it since it's
+    // not something a plugin ever calls, only receives:
+    //   lowarc:getContent {path, replyId} — reply with
+    //     window.parent.postMessage({type: "hostRequestReply", replyId, content}, "*")
+    //     (content: the current text, or null if this plugin has nothing for that path).
     // markDirty/requestClose talk straight to the host's own tab-bar UI, not through this
     // plugin's backend process the way call()/on() do — there's nothing for a backend to decide
     // here, it's just "update my tab", so routing it through a process round-trip would be pure
     // overhead. A viewer plugin (see tab-bar/open-files) is the only kind of plugin these mean
     // anything to; anyone else calling them is just poking a host tab that doesn't exist for them.
-    markDirty(dirty) {
-      window.parent.postMessage({ type: "host", action: "markDirty", dirty: Boolean(dirty) }, "*");
+    // `path` is required, not implicit — one viewer iframe can now be responsible for several open
+    // files at once (see lowarc:openFile/activateFile/closeFile below), so there's no longer a
+    // single unambiguous file this call could only be about.
+    markDirty(path, dirty) {
+      window.parent.postMessage({ type: "host", action: "markDirty", path, dirty: Boolean(dirty) }, "*");
     },
     // Same shape and reasoning as markDirty — a viewer with its own diagnostics (Monaco's marker
     // list, today) tells the host whenever that set of errors becomes empty/non-empty, not what
     // the errors actually are; the host only needs a boolean to decorate a tab or file row with.
-    markErrors(hasErrors) {
-      window.parent.postMessage({ type: "host", action: "markErrors", hasErrors: Boolean(hasErrors) }, "*");
+    markErrors(path, hasErrors) {
+      window.parent.postMessage({ type: "host", action: "markErrors", path, hasErrors: Boolean(hasErrors) }, "*");
     },
-    requestClose() {
-      window.parent.postMessage({ type: "host", action: "requestClose" }, "*");
+    // Registers (replacing any previous set from this same plugin) this plugin's own Command
+    // Palette entries — the dynamic counterpart to plugin.json's static `commands` array (see
+    // PluginCommand in protocol.rs). For a plugin whose available commands can't be known ahead of
+    // time at manifest-authoring time (Monaco's own built-in editor actions, which vary by what's
+    // actually registered at runtime) this is how it tells the host what to list instead. commands
+    // is [{id, label, hint}], same shape as the static ones; running one posts the same
+    // lowarc:runCommand emit either way. Fire-and-forget, same reasoning as markDirty.
+    setCommands(commands) {
+      window.parent.postMessage({ type: "host", action: "setCommands", commands: commands || [] }, "*");
+    },
+    requestClose(path) {
+      window.parent.postMessage({ type: "host", action: "requestClose", path }, "*");
     },
     // Any plugin can raise a toast/notification through the host's own system — see showToast()
     // in primitives.js, which is the SAME pipe host chrome's own errors/confirmations already go
@@ -231,6 +264,17 @@ pub const SHARED_STYLE_CSS: &str = include_str!("../../src/style.css");
 /// also reimplementing the JS behind it, so none of it is exposed. Depends on
 /// `__lowarc.css`'s tokens; a plugin using this should link both, `__lowarc.css` first.
 pub const SHARED_PRIMITIVES_CSS: &str = include_str!("../../src/primitives-shared.css");
+
+/// File-type icons — vendored from vscode's built-in "Seti" icon theme (see
+/// src/vendor/seti-icons/SETI_LICENSE), same include_str!/include_bytes! vendoring as everything
+/// else here. Three pieces, all opt-in the same way as __lowarc.css: the font itself
+/// (__lowarc-icons.woff), the generated stylesheet mapping each icon id to its glyph + color
+/// (__lowarc-icons.css, depends on the font), and a small resolver script exposing
+/// `window.lowarcIconClass(filename)` (__lowarc-icons.js) so a plugin doesn't have to reimplement
+/// vscode's own fileNames-then-longest-extension matching order itself.
+pub const SHARED_ICONS_CSS: &str = include_str!("../../src/vendor/seti-icons/icons.css");
+pub const SHARED_ICONS_JS: &str = include_str!("../../src/vendor/seti-icons/icons.js");
+pub const SHARED_ICONS_WOFF: &[u8] = include_bytes!("../../src/vendor/seti-icons/seti.woff");
 
 /// Resolves `<plugin_id>/<rel_path>` to a real file, refusing anything that canonicalizes outside
 /// that plugin's own folder — shared between plugin_asset_server.rs and `read_plugin_asset`

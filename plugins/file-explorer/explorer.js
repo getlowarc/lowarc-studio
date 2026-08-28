@@ -5,7 +5,6 @@
 // rows in place rather than popping a native prompt.
 
 const CHEVRON_SVG = '<svg viewBox="0 0 10 10" fill="none"><path d="M3 1l4 4-4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-const FOLDER_SVG = '<svg viewBox="0 0 16 16" fill="none"><path d="M2 4.5C2 3.67 2.67 3 3.5 3H6.5L8 4.5H12.5C13.33 4.5 14 5.17 14 6V11.5C14 12.33 13.33 13 12.5 13H3.5C2.67 13 2 12.33 2 11.5V4.5Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>';
 const FILE_SVG = '<svg viewBox="0 0 16 16" fill="none"><path d="M4 2h5l3 3v9H4V2Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M9 2v3h3" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>';
 
 // Read synchronously off the iframe's own URL fragment, not pushed in later via postMessage — no
@@ -123,20 +122,48 @@ function createInlineInput(initialValue, onCommit) {
   return input;
 }
 
+// One wrapper per row, not `depth` separate children of `.row` directly — `.row` uses flex `gap`
+// to space out its real children (chevron/icon/name), which would just as happily shove the guide
+// lines apart from each other too and break the illusion of one continuous line per ancestor.
+// Wrapping them keeps `.row`'s gap out of it; the guides pack flush against each other inside.
+function appendIndentGuides(row, depth) {
+  if (depth === 0) return;
+  const wrap = document.createElement("span");
+  wrap.className = "indent-guides";
+  for (let i = 0; i < depth; i++) {
+    const guide = document.createElement("span");
+    guide.className = "indent-guide";
+    wrap.appendChild(guide);
+  }
+  row.appendChild(wrap);
+}
+
+// Files get the real per-language glyph from the vendored Seti set (see window.lowarcIconClass,
+// __lowarc-icons.js) when it's loaded; falling back to the old generic FILE_SVG is what keeps this
+// plugin working even if a plugin author's own build omits the icon assets, rather than a silently
+// blank icon slot.
+function fileIconHtml(name) {
+  if (typeof window.lowarcIconClass !== "function") return FILE_SVG;
+  return `<span class="file-icon ${window.lowarcIconClass(name)}"></span>`;
+}
+
+// ONE slot, not a chevron slot followed by a separate icon slot — a folder's chevron and a file's
+// icon are the same thing positionally (the row's one "what is this" marker), so they need to
+// literally share one element's box, not two sequential ones. Two slots was the actual bug behind
+// "a file's icon and a sibling folder's chevron aren't at the same horizontal position": every file
+// row was reserving an invisible chevron-width column before its icon even started.
+function createRowMarker(isDir, isExpanded, label) {
+  const marker = document.createElement("span");
+  marker.className = "row-marker" + (isDir ? " chevron" + (isExpanded ? " expanded" : "") : "");
+  marker.innerHTML = isDir ? CHEVRON_SVG : fileIconHtml(label);
+  return marker;
+}
+
 function createRow({ path, label, isDir, depth }) {
   const row = document.createElement("div");
   row.className = "row" + (path === selectedPath ? " selected" : "");
-  row.style.paddingLeft = depth * 12 + 4 + "px";
-
-  const chevron = document.createElement("span");
-  chevron.className = "chevron" + (isDir ? (expandedDirs.has(path) ? " expanded" : "") : " hidden");
-  if (isDir) chevron.innerHTML = CHEVRON_SVG;
-  row.appendChild(chevron);
-
-  const icon = document.createElement("span");
-  icon.className = "row-icon";
-  icon.innerHTML = isDir ? FOLDER_SVG : FILE_SVG;
-  row.appendChild(icon);
+  appendIndentGuides(row, depth);
+  row.appendChild(createRowMarker(isDir, expandedDirs.has(path), label));
 
   const nameEl = document.createElement("span");
   nameEl.className = "row-name";
@@ -207,16 +234,16 @@ function createRow({ path, label, isDir, depth }) {
 function createInlineCreateRow(dir, isDir, depth) {
   const row = document.createElement("div");
   row.className = "row";
-  row.style.paddingLeft = depth * 12 + 4 + "px";
+  appendIndentGuides(row, depth);
 
-  const chevron = document.createElement("span");
-  chevron.className = "chevron hidden";
-  row.appendChild(chevron);
-
-  const icon = document.createElement("span");
-  icon.className = "row-icon";
-  icon.innerHTML = isDir ? FOLDER_SVG : FILE_SVG;
-  row.appendChild(icon);
+  // Nothing's been typed yet to pick an extension-specific glyph from — this always shows the
+  // generic file icon regardless of what's ultimately created, until the row re-renders as a real
+  // row (createRow, above) with the committed name. A pending folder's chevron is non-functional
+  // (nothing to expand yet) but shown anyway, matching createRow's marker for visual consistency.
+  const marker = document.createElement("span");
+  marker.className = "row-marker" + (isDir ? " chevron" : "");
+  marker.innerHTML = isDir ? CHEVRON_SVG : FILE_SVG;
+  row.appendChild(marker);
 
   const nameEl = document.createElement("span");
   nameEl.className = "row-name";

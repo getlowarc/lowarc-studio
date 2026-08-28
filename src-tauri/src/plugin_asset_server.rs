@@ -13,7 +13,10 @@
 // regardless of the URL's real origin. Isolation comes from the sandbox attribute, not from this
 // server, so nothing extra is needed here for that.
 
-use crate::plugin_assets::{resolve_asset_path, CSP, HARNESS_JS, SHARED_PRIMITIVES_CSS, SHARED_STYLE_CSS};
+use crate::plugin_assets::{
+    resolve_asset_path, CSP, HARNESS_JS, SHARED_ICONS_CSS, SHARED_ICONS_JS, SHARED_ICONS_WOFF, SHARED_PRIMITIVES_CSS,
+    SHARED_STYLE_CSS,
+};
 use crate::{settings, theme};
 use std::sync::atomic::{AtomicU16, Ordering};
 
@@ -38,7 +41,15 @@ fn respond(request: tiny_http::Request, status: u16, content_type: &str, body: V
     let response = tiny_http::Response::from_data(body)
         .with_status_code(status)
         .with_header(mk_header("Content-Type", content_type))
-        .with_header(mk_header("Content-Security-Policy", CSP));
+        .with_header(mk_header("Content-Security-Policy", CSP))
+        // Every plugin iframe is sandbox="allow-scripts" with no allow-same-origin, so it has an
+        // opaque origin — the browser can never consider a request FROM it "same-origin" with
+        // anything, including this literal server, no matter how the URL looks. Most resource
+        // types (scripts, stylesheets, plain images) don't enforce CORS for that anyway, but
+        // @font-face specifically does, so a font load from a sandboxed iframe fails with a bare
+        // NetworkError unless the response carries this. Loopback-only, no real user data ever
+        // flows through it, so a blanket allow-all costs nothing.
+        .with_header(mk_header("Access-Control-Allow-Origin", "*"));
     let _ = request.respond(response);
 }
 
@@ -69,6 +80,21 @@ fn handle(request: tiny_http::Request) {
     }
     if rel_path == "__lowarc-primitives.css" {
         respond(request, 200, "text/css", SHARED_PRIMITIVES_CSS.as_bytes().to_vec());
+        return;
+    }
+    if rel_path == "__lowarc-icons.css" {
+        respond(request, 200, "text/css", SHARED_ICONS_CSS.as_bytes().to_vec());
+        return;
+    }
+    if rel_path == "__lowarc-icons.js" {
+        respond(request, 200, "text/javascript", SHARED_ICONS_JS.as_bytes().to_vec());
+        return;
+    }
+    // "seti.woff", not "__lowarc-icons.woff" — icons.css references it by its real vendored
+    // filename (see that file's own comment for why), so this is the relative path a plugin
+    // iframe's browser actually requests after loading __lowarc-icons.css at .../<plugin_id>/.
+    if rel_path == "seti.woff" {
+        respond(request, 200, "font/woff", SHARED_ICONS_WOFF.to_vec());
         return;
     }
     // Computed fresh every request (settings::load() reads settings.json from disk each time, not

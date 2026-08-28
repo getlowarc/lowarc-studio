@@ -193,10 +193,17 @@
   align-items: center;
   gap: 8px;
   padding: 8px 8px 4px;
+  cursor: pointer;
 }
 
 .dropdown-menu-group-label:first-child {
   padding-top: 4px;
+}
+
+.dropdown-menu-group-label:hover .dropdown-menu-group-chevron,
+.dropdown-menu-group-label:focus-visible .dropdown-menu-group-chevron {
+  background: var(--bg-hover);
+  color: var(--fg);
 }
 
 .dropdown-menu-group-title {
@@ -215,7 +222,6 @@
 }
 
 .dropdown-menu-group-chevron {
-  all: unset;
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -224,7 +230,6 @@
   height: 16px;
   flex: none;
   color: var(--fg-dim);
-  cursor: pointer;
   border-radius: 3px;
   transition: transform 0.15s ease;
 }
@@ -232,11 +237,6 @@
 .dropdown-menu-group-chevron svg {
   width: 9px;
   height: 9px;
-}
-
-.dropdown-menu-group-chevron:hover {
-  background: var(--bg-hover);
-  color: var(--fg);
 }
 
 .dropdown-menu-group-chevron.is-expanded {

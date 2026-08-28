@@ -5,6 +5,8 @@
 <link rel="stylesheet" href="__lowarc.css" />
 <link rel="stylesheet" href="__lowarc-primitives.css" />
 <link rel="stylesheet" href="__lowarc-theme.css" />
+<link rel="stylesheet" href="__lowarc-icons.css" />
+<script src="__lowarc-icons.js"></script>
 <style>
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; }
@@ -69,23 +71,46 @@
   .row {
     display: flex;
     align-items: center;
-    height: 22px;
+    height: 26px;
+    padding-left: 4px;
     padding-right: 6px;
     white-space: nowrap;
     cursor: pointer;
-    gap: 4px;
+    gap: 2px;
   }
   .row:hover { background: var(--bg-hover); }
   .row.selected { background: var(--border); }
   .row.drop-target { outline: 1px solid var(--cyan); outline-offset: -2px; }
 
-  .chevron { width: 14px; height: 14px; flex: none; display: flex; align-items: center; justify-content: center; color: var(--fg-dim); transform: rotate(0deg); transition: transform 0.08s ease; }
-  .chevron.expanded { transform: rotate(90deg); }
-  .chevron.hidden { visibility: hidden; }
-  .chevron svg { width: 10px; height: 10px; }
+  /* One of these per ancestor directory, in place of the old flat depth*12px padding-left — a thin
+     vertical line down the middle of each 12px slot, the same "show the nesting, not just imply it
+     with whitespace" convention VS Code's own tree uses. Stacking them left-to-right for however
+     deep a row is nested reproduces the full-height, unbroken-looking rule across sibling rows for
+     free, since every row at a given depth draws the exact same line in the exact same slot. The
+     line's own position (left: 5px in its 12px slot) stays fixed — every row at a given depth
+     needs to agree on exactly where it sits, or the "continuous line down the tree" illusion
+     breaks; the negative margin below is what actually closes the gap to the marker that follows
+     (see .row-marker), by pulling IT toward the line instead of moving the line itself. */
+  .indent-guides { display: flex; flex: none; align-self: stretch; margin-right: -9px; }
+  .indent-guide { width: 12px; flex: none; align-self: stretch; position: relative; }
+  .indent-guide::before { content: ""; position: absolute; top: 0; bottom: 0; left: 5px; width: 1px; background: var(--border); }
 
-  .row-icon { width: 15px; height: 15px; flex: none; color: var(--fg); }
-  .row-icon svg { width: 100%; height: 100%; }
+  /* The ONE marker slot every row has — a folder's chevron and a file's icon are the same thing
+     positionally (see explorer.js's createRowMarker), so they share this exact box rather than
+     being two separate elements that could end up different sizes or in different places depending
+     on row type. Nothing else in this file should reference `.chevron`/`.row-icon` as standalone
+     classes anymore. */
+  .row-marker { width: 20px; height: 20px; flex: none; display: flex; align-items: center; justify-content: center; color: var(--fg); }
+  .row-marker.chevron { color: var(--fg-dim); transform: rotate(0deg); transition: transform 0.08s ease; }
+  .row-marker.chevron.expanded { transform: rotate(90deg); }
+  /* Grows with .row-marker's own box (was 10px in a 14px box) — a chevron that stayed fixed-size
+     while the file icon next to it grew would end up looking smaller than its own sibling. */
+  .row-marker.chevron svg { width: 14px; height: 14px; }
+  .row-marker svg { width: 100%; height: 100%; }
+  /* Seti glyphs render at their own font-size (icons.css sets 150% of the surrounding font-size,
+     tuned for a full-size file tab, not this compact a row) — scaling it back down here keeps file
+     rows the same visual size as the chevron above rather than dwarfing it. */
+  .row-marker .file-icon { font-size: 20px; }
 
   .row-status-dot { width: 6px; height: 6px; border-radius: 50%; flex: none; margin-left: auto; }
   .row-status-dot.status-dirty { background: var(--yellow); }

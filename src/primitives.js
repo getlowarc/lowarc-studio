@@ -316,8 +316,31 @@ function initSearchbar(el, { options, onSelect, categories, previewLimit = 0 } =
     const overflowing = truncatable && items.length > previewLimit;
     const shown = overflowing && !isExpanded ? items.slice(0, previewLimit) : items;
 
+    // The whole divider (title, line, chevron) is the hitbox now, not just the chevron glyph
+    // itself — that used to be the only clickable part, a target a few pixels across. The chevron
+    // is purely decorative (a plain span) with the toggle living on this element instead;
+    // role="button"/tabindex/keydown are what a real <button> would have given it for free.
     const labelEl = document.createElement("div");
     labelEl.className = "dropdown-menu-group-label";
+    labelEl.setAttribute("role", "button");
+    labelEl.tabIndex = 0;
+    labelEl.setAttribute("aria-label", isExpanded ? "Show fewer" : "Show more");
+    const toggle = () => {
+      if (isExpanded) expanded.delete(id);
+      else expanded.add(id);
+      renderBrowse();
+    };
+    labelEl.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggle();
+    });
+    labelEl.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      e.stopPropagation();
+      toggle();
+    });
+
     const title = document.createElement("span");
     title.className = "dropdown-menu-group-title";
     title.textContent = label;
@@ -326,17 +349,9 @@ function initSearchbar(el, { options, onSelect, categories, previewLimit = 0 } =
     line.className = "dropdown-menu-group-line";
     labelEl.appendChild(line);
 
-    const chevron = document.createElement("button");
-    chevron.type = "button";
+    const chevron = document.createElement("span");
     chevron.className = "dropdown-menu-group-chevron" + (isExpanded ? " is-expanded" : "");
-    chevron.setAttribute("aria-label", isExpanded ? "Show fewer" : "Show more");
     chevron.innerHTML = '<svg viewBox="0 0 10 10" fill="none"><path d="M2.5 4l2.5 2.5L7.5 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /></svg>';
-    chevron.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (isExpanded) expanded.delete(id);
-      else expanded.add(id);
-      renderBrowse();
-    });
     labelEl.appendChild(chevron);
 
     menu.appendChild(labelEl);

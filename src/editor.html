@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="primitives-shared.css" />
     <link rel="stylesheet" href="primitives.css" />
+    <link rel="stylesheet" href="vendor/seti-icons/icons.css" />
+    <script src="vendor/seti-icons/icons.js"></script>
     <style>
       /* ---------- Grid shell ---------- */
       /* Vocabulary: "Menu Bar" = the topmost bar (File/Edit/View/Help) — the window runs with
@@ -590,6 +592,20 @@
         outline-offset: -1px;
       }
 
+      .file-tab-icon {
+        flex: none;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      /* Same reasoning as the file explorer's own row-marker sizing — icons.css's default 150% is
+         tuned for a bigger surface than a compact tab. */
+      .file-tab-icon.file-icon {
+        font-size: 20px;
+      }
+
       /* Always present and laid out (never swapped for something a different size) so hovering a
          tab never shifts its width — just invisible and inert until the tab is hovered or active. */
       .file-tab-close {
@@ -617,9 +633,10 @@
         box-sizing: border-box;
       }
 
-      /* Always hosts either .center-viewport-empty or one iframe per open file (see the tab-bar/
-         open-files JS below) — never bare text of its own any more, so this stays a plain block
-         container; whichever child is actually showing manages its own sizing/centering. */
+      /* Always hosts either .center-viewport-empty or one iframe per mounted viewer instance (see
+         the tab-bar/open-files JS below — one instance can now show several open files, so this
+         isn't one-per-file any more) — never bare text of its own any more, so this stays a plain
+         block container; whichever child is actually showing manages its own sizing/centering. */
       .center-viewport {
         flex: 1;
         min-height: 0;
@@ -1621,7 +1638,18 @@
         return Promise.resolve(null);
       }
 
+      // A viewer plugin (Monaco, so far) can have several iframes mounted at once — one per open
+      // file, possibly across both split groups — so "the" mounted instance a panel/console-tab
+      // plugin has doesn't apply; its commands mean "run this in the file I'm currently looking
+      // at." The active file's own iframe is tried first (only really matches a viewer); anything
+      // else (Debug, Terminal, file explorer) has no open-file iframe of its own, so this falls
+      // through to the existing panel/console-tab path unchanged.
       async function runPluginCommand(pluginId, commandId) {
+        const activeFile = openFiles.get(groupActiveFilePath[activeGroupId]);
+        if (activeFile && activeFile.pluginId === pluginId && activeFile.iframe) {
+          activeFile.iframe.contentWindow.postMessage({ type: "emit", event: "lowarc:runCommand", payload: { commandId } }, "*");
+          return;
+        }
         const iframe = await ensurePluginMounted(pluginId);
         if (!iframe) {
           showToast({ variant: "error", message: "That plugin has nothing to open — its command can't run." });
@@ -1630,16 +1658,43 @@
         iframe.contentWindow.postMessage({ type: "emit", event: "lowarc:runCommand", payload: { commandId } }, "*");
       }
 
+      // The live array backing the Command Palette / Settings section of the header search — kept
+      // as ONE array object, mutated in place (push/splice, never reassigned), because initSearchbar
+      // (primitives.js) closes over whatever array it's handed at init time with no way to hand it
+      // a fresh one later. Each entry carries `value` (identical to `id`) purely because that's the
+      // field name initSearchbar's own rendering reads — letting `options` below just BE this same
+      // array, instead of a separate .map()'d copy that would silently stop tracking it.
+      const commandCenterEntries = [];
+
+      // The dynamic counterpart to buildPluginCommands() below — see window.lowarc.setCommands() in
+      // plugin_assets.rs. Re-registering (Monaco does this on every editor mount) replaces this
+      // plugin's previous set rather than piling up duplicates.
+      function setDynamicPluginCommands(pluginId, commands) {
+        for (let i = commandCenterEntries.length - 1; i >= 0; i--) {
+          if (commandCenterEntries[i].dynamicPluginId === pluginId) commandCenterEntries.splice(i, 1);
+        }
+        for (const cmd of commands) {
+          if (!cmd || typeof cmd.id !== "string" || typeof cmd.label !== "string") continue;
+          const id = `command:plugin:${pluginId}:${cmd.id}`;
+          commandCenterEntries.push({
+            id, value: id, label: cmd.label, hint: cmd.hint, category: "commands", kind: "command",
+            dynamicPluginId: pluginId,
+            run: () => runPluginCommand(pluginId, cmd.id),
+          });
+        }
+      }
+
       const commandCenterSearch = document.getElementById("command-center-search");
       const commandCenterInput = commandCenterSearch.querySelector("input");
 
       Promise.all([buildSearchableSettingsList(), buildPluginCommands()]).then(([settingEntries, pluginCommands]) => {
-        const entries = [...settingEntries, ...buildHostMenuCommands(), ...pluginCommands];
+        commandCenterEntries.push(...settingEntries, ...buildHostMenuCommands(), ...pluginCommands);
+        commandCenterEntries.forEach((e) => { e.value = e.id; });
         initSearchbar(commandCenterSearch, {
-          options: entries.map((e) => ({ value: e.id, label: e.label, category: e.category })),
+          options: commandCenterEntries,
           categories: HEADER_SEARCH_CATEGORIES,
           onSelect: (value) => {
-            const entry = entries.find((e) => e.id === value);
+            const entry = commandCenterEntries.find((e) => e.id === value);
             commandCenterInput.value = "";
             commandCenterSearch.classList.remove("has-value");
             if (!entry) return;
@@ -3128,16 +3183,51 @@
 
       // ---------- Tab bar / open files (one or two editor groups — see toggleSplit below) ----------
       // openFiles: absolute path -> { title, dirty, missing, hasErrors, pluginId, iframe, groupId }.
-      // One iframe per open file (not one shared iframe told "now show a different file") so
-      // switching tabs preserves each file's own scroll position/undo history in the background,
-      // the same reason VS Code keeps backgrounded editors alive rather than tearing them down.
-      // Unlike VS Code, a file isn't shared across groups here — there's no shared document model
-      // between two separate sandboxed iframes to split — so a path can only be open in ONE group
-      // at a time; opening an already-open file just activates it wherever it already is.
+      // ONE iframe per (editor group, viewer plugin) pair, not one per open file — a "multi-document
+      // viewer" plugin (Monaco, today) manages several open files inside that one instance itself
+      // (see the lowarc:openFile/activateFile/closeFile/getContent contract in plugin_assets.rs),
+      // the same shape a "session": true plugin like Terminal already uses for multiple terminal
+      // tabs inside one iframe — the host never needs to know a plugin has "instances," only which
+      // path is currently active. Per-file scroll position/undo history survive a tab switch
+      // because the PLUGIN itself saves/restores view state around each activateFile, the same way
+      // VS Code's own editor does — not because the DOM node never went away.
+      // Unlike VS Code, a file isn't shared across groups here — there's no way to share a model
+      // between two separate sandboxed iframes (two different JS realms) to split — so a path can
+      // only be open in ONE group at a time; opening an already-open file just activates it
+      // wherever it already is, and moving it to the other group asks the source instance for its
+      // current content (see requestPluginContent below) rather than re-reading the file from disk,
+      // so unsaved edits survive the move.
       const openFiles = new Map();
-      const windowToFilePath = new Map();
+      // iframe.contentWindow -> Set<path> this iframe is currently responsible for. A plugin's own
+      // markDirty/markErrors/requestClose/saveFile calls all carry an explicit path now (see
+      // plugin_assets.rs) — this Set is what validates that path actually belongs to the iframe
+      // claiming it, the same trust role a single Map<Window, path> played before multiple files
+      // could share one iframe.
+      const windowToFilePaths = new Map();
+      // "${groupId}:${pluginId}" -> the one iframe currently mounted for that plugin in that group,
+      // if any — what openFile()/moveFileToGroup() check before deciding whether to reuse an
+      // already-mounted multi-document viewer or create a fresh one.
+      const groupViewerIframes = new Map();
+      function viewerIframeKey(groupId, pluginId) {
+        return `${groupId}:${pluginId}`;
+      }
       const groupActiveFilePath = { 0: null, 1: null };
       let activeGroupId = 0;
+
+      // The reverse of call()/saveFile()'s own request/reply plumbing (see plugin_assets.rs) — this
+      // is the one place the HOST initiates a request a plugin must reply to, used by
+      // moveFileToGroup() to pull a file's current (possibly unsaved) content out of its source
+      // instance before mounting it in the other group. A plugin replies by posting
+      // {type: "hostRequestReply", replyId, content} — matched in the message listener below.
+      let nextHostRequestId = 1;
+      const hostPendingRequests = new Map();
+      function requestPluginContent(iframe, path) {
+        return new Promise((resolve) => {
+          const id = nextHostRequestId++;
+          hostPendingRequests.set(id, resolve);
+          iframe.contentWindow.postMessage({ type: "emit", event: "lowarc:getContent", payload: { path, replyId: id } }, "*");
+        });
+      }
 
       function groupEls(id) {
         return {
@@ -3176,7 +3266,13 @@
         for (const entry of pluginPanels.values()) {
           if (entry.iframe) entry.iframe.contentWindow.postMessage(payload, "*");
         }
+        // A Set, not a direct iteration over openFiles — several open files can now share one
+        // iframe (see groupViewerIframes above), and that instance only needs this once, not once
+        // per file it happens to have open.
+        const notified = new Set();
         for (const file of openFiles.values()) {
+          if (notified.has(file.iframe)) continue;
+          notified.add(file.iframe);
           file.iframe.contentWindow.postMessage(payload, "*");
         }
       }
@@ -3212,6 +3308,15 @@
             tab.title = contribution.id;
             tab.classList.toggle("is-active", contribution.id === groupActiveFilePath[groupId]);
             tab.classList.add(file.missing ? "status-missing" : file.dirty ? "status-dirty" : "status-clean");
+            // Same per-language glyph the file explorer shows (window.lowarcIconClass, vendored
+            // vendor/seti-icons/) — inserted first so it sits before the label, same reading order
+            // as the explorer's own rows. Guarded the same way explorer.js guards it: if the icon
+            // assets somehow aren't loaded, the tab just has no icon rather than an error.
+            if (typeof window.lowarcIconClass === "function") {
+              const icon = document.createElement("span");
+              icon.className = "file-tab-icon file-icon " + window.lowarcIconClass(file.title);
+              tab.insertBefore(icon, tab.firstChild);
+            }
           },
           onActivate: (contribution) => {
             groupActiveFilePath[groupId] = contribution.id;
@@ -3222,6 +3327,87 @@
         });
       }
 
+      // iframe -> Promise<void>, resolved once that iframe is actually ready to receive messages
+      // (its own script has run far enough to register a lowarc:openFile listener). A second file
+      // opened into an already-mounted-but-still-loading instance has to wait on this before
+      // posting — without it, a message sent between iframe creation and the listener existing is
+      // simply gone (postMessage doesn't queue for a future listener), the same failure shape the
+      // very first ensurePluginMounted() bug this session turned out to be.
+      const viewerIframeReady = new Map();
+
+      // Gets-or-creates the one iframe for (groupId, viewer.pluginId), pushes this path's content
+      // into it, and resolves once it's genuinely ready — either immediately (an already-mounted
+      // instance already has a load-complete script running) or after a freshly-created iframe's
+      // own load event fires. Doesn't touch openFiles/contribute/groupActiveFilePath/rendering —
+      // callers (openFile, moveFileToGroup) own that, since what happens around a mount differs
+      // between "brand new file" and "moved from the other group."
+      function mountFileInGroup(path, contents, viewer, groupId) {
+        const key = viewerIframeKey(groupId, viewer.pluginId);
+        const existingIframe = groupViewerIframes.get(key);
+
+        if (existingIframe) {
+          return viewerIframeReady.get(existingIframe).then(() => {
+            windowToFilePaths.get(existingIframe.contentWindow).add(path);
+            existingIframe.contentWindow.postMessage({ type: "emit", event: "lowarc:openFile", payload: { path, contents } }, "*");
+            return existingIframe;
+          });
+        }
+
+        return (async () => {
+          const iframe = document.createElement("iframe");
+          iframe.className = "plugin-panel-frame";
+          iframe.dataset.pluginId = viewer.pluginId; // lets a command look up this plugin's own mounted iframe by id, see runCommand()
+          iframe.setAttribute("sandbox", "allow-scripts");
+          // No per-file path in the URL anymore — this instance can outlive any one file, so which
+          // file(s) it's showing arrives entirely through lowarc:openFile/activateFile/closeFile
+          // messages over its lifetime, not something baked into how it was loaded.
+          iframe.src = await pluginAssetUrl(viewer.pluginId, viewer.viewer.entry);
+          // A click inside a sandboxed iframe never bubbles to the parent document, so the
+          // mousedown-based group-activation listener above can't see it — this is the
+          // supplementary signal for "the user is now working in this group" once its content
+          // actually takes focus (Monaco, e.g., calls focus() on the editor surface).
+          iframe.addEventListener("focus", () => setActiveGroup(groupId));
+          groupEls(groupId).viewport.appendChild(iframe);
+          windowToFilePaths.set(iframe.contentWindow, new Set([path]));
+          windowToPlugin.set(iframe.contentWindow, viewer.pluginId);
+          groupViewerIframes.set(key, iframe);
+
+          const ready = new Promise((resolve) => {
+            // The viewer's own iframe has no filesystem access (sandboxed, connect-src 'none') —
+            // the host already read the file, so it pushes the content in once the iframe's own
+            // script has had a chance to call lowarc.on("lowarc:openFile", ...) and start listening.
+            iframe.addEventListener("load", () => {
+              iframe.contentWindow.postMessage({ type: "emit", event: "lowarc:openFile", payload: { path, contents } }, "*");
+              broadcastFileStatus();
+              resolve();
+            });
+          });
+          viewerIframeReady.set(iframe, ready);
+          return ready.then(() => iframe);
+        })();
+      }
+
+      // Tears down whatever a plugin instance was tracking for one path — disposing (e.g. Monaco's
+      // model), not necessarily removing the iframe itself, since other open files may still be
+      // relying on it. Only once nothing else references it does the instance actually go away.
+      // Callers run this BEFORE removing their own openFiles entry for `path` (closeFile) or before
+      // reassigning it to the new iframe (moveFileToGroup) — excluding `path` itself from the
+      // "still used" check is what keeps that from always finding itself and never actually
+      // tearing the instance down.
+      function unmountFileFromGroup(path, iframe, groupId, pluginId) {
+        if (!iframe) return;
+        iframe.contentWindow.postMessage({ type: "emit", event: "lowarc:closeFile", payload: { path } }, "*");
+        const paths = windowToFilePaths.get(iframe.contentWindow);
+        if (paths) paths.delete(path);
+        const stillUsed = Array.from(openFiles.entries()).some(([p, f]) => p !== path && f.iframe === iframe);
+        if (stillUsed) return;
+        windowToFilePaths.delete(iframe.contentWindow);
+        windowToPlugin.delete(iframe.contentWindow);
+        groupViewerIframes.delete(viewerIframeKey(groupId, pluginId));
+        viewerIframeReady.delete(iframe);
+        iframe.remove();
+      }
+
       function showActiveFile(groupId) {
         const { viewport, empty } = groupEls(groupId);
         viewport.querySelectorAll(".plugin-panel-frame").forEach((f) => f.classList.remove("is-active"));
@@ -3229,7 +3415,10 @@
         const path = groupActiveFilePath[groupId];
         const file = path ? openFiles.get(path) : null;
         empty.style.display = file ? "none" : "flex";
-        if (file && file.iframe) file.iframe.classList.add("is-active");
+        if (file && file.iframe) {
+          file.iframe.classList.add("is-active");
+          file.iframe.contentWindow.postMessage({ type: "emit", event: "lowarc:activateFile", payload: { path } }, "*");
+        }
       }
 
       // Only for switching TO an already-rendered tab (a re-open, or right after openFile() has
@@ -3260,12 +3449,7 @@
         }
 
         const groupId = file.groupId;
-
-        if (file.iframe) {
-          windowToFilePath.delete(file.iframe.contentWindow);
-          windowToPlugin.delete(file.iframe.contentWindow);
-          file.iframe.remove();
-        }
+        unmountFileFromGroup(path, file.iframe, groupId, file.pluginId);
         openFiles.delete(path);
         removeContribution(`center-${groupId}`, path);
 
@@ -3279,20 +3463,30 @@
         broadcastFileStatus();
       }
 
-      // Moves an ALREADY-open file into a different group — re-parents the same iframe node (not
-      // a close+reopen, so scroll position/undo history survive, same reasoning as setSplitOpen's
-      // own group-0 merge) and moves its slot registration to match. Unlike setSplitOpen's bulk
-      // merge (which deliberately leaves whichever tab was already active in the destination group
-      // alone), this is always a direct response to the user acting on this ONE file — dragging its
-      // tab across, or "Open in Split View" — so it always becomes the active tab in its new group.
-      function moveFileToGroup(path, targetGroupId) {
+      // Moves an ALREADY-open file into a different group. Used to reparent the same iframe node
+      // outright when one instance = one file; now that an instance can hold several files at
+      // once, moving just ONE of them can't simply drag the whole iframe along (that would move
+      // every OTHER file sharing it too) — instead this asks the source instance for the file's
+      // current content (possibly with unsaved edits re-reading from disk would silently lose),
+      // unmounts it there, and mounts that same content into whatever instance already exists (or
+      // gets created) in the target group. Unlike setSplitOpen's bulk merge (which deliberately
+      // leaves whichever tab was already active in the destination group alone), this is always a
+      // direct response to the user acting on this ONE file — dragging its tab across, or "Open in
+      // Split View" — so it always becomes the active tab in its new group.
+      async function moveFileToGroup(path, targetGroupId) {
         const file = openFiles.get(path);
         if (!file || file.groupId === targetGroupId) return;
         const fromGroupId = file.groupId;
+        const viewer = viewersByExtension.get(fileExtension(path));
+        if (!viewer) return; // the plugin that opened this got uninstalled out from under it
+
+        const contents = file.iframe ? await requestPluginContent(file.iframe, path) : "";
 
         removeContribution(`center-${fromGroupId}`, path);
+        unmountFileFromGroup(path, file.iframe, fromGroupId, file.pluginId);
+
+        file.iframe = await mountFileInGroup(path, contents ?? "", viewer, targetGroupId);
         file.groupId = targetGroupId;
-        groupEls(targetGroupId).viewport.appendChild(file.iframe);
         contribute(`center-${targetGroupId}`, { id: path, sourceType: "plugin", pluginId: file.pluginId, label: file.title, closeable: true });
 
         if (groupActiveFilePath[fromGroupId] === path) {
@@ -3320,7 +3514,7 @@
         const existing = openFiles.get(path);
         if (existing) {
           if (existing.groupId !== targetGroupId && opts.openInSplit) {
-            moveFileToGroup(path, targetGroupId);
+            await moveFileToGroup(path, targetGroupId);
           } else {
             setActiveGroup(existing.groupId);
             activateFile(path);
@@ -3347,27 +3541,7 @@
         // there's no OTHER per-open group picker, matching the toolbar-level (not per-tab) split
         // button this pairs with.
         const groupId = targetGroupId;
-        const iframe = document.createElement("iframe");
-        iframe.className = "plugin-panel-frame";
-        iframe.dataset.pluginId = viewer.pluginId; // lets a command look up this plugin's own mounted iframe by id, see runCommand()
-        iframe.setAttribute("sandbox", "allow-scripts");
-        iframe.src = await pluginAssetUrl(viewer.pluginId, viewer.viewer.entry, `path=${encodeURIComponent(path)}`);
-        // A click inside a sandboxed iframe never bubbles to the parent document, so the
-        // mousedown-based group-activation listener above can't see it — this is the
-        // supplementary signal for "the user is now working in this group" once its content
-        // actually takes focus (Monaco, e.g., calls focus() on the editor surface).
-        iframe.addEventListener("focus", () => setActiveGroup(groupId));
-        groupEls(groupId).viewport.appendChild(iframe);
-        windowToFilePath.set(iframe.contentWindow, path);
-        windowToPlugin.set(iframe.contentWindow, viewer.pluginId);
-
-        // The viewer's own iframe has no filesystem access (sandboxed, connect-src 'none') — the
-        // host already read the file above, so it pushes the content in once the iframe's own
-        // script has had a chance to call lowarc.on("lowarc:openFile", ...) and start listening.
-        iframe.addEventListener("load", () => {
-          iframe.contentWindow.postMessage({ type: "emit", event: "lowarc:openFile", payload: { path, contents } }, "*");
-          broadcastFileStatus();
-        });
+        const iframe = await mountFileInGroup(path, contents, viewer, groupId);
 
         openFiles.set(path, { title: fileTitle(path), dirty: false, missing: false, hasErrors: false, pluginId: viewer.pluginId, iframe, groupId });
         contribute(`center-${groupId}`, { id: path, sourceType: "plugin", pluginId: viewer.pluginId, label: fileTitle(path), closeable: true });
@@ -3386,7 +3560,7 @@
         group0.style.flex = splitOpen ? `0 0 ${splitRatio * 100}%` : "";
       }
 
-      function setSplitOpen(open) {
+      async function setSplitOpen(open) {
         if (splitOpen === open) return;
         splitOpen = open;
         document.getElementById("center-panel").classList.toggle("is-split", open);
@@ -3395,20 +3569,17 @@
 
         if (!open) {
           // Closing the split is a layout change, not "discard everything in the second group" —
-          // move its files back into group 0 (re-parenting the same iframe nodes, not recreating
-          // them, so scroll position/undo history survive) rather than closing them.
-          const toMove = Array.from(openFiles.entries()).filter(([, f]) => f.groupId === 1);
-          for (const [path, file] of toMove) {
-            removeContribution("center-1", path);
-            file.groupId = 0;
-            groupEls(0).viewport.appendChild(file.iframe);
-            contribute("center-0", { id: path, sourceType: "plugin", pluginId: file.pluginId, label: file.title, closeable: true });
+          // move its files back into group 0 (via moveFileToGroup, so each one's current content
+          // — possibly unsaved — survives the move the same way a single dragged-across tab does)
+          // rather than closing them. moveFileToGroup already does its own per-file
+          // renderTabBar/showActiveFile/setActiveGroup; group 1's own tab bar just needs one final
+          // pass afterward since every one of its tabs is gone by then.
+          const toMove = Array.from(openFiles.keys()).filter((p) => openFiles.get(p).groupId === 1);
+          for (const path of toMove) {
+            await moveFileToGroup(path, 0);
           }
           groupActiveFilePath[1] = null;
           renderTabBar(1);
-          renderTabBar(0);
-          showActiveFile(0);
-          setActiveGroup(0);
         }
 
         savePanelLayout();
@@ -3481,7 +3652,7 @@
       // was silently rejecting every plugin-to-host action from every plugin the whole time it
       // existed — confirmed live (event.origin really is the string "null"). Checking for that
       // literal instead is what a legitimately-sandboxed plugin iframe's message actually looks
-      // like; the real per-plugin identity check remains windowToPlugin/windowToFilePath below
+      // like; the real per-plugin identity check remains windowToPlugin/windowToFilePaths below
       // (keyed by the unforgeable event.source), unchanged and doing the actual trust work here —
       // this origin check only ever added defense-in-depth on top of that, never replaced it.
       window.addEventListener("message", async (event) => {
@@ -3489,9 +3660,22 @@
         if (!data || typeof data !== "object") return;
         if (event.origin !== "null") return;
 
+        // A plugin replying to a HOST-initiated request — the only such request today is
+        // requestPluginContent() (see moveFileToGroup) — not one of the usual plugin-initiated
+        // "call"/"host" messages, so it gets its own type rather than overloading "reply" (which
+        // means something different: a plugin's OWN outgoing call() awaiting an answer).
+        if (data.type === "hostRequestReply") {
+          const resolve = hostPendingRequests.get(data.replyId);
+          if (resolve) {
+            hostPendingRequests.delete(data.replyId);
+            resolve(data.content);
+          }
+          return;
+        }
+
         if (data.type === "host") {
           // openFile isn't "about" a file that's already open the way markDirty/requestClose
-          // are, so it doesn't route through windowToFilePath — any tracked plugin iframe (a
+          // are, so it doesn't route through windowToFilePaths — any tracked plugin iframe (a
           // sidebar panel like the file explorer, not just a viewer) can ask the host to add a
           // path to the open-files list. windowToPlugin is still the trust check: only a real,
           // currently-mounted plugin iframe can trigger it, never an arbitrary postMessage.
@@ -3505,7 +3689,7 @@
           // window.lowarc.notify() — routes into the exact same showToast() every host-chrome
           // error/confirmation already goes through (see primitives.js's toast/notification-
           // history section), tagged with which plugin it came from so the bell's history can
-          // attribute it. Not routed through windowToFilePath/windowToPlugin's file-specific
+          // attribute it. Not routed through windowToFilePaths/windowToPlugin's file-specific
           // lookups — any tracked plugin iframe can raise one, not just a file viewer.
           if (data.action === "notify") {
             const pluginId = windowToPlugin.get(event.source);
@@ -3519,7 +3703,7 @@
           // Same trust/routing shape as openFile — these come from whatever plugin performed the
           // filesystem operation (the file explorer, today), not from the affected file's own
           // viewer iframe, so they're keyed by windowToPlugin and an explicit path lookup rather
-          // than windowToFilePath. Only exact-path matches are handled: a folder rename/move/
+          // than windowToFilePaths. Only exact-path matches are handled: a folder rename/move/
           // delete doesn't currently cascade to mark every open file underneath it — a deliberate
           // scope cut, not an oversight.
           if (data.action === "notifyPathDeleted") {
@@ -3544,7 +3728,7 @@
             }
             return;
           }
-          // All three routed by windowToPlugin, not windowToFilePath — a session-mode plugin's UI
+          // All three routed by windowToPlugin, not windowToFilePaths — a session-mode plugin's UI
           // (a console-tab panel, not a file viewer) manages its own instances, each identified by
           // a sessionId it minted itself; the host just needs to know which plugin's files/backend
           // that id belongs to, the same trust boundary as everything else here.
@@ -3642,9 +3826,26 @@
             }
             return;
           }
+          // window.lowarc.setCommands() — see plugin_assets.rs's harness.
+          if (data.action === "setCommands") {
+            const pluginId = windowToPlugin.get(event.source);
+            if (pluginId && Array.isArray(data.commands)) {
+              setDynamicPluginCommands(pluginId, data.commands);
+            } else {
+              showToast({ variant: "error", message: `Palette: setCommands rejected (pluginId=${pluginId}, isArray=${Array.isArray(data.commands)})` });
+            }
+            return;
+          }
 
-          const path = windowToFilePath.get(event.source);
-          if (!path) return;
+          // Every action below is "about" one specific open file — markDirty/markErrors/
+          // requestClose/saveFile all carry an explicit path now (see plugin_assets.rs), since one
+          // iframe can be responsible for several at once. windowToFilePaths is what validates a
+          // plugin can only claim a path the host itself actually told it to open — not proof of
+          // WHICH file (there's no single one anymore), just that this iframe is allowed to speak
+          // for that path at all.
+          const claimedPaths = windowToFilePaths.get(event.source);
+          if (!claimedPaths || typeof data.path !== "string" || !claimedPaths.has(data.path)) return;
+          const path = data.path;
           if (data.action === "markDirty") {
             const file = openFiles.get(path);
             if (file) {
@@ -3663,10 +3864,7 @@
           } else if (data.action === "saveFile") {
             // Unlike markDirty/requestClose, this one owes the caller a reply (see saveFile()'s
             // own comment in __lowarc.js) — a write can fail, and the plugin needs to know before
-            // it clears its own dirty state. data.path must match the path this iframe was
-            // actually opened for, same trust boundary as everything else routed through
-            // windowToFilePath — a viewer only gets to save the one file it owns.
-            if (data.path !== path) return;
+            // it clears its own dirty state.
             try {
               await invoke("write_text_file", { path, contents: String(data.contents ?? "") });
               const file = openFiles.get(path);
