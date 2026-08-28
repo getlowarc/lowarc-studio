@@ -3480,7 +3480,14 @@
         const viewer = viewersByExtension.get(fileExtension(path));
         if (!viewer) return; // the plugin that opened this got uninstalled out from under it
 
-        const contents = file.iframe ? await requestPluginContent(file.iframe, path) : "";
+        // A binary viewer (images, video) is read-only — no unsaved-edit concept to preserve, so
+        // re-reading from disk is exactly as correct as asking the plugin and means a binary
+        // viewer never has to implement lowarc:getContent at all, unlike a real editable one.
+        const contents = viewer.viewer.binary
+          ? await invoke("read_binary_file", { path }).catch(() => "")
+          : file.iframe
+            ? await requestPluginContent(file.iframe, path)
+            : "";
 
         removeContribution(`center-${fromGroupId}`, path);
         unmountFileFromGroup(path, file.iframe, fromGroupId, file.pluginId);
@@ -3531,7 +3538,10 @@
 
         let contents;
         try {
-          contents = await invoke("read_text_file", { path });
+          // A viewer whose plugin.json marks itself "binary": true (images, video) gets its
+          // content read+base64'd by read_binary_file instead — read_text_file would force a
+          // UTF-8 decode on bytes that were never text, corrupting them.
+          contents = await invoke(viewer.viewer.binary ? "read_binary_file" : "read_text_file", { path });
         } catch (err) {
           showToast({ variant: "error", message: String(err) });
           return;

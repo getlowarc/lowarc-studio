@@ -172,6 +172,13 @@ pub struct ViewerContribution {
     /// Lowercase, dot-included ("`.uc`", "`.png`") — matched case-insensitively against the open
     /// file's own extension.
     pub extensions: Vec<String>,
+    /// False (the default — every existing viewer, Monaco included, wants this) reads the file as
+    /// UTF-8 text via read_text_file and pushes it as a plain string, same as always. True reads
+    /// it via read_binary_file instead and pushes it as a base64 string — for anything that isn't
+    /// text (images, video), where decoding as UTF-8 would corrupt the bytes. See lowarc:openFile's
+    /// payload shape in plugin_assets.rs for exactly which field carries which.
+    #[serde(default)]
+    pub binary: bool,
 }
 
 fn default_timeout() -> u64 {

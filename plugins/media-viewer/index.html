@@ -1,0 +1,72 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="__lowarc.css" />
+<link rel="stylesheet" href="__lowarc-primitives.css" />
+<link rel="stylesheet" href="__lowarc-theme.css" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; }
+  body { display: flex; flex-direction: column; }
+
+  /* Only shown while the active file is an image — video's own native controls already cover
+     play/pause/seek/volume, nothing here applies to it. */
+  .toolbar {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    flex: none;
+  }
+  .toolbar.is-visible { display: flex; }
+  .zoom-label { font-size: 12px; color: var(--fg-dim); min-width: 42px; text-align: center; }
+
+  #container { position: relative; flex: 1; min-height: 0; }
+
+  /* One of these per open file, same "several documents, one instance" shape monaco.js uses —
+     kept in the DOM and toggled via .is-active rather than added/removed on every tab switch, so
+     a video doesn't restart and an image doesn't re-decode each time. Also the scroll container
+     for a zoomed-in image — overflow lives here, not on #container, so each file keeps its own
+     independent scroll position exactly like Monaco keeps each file's own view state. */
+  .media-item {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    overflow: auto;
+  }
+  .media-item.is-active { display: flex; }
+  .media-item.is-draggable { cursor: grab; }
+  .media-item.is-dragging { cursor: grabbing; }
+
+  .media-item video {
+    max-width: 100%;
+    max-height: 100%;
+  }
+  /* Fit-to-window (the default) — scaled down to the viewport via object-fit, never larger than
+     its own natural size (no "width/height: auto" upscale past 100% here on purpose, matching
+     how an image viewer conventionally treats "fit"). A zoomed-in image gets explicit pixel
+     width/height from JS instead (see media-viewer.js's applyZoom) and none of this applies —
+     that's what actually makes it bigger than the container and lets the overflow above scroll. */
+  .media-item.is-fit img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+</style>
+</head>
+<body>
+  <script src="__lowarc.js"></script>
+  <div class="toolbar" id="toolbar">
+    <button type="button" class="btn btn-ghost btn-sm" id="zoom-out" title="Zoom Out">−</button>
+    <button type="button" class="btn btn-ghost btn-sm" id="zoom-fit" title="Fit to Window">Fit</button>
+    <button type="button" class="btn btn-ghost btn-sm" id="zoom-in" title="Zoom In">+</button>
+    <span class="zoom-label" id="zoom-label">Fit</span>
+  </div>
+  <div id="container"></div>
+  <script src="media-viewer.js"></script>
+</body>
+</html>

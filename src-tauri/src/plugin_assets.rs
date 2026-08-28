@@ -236,7 +236,10 @@ pub const HARNESS_JS: &str = r#"(function () {
 // `data:` URI embedded directly in editor.main.css, not a separate file, so without explicit
 // permission here it also falls back to default-src 'none' and silently renders as fallback
 // tofu/square glyphs instead of the real icons.
-pub const CSP: &str = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; worker-src 'self' blob:; connect-src 'none'";
+// media-src covers <video>/<audio> src (the media-viewer plugin's own data: URIs) — CSP treats
+// this as a distinct resource type from img-src, so without it a <video> falls back to
+// default-src 'none' the same way an unlisted font or worker would.
+pub const CSP: &str = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; media-src 'self' data:; worker-src 'self' blob:; connect-src 'none'";
 
 /// The host's own base stylesheet (root color-token variables, plus reset/scrollbar/titlebar
 /// rules) — the literal same file every host page (editor.html, settings.html, etc.) already

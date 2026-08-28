@@ -255,6 +255,19 @@ fn write_text_file(path: String, contents: String) -> Result<(), String> {
     std::fs::write(&path, contents).map_err(|e| format!("Could not save {}: {e}", path.display()))
 }
 
+/// read_text_file's counterpart for a viewer whose plugin.json marks its `viewers` entry
+/// `"binary": true` (images, video — anything read_to_string would corrupt by forcing a UTF-8
+/// decode on bytes that were never text). Base64, not a raw byte array — directly usable as a
+/// data: URI on the plugin side (`data:${mime};base64,${content}`) with no further decoding, and
+/// far more compact over postMessage/JSON than Tauri's default array-of-numbers serialization for
+/// Vec<u8> would be.
+#[tauri::command]
+fn read_binary_file(path: String) -> Result<String, String> {
+    let path = validate_file_path(&path)?;
+    let bytes = std::fs::read(&path).map_err(|e| format!("Could not read {}: {e}", path.display()))?;
+    Ok(base64::Engine::encode(&base64::engine::general_purpose::STANDARD, bytes))
+}
+
 #[cfg(test)]
 mod file_path_tests {
     use super::*;
@@ -652,6 +665,7 @@ pub fn run() {
       entry_file_exists,
       read_text_file,
       write_text_file,
+      read_binary_file,
       read_plugin_asset,
       plugin_asset_port,
       list_recent_projects,

@@ -1,0 +1,19 @@
+{
+  "name": "Media Viewer",
+  "version": "0.1.0",
+  "description": "Views images and video in formats the browser already renders natively — no bundled decoder, unlike Monaco/xterm. Exotic formats (RAW, PSD, HEIC, TIFF) aren't supported yet.",
+  "contributes": {
+    "viewers": [
+      {
+        "id": "main",
+        "title": "Media",
+        "entry": "index.html",
+        "binary": true,
+        "extensions": [
+          ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".svg", ".avif",
+          ".mp4", ".webm", ".ogg", ".ogv"
+        ]
+      }
+    ]
+  }
+}
