@@ -5,7 +5,8 @@
   "version": "0.1.0",
   "identifier": "com.lowarc.studio",
   "build": {
-    "frontendDist": "../src"
+    "frontendDist": "../src",
+    "beforeBundleCommand": "powershell -NoProfile -ExecutionPolicy Bypass -File src-tauri/prepare-bundle.ps1"
   },
   "app": {
     "withGlobalTauri": true,
@@ -20,7 +21,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; frame-src 'self' http://127.0.0.1:*; connect-src 'self'"
     }
   },
   "bundle": {
@@ -33,6 +34,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "resources": ["../plugins", "runtime-helpers"],
     "android": {
       "debugApplicationIdSuffix": ".debug"
     }

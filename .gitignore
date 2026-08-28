@@ -16,21 +16,31 @@ dist/
 /recent.json
 
 # /plugins/ is the SAME per-user runtime location, but some of what lands there are the app's
-# own built-in plugins (file-explorer, monaco, terminal, debugger, media-viewer) — load-bearing,
-# not user-installed content, so they're tracked source despite living in an otherwise-ignored
-# runtime folder. Anything else a user installs into /plugins/ still falls through to the blanket
-# rule below.
+# own built-in plugins (file-explorer, monaco, terminal, debugger, media-viewer, outline,
+# node-graph) — load-bearing, not user-installed content, so they're tracked source despite
+# living in an otherwise-ignored runtime folder. Anything else a user installs into /plugins/
+# still falls through to the blanket rule below.
 /plugins/*
 !/plugins/file-explorer/
 !/plugins/monaco/
 !/plugins/terminal/
 !/plugins/debugger/
 !/plugins/media-viewer/
+!/plugins/outline/
+!/plugins/node-graph/
 # The two backend binaries under those are Cargo build output (see AppPaths::
 # ensure_builtin_plugin_binaries(), which copies them here automatically at startup from
 # target/) — never commit the binary itself, only the plugin source around it.
 /plugins/file-explorer/file_explorer_backend.exe
 /plugins/terminal/terminal_backend.exe
+
+# A release-build-only staging folder — prepare-bundle.ps1 populates it with native_module_host.exe
+# right before `cargo tauri build` packages tauri.conf.json's bundle.resources; never meaningful
+# outside that one build step. The directory itself (not its generated contents) has to stay
+# tracked, though — Tauri validates every bundle.resources path exists on EVERY cargo build, not
+# just an actual release bundle, so a missing directory would break plain `cargo build`/`cargo test`.
+/src-tauri/runtime-helpers/*
+!/src-tauri/runtime-helpers/.gitkeep
 
 # Editors / OS
 .vs/

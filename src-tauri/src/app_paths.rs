@@ -78,6 +78,15 @@ impl AppPaths {
     pub fn themes() -> PathBuf {
         Self::user_data().join("themes")
     }
+    /// Where a native binary this app needs at runtime, but that isn't part of any one plugin
+    /// (just native_module_host today), lives for an INSTALLED copy. A source checkout doesn't use
+    /// this at all — native_module_host_path() (runtime/native_module.rs) resolves next to the
+    /// running exe there instead, since Cargo already puts every one of this workspace's binaries
+    /// in the same target/ directory as a normal side effect of building it. Distinct from
+    /// plugins() since native_module_host isn't a plugin and has no plugin.json of its own.
+    pub fn runtime_helpers() -> PathBuf {
+        Self::user_data().join("runtime-helpers")
+    }
 
     pub fn ensure_directories() -> std::io::Result<()> {
         std::fs::create_dir_all(Self::modules())?;
@@ -123,6 +132,85 @@ impl AppPaths {
         }
         Ok(())
     }
+
+    /// The installed-copy counterpart to ensure_builtin_plugin_binaries() above — that one only
+    /// runs for a source checkout (dev_root().is_some(), the opposite guard from this one). A
+    /// fresh install's plugins()/runtime_helpers() start out completely empty: unlike a source
+    /// checkout, where user_data() IS the repo root, so plugins() already IS the real plugins/
+    /// folder with everything already in it, an installed copy's writable per-user data location
+    /// has no relationship to where the installer actually put anything. `resource_dir` is where
+    /// Tauri's own bundled resources (this app's `bundle.resources`, populated at build time by
+    /// prepare-bundle.ps1 — see its own comment for the full bundling story) actually live; this
+    /// copies the built-in plugins and native_module_host out of there and into the writable
+    /// locations the rest of the app already expects to find them in, exactly once.
+    ///
+    /// First-run only, not a sync: skips a plugin folder that already has a plugin.json, the same
+    /// "don't resurrect something the user deliberately removed" reasoning as
+    /// ensure_builtin_plugin_binaries(). Deliberately does NOT handle "this installed copy was
+    /// upgraded to a newer version, refresh what's already there" — that needs real update
+    /// infrastructure to do safely (a user's own edits inside a plugin folder shouldn't be
+    /// silently clobbered by an update), which is a separate, larger piece of work, not something
+    /// to fake here.
+    pub fn ensure_installed_copy_resources(resource_dir: &Path) -> std::io::Result<()> {
+        if Self::dev_root().is_some() {
+            return Ok(());
+        }
+        unpack_installed_resources(resource_dir, &Self::plugins(), &Self::runtime_helpers())
+    }
+}
+
+/// The real logic behind ensure_installed_copy_resources(), minus its dev_root() guard — split out
+/// the same way needs_copy() was, so this is directly testable with real temp directories instead
+/// of needing to fake AppPaths' own dev-checkout detection (which would always say "yes, dev" when
+/// tests run from this actual repo, making the guarded version untestable here).
+fn unpack_installed_resources(resource_dir: &Path, plugins_dest: &Path, helpers_dest: &Path) -> std::io::Result<()> {
+    let src_plugins = resource_dir.join("plugins");
+    if src_plugins.is_dir() {
+        for entry in std::fs::read_dir(&src_plugins)? {
+            let entry = entry?;
+            if !entry.file_type()?.is_dir() {
+                continue;
+            }
+            let dest = plugins_dest.join(entry.file_name());
+            if dest.join("plugin.json").is_file() {
+                continue; // already there — either a prior first-run, or a deliberate removal
+            }
+            copy_dir_all(&entry.path(), &dest)?;
+        }
+    }
+
+    let src_helpers = resource_dir.join("runtime-helpers");
+    if src_helpers.is_dir() {
+        std::fs::create_dir_all(helpers_dest)?;
+        for entry in std::fs::read_dir(&src_helpers)? {
+            let entry = entry?;
+            if !entry.file_type()?.is_file() {
+                continue;
+            }
+            let dest = helpers_dest.join(entry.file_name());
+            if !dest.is_file() {
+                std::fs::copy(entry.path(), &dest)?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// std has no recursive directory copy — needed here for the plugins/ tree (Monaco's vendored
+/// bundle alone is hundreds of files across nested language/asset folders).
+fn copy_dir_all(src: &Path, dest: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dest)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let dest_path = dest.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            copy_dir_all(&entry.path(), &dest_path)?;
+        } else {
+            std::fs::copy(entry.path(), &dest_path)?;
+        }
+    }
+    Ok(())
 }
 
 const BUILTIN_PLUGIN_BACKENDS: &[(&str, &str)] = &[("file-explorer", "file_explorer_backend"), ("terminal", "terminal_backend")];
@@ -214,5 +302,59 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(1100));
         std::fs::write(&src, b"v2").unwrap();
         assert!(needs_copy(&src, &dest).unwrap(), "src was modified after dest");
+    }
+
+    fn temp_dir(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("lowarc_studio_app_paths_test_{name}_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn copy_dir_all_reproduces_a_nested_tree() {
+        let root = temp_dir("copy_dir_all");
+        let src = root.join("src");
+        std::fs::create_dir_all(src.join("nested")).unwrap();
+        std::fs::write(src.join("top.txt"), b"top").unwrap();
+        std::fs::write(src.join("nested").join("deep.txt"), b"deep").unwrap();
+
+        let dest = root.join("dest");
+        copy_dir_all(&src, &dest).unwrap();
+
+        assert_eq!(std::fs::read(dest.join("top.txt")).unwrap(), b"top");
+        assert_eq!(std::fs::read(dest.join("nested").join("deep.txt")).unwrap(), b"deep");
+    }
+
+    #[test]
+    fn unpack_installed_resources_copies_plugins_and_helpers_once() {
+        let root = temp_dir("unpack_resources");
+        let resource_dir = root.join("resources");
+        let plugins_dest = root.join("data").join("plugins");
+        let helpers_dest = root.join("data").join("runtime-helpers");
+
+        // A bundled resource tree: one plugin folder, one helper binary.
+        let src_plugin = resource_dir.join("plugins").join("file-explorer");
+        std::fs::create_dir_all(&src_plugin).unwrap();
+        std::fs::write(src_plugin.join("plugin.json"), b"{}").unwrap();
+        std::fs::write(src_plugin.join("file_explorer_backend.exe"), b"binary").unwrap();
+        let src_helpers = resource_dir.join("runtime-helpers");
+        std::fs::create_dir_all(&src_helpers).unwrap();
+        std::fs::write(src_helpers.join("native_module_host.exe"), b"host").unwrap();
+
+        unpack_installed_resources(&resource_dir, &plugins_dest, &helpers_dest).unwrap();
+
+        assert!(plugins_dest.join("file-explorer").join("plugin.json").is_file());
+        assert_eq!(
+            std::fs::read(plugins_dest.join("file-explorer").join("file_explorer_backend.exe")).unwrap(),
+            b"binary"
+        );
+        assert_eq!(std::fs::read(helpers_dest.join("native_module_host.exe")).unwrap(), b"host");
+
+        // A plugin folder the "user" already has (their own edit, or a deliberate removal that
+        // left it present-but-empty) must NOT be overwritten by a second unpack.
+        std::fs::write(plugins_dest.join("file-explorer").join("plugin.json"), b"edited").unwrap();
+        unpack_installed_resources(&resource_dir, &plugins_dest, &helpers_dest).unwrap();
+        assert_eq!(std::fs::read(plugins_dest.join("file-explorer").join("plugin.json")).unwrap(), b"edited");
     }
 }

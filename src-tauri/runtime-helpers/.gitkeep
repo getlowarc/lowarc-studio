@@ -1,0 +1,5 @@
+Keeps this directory present in a fresh clone — tauri.conf.json's bundle.resources references it
+by path, and Tauri validates that path exists on EVERY cargo build (not just `cargo tauri build`'s
+actual bundling step), so a missing directory breaks plain `cargo build`/`cargo test` too, not just
+a release build. The real content (native_module_host.exe) is populated by prepare-bundle.ps1 right
+before packaging — see that script's own header comment. This file itself is never read by anything.

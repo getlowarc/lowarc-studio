@@ -45,14 +45,21 @@ pub fn platform_library_file_name(base: &str) -> String {
     }
 }
 
-/// The isolation helper always ships in the same directory as this app's own executable — it's
-/// built by the same Cargo package (src/bin auto-discovery), never something a user installs or a
-/// module provides, so there's no search path here, just "next to whatever exe is running now."
+/// A source checkout finds this next to the running exe — it's built by the same Cargo package
+/// (src/bin auto-discovery), landing in the same target/ directory as lowarc-studio.exe itself as
+/// a normal side effect of building the workspace. An installed copy has no such guarantee (Tauri
+/// doesn't bundle a sibling binary just because it happened to exist in the same build output
+/// directory) — it resolves via AppPaths::runtime_helpers() instead, which
+/// AppPaths::ensure_installed_copy_resources() populates from this app's own bundled resources on
+/// first run. See prepare-bundle.ps1 for how it gets into that resource bundle in the first place.
 fn native_module_host_path() -> Result<PathBuf, String> {
-    let exe = std::env::current_exe().map_err(|e| format!("could not resolve the current executable: {e}"))?;
-    let dir = exe.parent().ok_or("the current executable has no parent directory")?;
     let name = if cfg!(windows) { "native_module_host.exe" } else { "native_module_host" };
-    Ok(dir.join(name))
+    if crate::app_paths::AppPaths::dev_root().is_some() {
+        let exe = std::env::current_exe().map_err(|e| format!("could not resolve the current executable: {e}"))?;
+        let dir = exe.parent().ok_or("the current executable has no parent directory")?;
+        return Ok(dir.join(name));
+    }
+    Ok(crate::app_paths::AppPaths::runtime_helpers().join(name))
 }
 
 /// Every module gets its own isolated native_module_host process — not one process per run, but
