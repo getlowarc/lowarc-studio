@@ -8,5 +8,9 @@
     "panels": [
       { "id": "main", "title": "Explorer", "location": "sidebar", "entry": "index.html", "railIcon": "icon.svg" }
     ]
-  }
+  },
+  "settings": [
+    { "key": "showHidden", "label": "Show hidden files", "type": "checkbox", "hint": "Files and folders whose name starts with a dot." },
+    { "key": "foldersFirst", "label": "Folders first", "type": "checkbox", "hint": "Off sorts everything together, alphabetically." }
+  ]
 }

@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="__lowarc.css" />
+<link rel="stylesheet" href="__lowarc-primitives.css" />
+<link rel="stylesheet" href="__lowarc-theme.css" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); }
+  body { display: flex; flex-direction: column; padding: 10px; gap: 10px; }
+
+  .ng-panel-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .ng-panel-actions .btn {
+    width: 100%;
+  }
+</style>
+</head>
+<body>
+  <script src="__lowarc.js"></script>
+  <div class="ng-panel-actions">
+    <button type="button" class="btn btn-md" id="new-graph-btn">New Graph…</button>
+    <button type="button" class="btn btn-md btn-ghost" id="open-graph-btn">Open Graph…</button>
+  </div>
+  <script src="panel.js"></script>
+</body>
+</html>

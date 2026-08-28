@@ -1,0 +1,10 @@
+{
+  "name": "Outline",
+  "version": "0.1.0",
+  "description": "Lists variables, constants, and other top-level declarations in the active file. Lightweight per-language pattern matching, not a real parser — best-effort, not exhaustive, and language coverage varies.",
+  "contributes": {
+    "panels": [
+      { "id": "main", "title": "Outline", "location": "inspector", "entry": "index.html" }
+    ]
+  }
+}

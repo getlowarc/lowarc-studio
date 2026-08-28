@@ -11,12 +11,16 @@ const sessions = new Map(); // sessionId -> { term, fitAddon, container, sidebar
 let activeSessionId = null;
 let instanceCounter = 0;
 
-// This plugin's own configured default shell (Settings > Plugins > Terminal, see plugin.json's
+// This plugin's own configured defaults (Settings > Plugins > Terminal, see plugin.json's
 // `settings` declaration) — read once at load via window.lowarc.getSettings(), the generic
-// per-plugin settings mechanism. Only used when an instance isn't given an explicit per-instance
-// override (the console header's "..." menu); the host itself no longer knows or cares about this
-// value at all, unlike before.
+// per-plugin settings mechanism; like every setting read this way, a change while a terminal is
+// already open takes effect on its next instance, not live. configuredShell is only used when an
+// instance isn't given an explicit per-instance override (the console header's "..." menu); the
+// host itself no longer knows or cares about any of these three values, unlike before shell was
+// moved here.
 let configuredShell = null;
+let configuredFontSize = 13;
+let configuredScrollback = 1000;
 
 // Not just crypto.randomUUID() directly — this only needs to be unique within one running app
 // instance, not cryptographically unguessable, and a sandboxed iframe without allow-same-origin
@@ -121,7 +125,8 @@ function createInstance(shell) {
   const term = new Terminal({
     convertEol: true,
     cursorBlink: true,
-    fontSize: 13,
+    fontSize: configuredFontSize,
+    scrollback: configuredScrollback,
     fontFamily: "Consolas, 'Cascadia Mono', Menlo, monospace",
     theme: { background: "#1e1e1e", foreground: "#d4d4d4" },
   });
@@ -194,5 +199,13 @@ new ResizeObserver(() => {
 // (falls back to {} on the host side), so this is a short real delay, never an indefinite one.
 window.lowarc.getSettings().then((settings) => {
   configuredShell = (settings && settings.shell) || null;
+  // Plugin settings are always stored/returned as plain strings (Settings.plugin_settings is a
+  // HashMap<String, HashMap<String, String>> — no per-field type on the Rust side), so a "number"
+  // field is this plugin's own job to parse and validate, same as CORE_SETTINGS_SCHEMA's FPS field
+  // does on the host side for its own General setting.
+  const fontSize = Number(settings && settings.fontSize);
+  if (Number.isInteger(fontSize) && fontSize > 0) configuredFontSize = fontSize;
+  const scrollback = Number(settings && settings.scrollback);
+  if (Number.isInteger(scrollback) && scrollback >= 0) configuredScrollback = scrollback;
   createInstance(null);
 });

@@ -1,0 +1,18 @@
+{
+  "name": "Node Graph",
+  "version": "0.1.0",
+  "description": "A visual node-graph editor for .lan (LowArc Node) files — boxes, sockets, and connections. Pure editing surface for now: nothing here feeds into the runtime/compiler yet, this just lets you draw and save a graph.",
+  "contributes": {
+    "panels": [
+      { "id": "main", "title": "Node Graph", "location": "sidebar", "entry": "panel.html", "railIcon": "icon.svg" }
+    ],
+    "viewers": [
+      {
+        "id": "main",
+        "title": "Node Graph",
+        "entry": "index.html",
+        "extensions": [".lan"]
+      }
+    ]
+  }
+}

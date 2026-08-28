@@ -24,5 +24,13 @@
         ]
       }
     ]
-  }
+  },
+  "settings": [
+    { "key": "fontSize", "label": "Font size", "type": "number", "placeholder": "14" },
+    { "key": "tabSize", "label": "Tab size", "type": "number", "placeholder": "4" },
+    { "key": "insertSpaces", "label": "Insert spaces on Tab", "type": "checkbox", "hint": "Off inserts an actual tab character instead." },
+    { "key": "wordWrap", "label": "Word wrap", "type": "checkbox" },
+    { "key": "minimap", "label": "Minimap", "type": "checkbox" },
+    { "key": "lineNumbers", "label": "Line numbers", "type": "checkbox" }
+  ]
 }

@@ -21,6 +21,13 @@ let renamingPath = null; // path whose row is currently an editable input
 let pendingDelete = null; // path awaiting the inline delete confirmation
 let fileStatus = {}; // absolute path -> { dirty, missing, hasErrors } — see broadcastFileStatus() host-side
 
+// This plugin's own configured defaults (Settings > Plugins > File Explorer, see plugin.json's
+// `settings` declaration) — read once at load, before the very first renderTree(), via
+// window.lowarc.getSettings(). Like every setting read this way, a change made while this panel
+// is already open takes effect on its next mount (reload), not live.
+let configuredShowHidden = false;
+let configuredFoldersFirst = true;
+
 function sep() {
   return root && root.includes("\\") ? "\\" : "/";
 }
@@ -74,9 +81,10 @@ function invalidateAll() {
 
 async function loadChildren(path) {
   if (!treeCache.has(path)) {
-    const entries = await callBackend("listDir", { path });
+    let entries = await callBackend("listDir", { path });
+    if (!configuredShowHidden) entries = entries.filter((e) => !e.name.startsWith("."));
     entries.sort((a, b) => {
-      if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+      if (configuredFoldersFirst && a.isDir !== b.isDir) return a.isDir ? -1 : 1;
       return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
     });
     treeCache.set(path, entries);
@@ -590,8 +598,12 @@ if (root) {
   const header = document.getElementById("header");
   header.textContent = baseName(root) || root;
   header.title = root; // full path on hover, since a long root name truncates with an ellipsis
-  renderTree();
-  refreshTotals();
+  window.lowarc.getSettings().then((settings) => {
+    configuredShowHidden = (settings && settings.showHidden) === "true";
+    configuredFoldersFirst = !(settings && settings.foldersFirst === "false");
+    renderTree();
+    refreshTotals();
+  });
 } else {
   showError("No project path was provided to this panel.");
 }

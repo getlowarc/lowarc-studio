@@ -1,0 +1,173 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="__lowarc.css" />
+<link rel="stylesheet" href="__lowarc-primitives.css" />
+<link rel="stylesheet" href="__lowarc-theme.css" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; }
+  body { display: flex; flex-direction: column; }
+
+  #container { position: relative; flex: 1; min-height: 0; }
+
+  /* One of these per open file, same "several documents, one instance" shape monaco.js/
+     media-viewer.js already use. */
+  .ng-doc {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+  }
+  .ng-doc.is-active { display: flex; }
+
+  .ng-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    flex: none;
+  }
+  .ng-viewport {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    position: relative;
+    cursor: grab;
+  }
+  .ng-viewport.is-panning { cursor: grabbing; }
+
+  .ng-canvas {
+    position: relative;
+    width: 3000px;
+    height: 2000px;
+    /* A faint dot grid — purely a spatial reference, same idea every node-editor-style tool uses
+       so empty space still reads as "a surface", not a void. */
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .ng-connections {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: visible;
+  }
+  .ng-connection-hit {
+    fill: none;
+    stroke: transparent;
+    stroke-width: 14px;
+    pointer-events: stroke;
+    cursor: pointer;
+  }
+  .ng-connection-line {
+    fill: none;
+    stroke: var(--fg-dim);
+    stroke-width: 2px;
+    pointer-events: none;
+  }
+  .ng-connection.is-selected .ng-connection-line {
+    stroke: var(--cyan);
+    stroke-width: 2.5px;
+  }
+  .ng-drag-line {
+    fill: none;
+    stroke: var(--cyan);
+    stroke-width: 2px;
+    stroke-dasharray: 5 4;
+    pointer-events: none;
+  }
+
+  .ng-node {
+    position: absolute;
+    min-width: 160px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    user-select: none;
+  }
+  .ng-node.is-selected {
+    border-color: var(--cyan);
+    box-shadow: 0 0 0 1px var(--cyan), 0 2px 8px rgba(0, 0, 0, 0.25);
+  }
+  .ng-node-title {
+    padding: 6px 10px;
+    font-size: 13px;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+    cursor: grab;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    background: var(--bg-hover);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ng-node.is-dragging .ng-node-title {
+    cursor: grabbing;
+  }
+  .ng-node-title-input {
+    width: 100%;
+    font: inherit;
+    font-weight: 600;
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--cyan);
+    border-radius: 3px;
+    padding: 1px 4px;
+  }
+  .ng-node-body {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 8px 0;
+  }
+  .ng-node-sockets {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    flex: 1;
+  }
+  .ng-socket {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--fg-dim);
+    padding: 1px 10px;
+    white-space: nowrap;
+  }
+  .ng-node-sockets.is-outputs .ng-socket {
+    flex-direction: row-reverse;
+    text-align: right;
+  }
+  .ng-socket-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg);
+    border: 2px solid var(--fg-dim);
+    flex: none;
+    cursor: crosshair;
+  }
+  .ng-socket-dot:hover {
+    border-color: var(--cyan);
+    background: var(--cyan);
+  }
+  .ng-socket-dot.is-connected {
+    border-color: var(--cyan);
+  }
+</style>
+</head>
+<body>
+  <script src="__lowarc.js"></script>
+  <div id="container"></div>
+  <script src="node-graph.js"></script>
+</body>
+</html>

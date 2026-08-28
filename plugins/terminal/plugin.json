@@ -17,6 +17,20 @@
       "type": "text",
       "placeholder": "Default",
       "hint": "Command used to launch a new terminal. Default is PowerShell on Windows, $SHELL elsewhere. Anything on your PATH works, e.g. pwsh, bash, zsh, cmd."
+    },
+    {
+      "key": "fontSize",
+      "label": "Font size",
+      "type": "number",
+      "placeholder": "13",
+      "hint": "Applies to new terminals opened after this is changed, not ones already open."
+    },
+    {
+      "key": "scrollback",
+      "label": "Scrollback (lines)",
+      "type": "number",
+      "placeholder": "1000",
+      "hint": "How many lines of output each terminal keeps for scrolling back. Applies to new terminals opened after this is changed."
     }
   ],
   "commands": [

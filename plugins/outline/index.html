@@ -1,0 +1,103 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="__lowarc.css" />
+<link rel="stylesheet" href="__lowarc-primitives.css" />
+<link rel="stylesheet" href="__lowarc-theme.css" />
+<script src="__lowarc-dropdown.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { font-size: 12px; overflow: hidden; display: flex; flex-direction: column; }
+
+  #empty {
+    display: none;
+    padding: 16px 12px;
+    color: var(--fg-dim);
+    text-align: center;
+  }
+  #empty.is-visible { display: block; }
+
+  #list { flex: 1; min-height: 0; overflow-y: auto; display: none; }
+  #list.is-visible { display: block; }
+
+  /* Taller than a typical list row, with real padding, on purpose — this was cramped (24px,
+     no padding) before, and once a field/dropdown lives inline on the same row (see .is-open
+     below) it needs the extra height to not look squeezed. */
+  .outline-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+    padding: 6px 10px;
+    white-space: nowrap;
+    cursor: default;
+  }
+  .outline-row:hover { background: var(--bg-hover); }
+  .outline-row.is-expandable { cursor: pointer; }
+
+  /* Same chevron convention as the file explorer: a real drawn arrow (see CHEVRON_SVG in
+     outline.js), rotated when expanded, invisible-but-still-taking-its-space on a row that can't
+     expand — so names stay aligned in a column whether or not a given row has anything to expand
+     into, rather than editable and non-editable rows drifting out of sync with each other. */
+  .chevron { width: 14px; height: 14px; flex: none; display: flex; align-items: center; justify-content: center; color: var(--fg-dim); transform: rotate(0deg); transition: transform 0.08s ease; }
+  .chevron.expanded { transform: rotate(90deg); }
+  .chevron.hidden { visibility: hidden; }
+  .chevron svg { width: 10px; height: 10px; }
+
+  .outline-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: var(--font-mono, monospace);
+  }
+  /* Expanded (a value control is showing inline, same row) — the name stops claiming all the
+     leftover space so the control actually has room next to it, rather than being squeezed into
+     whatever's left after a full-width name. */
+  .outline-row.is-open .outline-name {
+    flex: none;
+    max-width: 40%;
+  }
+
+  /* A short word, not a single letter or a pill/dot — plain text + color is the house style
+     here, no badge shapes. (This used to be the leading element, before the chevron above took
+     that spot back — a bare "V" alone in a chevron's usual position read as one, which is why it
+     moved to a trailing label instead of just changing what the letter said.) Hidden once a row
+     is open — the inline control takes this same trailing slot instead, no reason to show both. */
+  .outline-kind {
+    flex: none;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .outline-kind.kind-constant { color: var(--cyan); }
+  .outline-kind.kind-variable { color: var(--fg-dim); }
+  .outline-kind.kind-function { color: var(--yellow); }
+  .outline-kind.kind-class { color: var(--yellow); }
+  .outline-kind.kind-property { color: var(--fg-dim); }
+
+  /* The value control itself — inline on the same row as the name (not a separate row below it,
+     which is how this looked before), taking whatever space the kind label gave up. */
+  .outline-control {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    justify-content: flex-end;
+  }
+  .outline-control .input,
+  .outline-control .dropdown {
+    width: 100%;
+  }
+  .outline-control .checkbox-row {
+    margin-left: auto;
+  }
+</style>
+</head>
+<body>
+  <script src="__lowarc.js"></script>
+  <div id="empty">No file open.</div>
+  <div id="list"></div>
+  <script src="outline.js"></script>
+</body>
+</html>

@@ -65,7 +65,24 @@ function languageForPath(path) {
 
 require.config({ paths: { vs: "vs" } });
 
-require(["vs/editor/editor.main"], () => {
+// Plugin settings (Settings > Plugins > Monaco, see plugin.json's `settings` declaration) are
+// always stored/returned as plain strings — Settings.plugin_settings is a
+// HashMap<String, HashMap<String, String>> with no per-field type on the Rust side — so parsing
+// and defaulting each one is this plugin's own job, same as every other plugin that reads its own
+// settings this way. Fetched in parallel with the (much slower) editor.main module load itself,
+// not after it, so this never adds to the real bottleneck.
+function boolSetting(settings, key, fallback) {
+  if (settings[key] === "true") return true;
+  if (settings[key] === "false") return false;
+  return fallback;
+}
+function numSetting(settings, key, fallback) {
+  const n = Number(settings[key]);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve)), window.lowarc.getSettings()]).then(([, settings]) => {
+  settings = settings || {};
   monaco.languages.register({ id: "uc" });
   monaco.editor.setTheme("vs-dark");
 
@@ -73,7 +90,12 @@ require(["vs/editor/editor.main"], () => {
     value: "",
     language: "plaintext",
     automaticLayout: true,
-    minimap: { enabled: true },
+    minimap: { enabled: boolSetting(settings, "minimap", true) },
+    lineNumbers: boolSetting(settings, "lineNumbers", true) ? "on" : "off",
+    wordWrap: boolSetting(settings, "wordWrap", false) ? "on" : "off",
+    fontSize: numSetting(settings, "fontSize", 14),
+    tabSize: numSetting(settings, "tabSize", 4),
+    insertSpaces: boolSetting(settings, "insertSpaces", true),
     // Monaco's own right-click menu is a second, separate context-menu system living outside the
     // app's own (every other plugin either has none or, like file explorer, builds its own via
     // window.lowarc.showMenu() into the host's un-clippable floating-menu) — and its default
@@ -173,6 +195,31 @@ require(["vs/editor/editor.main"], () => {
     window.parent.postMessage({ type: "hostRequestReply", replyId: payload.replyId, content: doc ? doc.model.getValue() : null }, "*");
   });
 
+  // A plugin that isn't this file's own viewer asking for a specific line's text to change (the
+  // Outline plugin, editing a value it parsed out). editor.executeEdits(), not model.applyEdits()
+  // or model.setValue() — this is the one that actually integrates with the editor's own
+  // undo-redo controller the same way a real keystroke does; a bare model-level edit still lands
+  // in the model's own undo stack, but doesn't reliably wire up to Ctrl+Z the way a genuine editor
+  // operation does (confirmed missing live: an Outline edit couldn't be undone at all before this
+  // was executeEdits). Only valid while this file is the one actually showing in the editor —
+  // executeEdits acts on whatever model is CURRENTLY SET, so editing a backgrounded file through
+  // it would silently corrupt whichever OTHER file happens to be on screen; falls back to a plain
+  // model edit for that case; genuinely rare in practice, since Outline only ever shows the active
+  // file's own symbols to begin with.
+  window.lowarc.on("lowarc:applyLineEdit", (payload) => {
+    if (!payload || typeof payload.line !== "number" || typeof payload.text !== "string") return;
+    const doc = docs.get(payload.path);
+    if (!doc) return;
+    const line = payload.line;
+    if (line < 1 || line > doc.model.getLineCount()) return;
+    const range = new monaco.Range(line, 1, line, doc.model.getLineMaxColumn(line));
+    if (payload.path === activePath) {
+      editor.executeEdits("outline", [{ range, text: payload.text }]);
+    } else {
+      doc.model.applyEdits([{ range, text: payload.text }]);
+    }
+  });
+
   async function save() {
     if (saving || !activePath) return;
     const path = activePath;
@@ -192,6 +239,31 @@ require(["vs/editor/editor.main"], () => {
   }
 
   editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, save);
+
+  // The host's File > Save menu item / Ctrl+S (see editor.html) — a click happens in the host
+  // document, not this iframe, so it can't reach the keybinding above; this is the same save()
+  // reached a different way.
+  window.lowarc.on("lowarc:requestSave", save);
+
+  // The host's Edit menu (Undo/Redo/Cut/Copy/Find/Replace — everything except Paste) and any
+  // matching host-level shortcut — editor.trigger(), not editor.getAction(id).run() (what
+  // lowarc:runCommand below uses), because Undo/Redo aren't registered Actions, only Commands;
+  // trigger() dispatches to either kind, so one handler covers all of them.
+  window.lowarc.on("lowarc:editorCommand", (payload) => {
+    if (!payload || typeof payload.command !== "string") return;
+    editor.trigger("host-menu", payload.command, null);
+  });
+
+  // Paste specifically: the host already read the OS clipboard itself (this iframe's own
+  // navigator.clipboard.readText() is what's actually blocked — see editor.html's paste handler
+  // for the full reasoning) and hands over plain text to drop in at the current selection.
+  // executeEdits(), not insertText/applyEdits, for the same undo-integration reason every other
+  // real edit in this file uses it.
+  window.lowarc.on("lowarc:insertText", (payload) => {
+    if (!payload || typeof payload.text !== "string" || !activePath) return;
+    editor.executeEdits("host-paste", [{ range: editor.getSelection(), text: payload.text }]);
+    editor.focus();
+  });
 
   // Monaco ships its own command palette (F1 / Ctrl+Shift+P), a second, separate "list of every
   // action" surface competing with the host's own — reported directly by the person building this
