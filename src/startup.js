@@ -225,7 +225,7 @@ document.getElementById("new-project").addEventListener("click", async () => {
 });
 
 document.getElementById("open-project").addEventListener("click", async () => {
-  const path = await openDialog({ directory: true, title: "Open a LowArc Studio project" });
+  const path = await openDialog({ directory: true, title: "Open Folder" });
   if (!path) return;
 
   try {

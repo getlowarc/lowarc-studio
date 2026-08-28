@@ -45,7 +45,11 @@ fn write_entries(recents_file: &Path, entries: &[StoredEntry]) -> std::io::Resul
 fn to_recent_project(entry: &StoredEntry) -> RecentProject {
     let path = PathBuf::from(&entry.path);
     let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| entry.path.clone());
-    let exists = path.join("project.json").is_file();
+    // Whether the FOLDER is still there, not whether it happens to have a project.json — a
+    // project-less folder (see open_project_in below) is just as openable as one with a preset,
+    // so gating "exists" on project.json specifically would show every one of those as the
+    // "missing" (grayed out, unclickable) state in the recents list despite being perfectly fine.
+    let exists = path.is_dir();
     RecentProject { path: entry.path.clone(), name, exists, pinned: entry.pinned }
 }
 
@@ -137,15 +141,19 @@ fn create_project_in(recents_file: &Path, parent_dir: &Path, name: &str) -> Resu
     Ok(project_dir)
 }
 
-/// Validates the folder is actually a project (has project.json) before adding it to recents —
-/// the same "throw a visible error, don't guess" rule as everywhere else, not a silent no-op.
+/// Validates the folder actually exists before adding it to recents — the same "throw a visible
+/// error, don't guess" rule as everywhere else, not a silent no-op. project.json is deliberately
+/// NOT required here: this app works as a plain editor over any folder, LowArc project or not —
+/// project.json only matters once something actually needs project-run features (see
+/// ProjectPreset::load treating a missing one as an empty preset, and start_dev_run/
+/// set_project_entry, which create it on demand the first time Run actually needs one).
 pub fn open_project(path: &Path) -> Result<(), String> {
     open_project_in(&AppPaths::recent_projects_file(), path)
 }
 
 fn open_project_in(recents_file: &Path, path: &Path) -> Result<(), String> {
-    if !path.join("project.json").is_file() {
-        return Err(format!("{} is not a LowArc Studio project — no project.json found.", path.display()));
+    if !path.is_dir() {
+        return Err(format!("{} is not a folder.", path.display()));
     }
     add_recent(recents_file, path).map_err(|e| e.to_string())
 }
@@ -183,11 +191,23 @@ mod tests {
     }
 
     #[test]
-    fn open_project_rejects_a_folder_with_no_project_json() {
-        let base = temp_dir("not_a_project");
+    fn open_project_accepts_a_plain_folder_with_no_project_json() {
+        let base = temp_dir("plain_folder");
         let recents_file = base.join("recent.json");
-        let err = open_project_in(&recents_file, &base).expect_err("a folder with no project.json must be rejected");
-        assert!(err.contains("project.json"));
+        open_project_in(&recents_file, &base).expect("a plain folder with no project.json should still be openable — LowArc project or not");
+
+        let recents = list_recent_from(&recents_file);
+        let entry = recents.iter().find(|r| r.path == base.to_string_lossy()).expect("expected the folder in recents");
+        assert!(entry.exists, "a real folder should report exists:true even without a project.json");
+    }
+
+    #[test]
+    fn open_project_rejects_a_path_that_does_not_exist() {
+        let base = temp_dir("open_missing_parent");
+        let recents_file = base.join("recent.json");
+        let missing = base.join("nowhere");
+        let err = open_project_in(&recents_file, &missing).expect_err("a path that isn't a real folder must be rejected");
+        assert!(err.contains("not a folder"));
     }
 
     #[test]

@@ -652,6 +652,7 @@ pub fn run() {
   builder
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_opener::init())
+    .plugin(tauri_plugin_clipboard_manager::init())
     .invoke_handler(tauri::generate_handler![
       start_dev_run,
       stop_dev_run,
@@ -710,6 +711,16 @@ pub fn run() {
       // plugin already does, rather than taking the whole app down over it.
       if let Err(err) = AppPaths::ensure_builtin_plugin_binaries() {
         log::warn!("couldn't refresh a built-in plugin's backend binary: {err}");
+      }
+      // The installed-copy counterpart to the dev-only copy above — no-ops entirely for a source
+      // checkout (AppPaths::dev_root().is_some()), same as ensure_builtin_plugin_binaries() does
+      // in reverse. resource_dir() can itself fail on some platforms/configurations; that's not
+      // fatal either, for the same "don't crash the whole app over an asset problem" reasoning —
+      // whatever plugin/helper ends up missing surfaces its own error later instead.
+      if let Ok(resource_dir) = app.path().resource_dir() {
+        if let Err(err) = AppPaths::ensure_installed_copy_resources(&resource_dir) {
+          log::warn!("couldn't unpack this install's bundled plugin/runtime resources: {err}");
+        }
       }
 
       Ok(())

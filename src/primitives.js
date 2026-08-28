@@ -4,8 +4,13 @@
 // needs a real data source to filter against, so it's exposed as a function (initSearchbar)
 // instead of auto-init, and a toast has no fixed markup to init — it's created on demand.
 
+// Also matches .searchbar[data-open] (the header's command-center search — see initSearchbar
+// below) even though it has no [data-dropdown] attribute of its own; it's a bespoke widget, not
+// one of the data-attribute-driven primitives above, but shares the same open/closed convention
+// and needs to close from the same triggers (outside click, Escape, and — see editor.html's
+// iframe focus listener — focus moving into a plugin iframe).
 function closeAllDropdowns(except) {
-  document.querySelectorAll('[data-dropdown][data-open="true"]').forEach((el) => {
+  document.querySelectorAll('[data-dropdown][data-open="true"], .searchbar[data-open="true"]').forEach((el) => {
     if (el !== except) el.dataset.open = "false";
   });
 }
@@ -70,7 +75,13 @@ function initDropdowns(root = document) {
 document.addEventListener("contextmenu", (e) => e.preventDefault());
 
 document.addEventListener("click", (e) => {
-  if (!e.target.closest("[data-dropdown]")) closeAllDropdowns();
+  // .searchbar is excluded from the outside-click check for the same reason closeAllDropdowns()
+  // itself now matches it (see that function's comment) — it has no [data-dropdown] attribute of
+  // its own, so without this a click that OPENS it (via the input's own focus handler, see
+  // initSearchbar) would immediately be undone by this same click bubbling here, closing it again
+  // before it was ever visible. initSearchbar's own outside-click listener already excludes
+  // .searchbar the same way; this just makes this listener consistent with that one.
+  if (!e.target.closest("[data-dropdown]") && !e.target.closest(".searchbar")) closeAllDropdowns();
 });
 
 document.addEventListener("keydown", (e) => {
@@ -640,7 +651,7 @@ document.addEventListener("keydown", (e) => {
 // editor.html's #floating-menu) — see editor.html for the original, and settings.html/modules.html/
 // plugins.html for pages that adopted it afterward.
 const popupStack = [];
-const POPUP_Z_FLOOR = 200; // above floating-menu (60) / toast-stack (100), below tooltip (300)
+const POPUP_Z_FLOOR = 200; // above floating-menu (60), below tooltip (300) / toast-stack (500)
 
 function topPopup() {
   return popupStack.length ? popupStack[popupStack.length - 1] : null;
@@ -815,7 +826,7 @@ const CORE_SETTINGS_SCHEMA = [
 // results (see initSearchbar's `categories` option) — distinct from `tab`, which is which
 // settings.html tab an entry belongs to, a completely different grouping for a different UI.
 async function buildSearchableSettingsList() {
-  const { invoke } = window.__TAURI__.core;
+  const invoke = relayableInvoke;
   const entries = CORE_SETTINGS_SCHEMA.map((field) => ({
     id: `core:${field.key}`,
     key: field.key,
@@ -988,6 +999,69 @@ function renderSettingRow(entry, value, onCommit) {
 // postMessage sidesteps that entirely — it's the exact same mechanism popup-tab-change/
 // popup-button-click already use below, proven to reach the iframe reliably, so a page's own
 // script just listens for `window.addEventListener("message", ...)` instead of a raw Tauri event.
+// ---------- Tauri call relay (for an iframe-hosted popup page) ----------
+// window.__TAURI__.core.invoke() (and every plugin API built on the same transport, e.g.
+// dialog.open()) never resolves OR rejects when called from inside an iframe on Windows/WebView2
+// — confirmed live: it hangs forever, no error, nothing. This is a known Tauri limitation
+// (https://github.com/tauri-apps/tauri/issues/6204): the response callback lands on the PARENT
+// window instead of the iframe that registered it, so the iframe's own promise just never settles.
+// Settings/Modules/Plugins/Export (contributeIframePopup below) all call these Tauri APIs directly
+// from their OWN document, which is exactly this situation — every one of them was silently
+// broken until this existed. relayableInvoke/relayableOpenDialog are drop-in replacements for
+// `const { invoke } = window.__TAURI__.core` / `const { open } = window.__TAURI__.dialog`: on a
+// genuine top-level document (this file is shared, so it's ALSO loaded there) they just call the
+// real thing straight through; from inside an iframe they relay the call to window.parent over
+// postMessage instead — the exact same "proven to reach the iframe reliably" mechanism
+// popup-tab-change/forwardEvents below already use, just in the other direction. The parent-side
+// half of this (listening for "relay-call" and replying) lives in contributeIframePopup's mount()
+// just below, scoped to only the popup iframes it itself created — never a plugin iframe, which
+// must stay unable to reach real Tauri commands directly regardless of this existing.
+let nextRelayCallId = 1;
+const pendingRelayCalls = new Map();
+window.addEventListener("message", (e) => {
+  if (e.source !== window.parent || !e.data || e.data.type !== "relay-call-reply") return;
+  const pending = pendingRelayCalls.get(e.data.id);
+  if (!pending) return;
+  pendingRelayCalls.delete(e.data.id);
+  if (e.data.ok) pending.resolve(e.data.result);
+  else pending.reject(e.data.error);
+});
+function relayCall(kind, payload) {
+  if (window.parent === window) {
+    if (kind === "invoke") return window.__TAURI__.core.invoke(payload.command, payload.params);
+    if (kind === "dialog-open") return window.__TAURI__.dialog.open(payload);
+  }
+  return new Promise((resolve, reject) => {
+    const id = nextRelayCallId++;
+    pendingRelayCalls.set(id, { resolve, reject });
+    window.parent.postMessage({ type: "relay-call", id, kind, payload }, "*");
+  });
+}
+function relayableInvoke(command, params) {
+  return relayCall("invoke", { command, params });
+}
+function relayableOpenDialog(opts) {
+  return relayCall("dialog-open", opts);
+}
+
+// Parent-side half — called from contributeIframePopup's own onMessage below, which has ALREADY
+// verified e.source === this specific popup's own iframe.contentWindow before this ever runs, so
+// there's no separate trust check needed here: a plugin iframe (sandbox="allow-scripts", a
+// completely different, deliberately unprivileged trust level) is never the source of a message
+// this reaches, only ever one of editor.html's own contributeIframePopup-created popups.
+async function handleRelayCall(sourceWindow, data) {
+  const { id, kind, payload } = data;
+  try {
+    let result;
+    if (kind === "invoke") result = await window.__TAURI__.core.invoke(payload.command, payload.params);
+    else if (kind === "dialog-open") result = await window.__TAURI__.dialog.open(payload);
+    else throw new Error(`Unknown relay-call kind "${kind}"`);
+    sourceWindow.postMessage({ type: "relay-call-reply", id, ok: true, result }, "*");
+  } catch (err) {
+    sourceWindow.postMessage({ type: "relay-call-reply", id, ok: false, error: String(err) }, "*");
+  }
+}
+
 function contributeIframePopup(id, { title, forwardEvents }) {
   contribute("popups", {
     id,
@@ -1019,6 +1093,10 @@ function contributeIframePopup(id, { title, forwardEvents }) {
 
       const onMessage = (e) => {
         if (e.source !== iframe.contentWindow || !e.data || typeof e.data !== "object") return;
+        if (e.data.type === "relay-call") {
+          handleRelayCall(iframe.contentWindow, e.data);
+          return;
+        }
         if (e.data.type !== "popup-header") return;
         latestTabs = e.data.tabs || [];
         latestButtons = e.data.buttons || [];
@@ -1155,8 +1233,8 @@ function initTooltips(root = document) {
 // initializing — call it once at page load; it wires everything (including the popup-header relay
 // and the shared remove-confirm popup) and loads the list itself, nothing else needs to run after.
 function createManagerPage(config) {
-  const { invoke } = window.__TAURI__.core;
-  const { open: openDialog } = window.__TAURI__.dialog;
+  const invoke = relayableInvoke;
+  const openDialog = relayableOpenDialog;
   const popupId = `remove-${config.nounSingular.toLowerCase()}`;
 
   let items = [];

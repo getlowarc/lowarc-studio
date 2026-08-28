@@ -181,7 +181,7 @@
 
     <script src="primitives.js"></script>
     <script>
-      const { invoke } = window.__TAURI__.core;
+      const invoke = relayableInvoke;
 
       // ---------- Tabs ----------
       // The tab BUTTONS render in the popup shell's own header now (see setPopupHeaderControls()
@@ -608,34 +608,45 @@
       }
 
       (async () => {
-        initTooltips();
+        try {
+          initTooltips();
 
-        const requestedTab = new URLSearchParams(window.location.search).get("tab");
-        const initialTab = ["appearance", "plugins"].includes(requestedTab) ? requestedTab : "general";
-        previousTab = initialTab;
-        showTab(initialTab);
-        setPopupHeaderControls({
-          tabs: [
-            { value: "general", label: "General" },
-            { value: "appearance", label: "Appearance" },
-            { value: "plugins", label: "Plugins" },
-          ],
-          activeTab: initialTab,
-        });
-        // Clicking a real header tab while a search is active should behave like clearing the
-        // search box, not layer a tab switch underneath a still-visible search results view.
-        onPopupHeaderAction({
-          onTabChange: (value) => {
-            previousTab = value;
-            searchInput.value = "";
-            searchEl.classList.remove("has-value");
-            showTab(value);
-          },
-        });
+          const requestedTab = new URLSearchParams(window.location.search).get("tab");
+          const initialTab = ["appearance", "plugins"].includes(requestedTab) ? requestedTab : "general";
+          previousTab = initialTab;
+          showTab(initialTab);
+          setPopupHeaderControls({
+            tabs: [
+              { value: "general", label: "General" },
+              { value: "appearance", label: "Appearance" },
+              { value: "plugins", label: "Plugins" },
+            ],
+            activeTab: initialTab,
+          });
+          // Clicking a real header tab while a search is active should behave like clearing the
+          // search box, not layer a tab switch underneath a still-visible search results view.
+          onPopupHeaderAction({
+            onTabChange: (value) => {
+              previousTab = value;
+              searchInput.value = "";
+              searchEl.classList.remove("has-value");
+              showTab(value);
+            },
+          });
 
-        registry = await buildSearchableSettingsList();
-        await Promise.all([loadGeneral(), loadAppearance(), loadPluginSettings()]);
-        await applyUrlSearch();
+          registry = await buildSearchableSettingsList();
+          // allSettled, not all — one tab's own load failing shouldn't stop the other two from
+          // still rendering whatever they can; a plain Promise.all would abandon all three the
+          // moment any single one rejects.
+          const results = await Promise.allSettled([loadGeneral(), loadAppearance(), loadPluginSettings()]);
+          results.forEach((r) => {
+            if (r.status === "rejected") console.error("[settings] a tab failed to load:", r.reason);
+          });
+          await applyUrlSearch();
+        } catch (err) {
+          console.error("[settings] failed to initialize:", err);
+          showToast({ variant: "error", message: `Settings failed to load: ${err && err.message ? err.message : err}` });
+        }
       })();
     </script>
   </body>

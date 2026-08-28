@@ -14,8 +14,8 @@
 // server, so nothing extra is needed here for that.
 
 use crate::plugin_assets::{
-    resolve_asset_path, CSP, HARNESS_JS, SHARED_ICONS_CSS, SHARED_ICONS_JS, SHARED_ICONS_WOFF, SHARED_PRIMITIVES_CSS,
-    SHARED_STYLE_CSS,
+    resolve_asset_path, CSP, HARNESS_JS, SHARED_DROPDOWN_JS, SHARED_ICONS_CSS, SHARED_ICONS_JS, SHARED_ICONS_WOFF,
+    SHARED_PRIMITIVES_CSS, SHARED_STYLE_CSS,
 };
 use crate::{settings, theme};
 use std::sync::atomic::{AtomicU16, Ordering};
@@ -27,8 +27,17 @@ pub fn start() {
     let port = server.server_addr().to_ip().expect("loopback server has an ip address").port();
     PORT.store(port, Ordering::SeqCst);
     std::thread::spawn(move || {
+        // A thread per request, not one loop handling requests one at a time — Monaco alone
+        // pulls in dozens of separate chunk files (vs/editor/*, vs/language/*/, its worker
+        // scripts) the instant its own iframe navigates, and the browser fires most of those
+        // concurrently; serialized behind a single thread, each one queues behind whatever
+        // std::fs::read was already mid-flight, which is exactly the several-second stall
+        // reported on a file's first open (and doubly so opening a second Monaco instance for
+        // split view, competing for the same one thread). Every request here is a plain
+        // stateless disk read with no shared mutable state to race on, so unbounded concurrency
+        // costs nothing but a thread per in-flight request.
         for request in server.incoming_requests() {
-            handle(request);
+            std::thread::spawn(move || handle(request));
         }
     });
 }
@@ -38,7 +47,21 @@ pub fn port() -> u16 {
 }
 
 fn respond(request: tiny_http::Request, status: u16, content_type: &str, body: Vec<u8>) {
-    let response = tiny_http::Response::from_data(body)
+    respond_cacheable(request, status, content_type, body, false);
+}
+
+// cacheable is what a plain `respond()` skips (a 404, or content computed fresh per-request like
+// __lowarc-theme.css) — everything a plugin actually renders with is genuinely static for the
+// life of one running app, and Monaco alone is dozens of separate chunk files an iframe re-fetches
+// in full on every single mount otherwise — reopening a file, or opening a second instance for
+// split view, was paying that same multi-second cost again with nothing to show for it. Kept
+// short (not the usual immutable-forever a content-hashed bundle would get) specifically because
+// this app's own plugins (Monaco's own harness aside) are actively edited during development —
+// unhashed filenames mean a stale cache would otherwise hide a just-saved change for however long
+// the lifetime is; a minute is enough to absorb rapid reopens/split-toggles in one sitting without
+// meaningfully getting in the way of an edit-reload loop.
+fn respond_cacheable(request: tiny_http::Request, status: u16, content_type: &str, body: Vec<u8>, cacheable: bool) {
+    let mut response = tiny_http::Response::from_data(body)
         .with_status_code(status)
         .with_header(mk_header("Content-Type", content_type))
         .with_header(mk_header("Content-Security-Policy", CSP))
@@ -50,6 +73,9 @@ fn respond(request: tiny_http::Request, status: u16, content_type: &str, body: V
         // NetworkError unless the response carries this. Loopback-only, no real user data ever
         // flows through it, so a blanket allow-all costs nothing.
         .with_header(mk_header("Access-Control-Allow-Origin", "*"));
+    if cacheable {
+        response = response.with_header(mk_header("Cache-Control", "max-age=60"));
+    }
     let _ = request.respond(response);
 }
 
@@ -71,36 +97,41 @@ fn handle(request: tiny_http::Request) {
     // plugin_assets.rs's SHARED_STYLE_CSS/SHARED_PRIMITIVES_CSS) a plugin can link if it wants to
     // look like the IDE.
     if rel_path == "__lowarc.js" {
-        respond(request, 200, "text/javascript", HARNESS_JS.as_bytes().to_vec());
+        respond_cacheable(request, 200, "text/javascript", HARNESS_JS.as_bytes().to_vec(), true);
         return;
     }
     if rel_path == "__lowarc.css" {
-        respond(request, 200, "text/css", SHARED_STYLE_CSS.as_bytes().to_vec());
+        respond_cacheable(request, 200, "text/css", SHARED_STYLE_CSS.as_bytes().to_vec(), true);
         return;
     }
     if rel_path == "__lowarc-primitives.css" {
-        respond(request, 200, "text/css", SHARED_PRIMITIVES_CSS.as_bytes().to_vec());
+        respond_cacheable(request, 200, "text/css", SHARED_PRIMITIVES_CSS.as_bytes().to_vec(), true);
         return;
     }
     if rel_path == "__lowarc-icons.css" {
-        respond(request, 200, "text/css", SHARED_ICONS_CSS.as_bytes().to_vec());
+        respond_cacheable(request, 200, "text/css", SHARED_ICONS_CSS.as_bytes().to_vec(), true);
         return;
     }
     if rel_path == "__lowarc-icons.js" {
-        respond(request, 200, "text/javascript", SHARED_ICONS_JS.as_bytes().to_vec());
+        respond_cacheable(request, 200, "text/javascript", SHARED_ICONS_JS.as_bytes().to_vec(), true);
         return;
     }
     // "seti.woff", not "__lowarc-icons.woff" — icons.css references it by its real vendored
     // filename (see that file's own comment for why), so this is the relative path a plugin
     // iframe's browser actually requests after loading __lowarc-icons.css at .../<plugin_id>/.
     if rel_path == "seti.woff" {
-        respond(request, 200, "font/woff", SHARED_ICONS_WOFF.to_vec());
+        respond_cacheable(request, 200, "font/woff", SHARED_ICONS_WOFF.to_vec(), true);
+        return;
+    }
+    if rel_path == "__lowarc-dropdown.js" {
+        respond_cacheable(request, 200, "text/javascript", SHARED_DROPDOWN_JS.as_bytes().to_vec(), true);
         return;
     }
     // Computed fresh every request (settings::load() reads settings.json from disk each time, not
     // a cached value) — a plugin's iframe never re-fetches this on its own just because the user
     // changed Appearance elsewhere, but at least a freshly-mounted or reloaded panel always gets
     // whatever's current, rather than whatever was active the moment the app happened to launch.
+    // NOT cacheable, unlike everything else here — the whole point is that it can change.
     if rel_path == "__lowarc-theme.css" {
         let css = theme::resolved_css(&settings::load().theme_mode);
         respond(request, 200, "text/css", css.into_bytes());
@@ -116,7 +147,7 @@ fn handle(request: tiny_http::Request) {
         Ok(data) => {
             let mime = mime_guess::from_path(&resolved).first_or_octet_stream();
             let content_type = mime.essence_str().to_string();
-            respond(request, 200, &content_type, data);
+            respond_cacheable(request, 200, &content_type, data, true);
         }
         Err(_) => respond(request, 404, "text/plain", Vec::new()),
     }

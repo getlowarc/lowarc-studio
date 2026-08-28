@@ -22,9 +22,18 @@ pub struct ProjectPreset {
 }
 
 impl ProjectPreset {
+    // A missing project.json is treated as an empty preset (no requires, no entry set), not an
+    // error — this app works as a plain editor over any folder, LowArc project or not, and
+    // project.json only matters once something actually needs a project-run feature (module
+    // resolution, an entry file). One that exists but fails to PARSE is still a real error,
+    // though — that's a genuine problem with a file the user (or a previous run) actually wrote,
+    // not an absence to quietly paper over.
     pub fn load(project_dir: &Path) -> Result<Self, String> {
-        let text = std::fs::read_to_string(project_dir.join("project.json"))
-            .map_err(|e| format!("project.json not found or unreadable: {e}"))?;
+        let path = project_dir.join("project.json");
+        if !path.is_file() {
+            return Ok(Self::default());
+        }
+        let text = std::fs::read_to_string(&path).map_err(|e| format!("project.json not found or unreadable: {e}"))?;
         serde_json::from_str(&text).map_err(|e| format!("project.json is invalid: {e}"))
     }
 

@@ -89,8 +89,8 @@
 
     <script src="primitives.js"></script>
     <script>
-      const { invoke } = window.__TAURI__.core;
-      const { open: openDialog } = window.__TAURI__.dialog;
+      const invoke = relayableInvoke;
+      const openDialog = relayableOpenDialog;
 
       const projectDir = new URLSearchParams(window.location.search).get("project") || "";
 

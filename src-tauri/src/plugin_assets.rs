@@ -113,6 +113,17 @@ pub const HARNESS_JS: &str = r#"(function () {
     requestClose(path) {
       window.parent.postMessage({ type: "host", action: "requestClose", path }, "*");
     },
+    // Lets a plugin that isn't itself the file's own viewer (Outline, editing a value it parsed
+    // out of the file) push a change into whatever IS currently showing that file — the host
+    // forwards it as a lowarc:applyLineEdit emit to that path's owning viewer instance, which
+    // applies it as a real edit (Monaco: model.applyEdits, not setValue — preserves undo history
+    // and fires the exact same dirty-tracking a person's own keystroke would). `line` is 1-based,
+    // `text` replaces that entire line's content. Fire-and-forget, same reasoning as markDirty —
+    // nothing for the caller to wait on; if the path isn't open or has no viewer, this silently
+    // does nothing rather than erroring, the same as every other host-owned action here.
+    editFile(path, line, text) {
+      window.parent.postMessage({ type: "host", action: "editFile", path, line, text }, "*");
+    },
     // Any plugin can raise a toast/notification through the host's own system — see showToast()
     // in primitives.js, which is the SAME pipe host chrome's own errors/confirmations already go
     // through, not a separate plugin-only notification channel. Fire-and-forget: a plugin has
@@ -131,6 +142,32 @@ pub const HARNESS_JS: &str = r#"(function () {
     // opening the split first if it isn't already — see the file explorer's "Open in Split View".
     openFile(path, opts) {
       window.parent.postMessage({ type: "host", action: "openFile", path, openInSplit: Boolean(opts && opts.openInSplit) }, "*");
+    },
+    // Generic "let the user pick a file for me to open" — a plugin has no filesystem access of
+    // its own to browse with, so this asks the host to show its real native file picker instead
+    // (options passed straight through to Tauri's dialog.open(), e.g. {filters: [{name, extensions}]}).
+    // Resolves to the picked absolute path, or null if cancelled — never rejects, same reasoning
+    // showMenu() gives for its own reject-into-null. Opening the result is a separate step
+    // (openFile() above) rather than automatic, since a caller might want the path itself for
+    // something else (e.g. remembering it, or reading it back through call()).
+    pickOpenFile(opts) {
+      return new Promise((resolve) => {
+        const id = nextId++;
+        pending.set(id, { resolve, reject: () => resolve(null) });
+        window.parent.postMessage({ type: "host", action: "pickOpenFile", id, opts: opts || {} }, "*");
+      });
+    },
+    // Generic "let the user pick where a brand-new file goes, then write it for me" — the
+    // complement to pickOpenFile, for a plugin that wants a "New…" button of its own without ever
+    // needing raw filesystem write access itself (opts.contents is what actually gets written,
+    // "" if omitted). Resolves to the new file's absolute path, or null if the save dialog was
+    // cancelled — never rejects.
+    createFile(opts) {
+      return new Promise((resolve) => {
+        const id = nextId++;
+        pending.set(id, { resolve, reject: () => resolve(null) });
+        window.parent.postMessage({ type: "host", action: "createFile", id, opts: opts || {} }, "*");
+      });
     },
     // Fire-and-forget, same reasoning as markDirty/requestClose/openFile — a file explorer (or
     // anything else that mutates the filesystem) tells the host a path is gone or moved so the
@@ -278,6 +315,12 @@ pub const SHARED_PRIMITIVES_CSS: &str = include_str!("../../src/primitives-share
 pub const SHARED_ICONS_CSS: &str = include_str!("../../src/vendor/seti-icons/icons.css");
 pub const SHARED_ICONS_JS: &str = include_str!("../../src/vendor/seti-icons/icons.js");
 pub const SHARED_ICONS_WOFF: &[u8] = include_bytes!("../../src/vendor/seti-icons/seti.woff");
+
+/// A single-select dropdown matching the real IDE look (the CSS moved to primitives-shared.css
+/// for this specifically) with its own small standalone behavior — see dropdown-shared.js's own
+/// header for why this isn't just reusing the host's fuller-featured one. Served at
+/// __lowarc-dropdown.js; exposes one function, `createLowarcDropdown(options, value, onChange)`.
+pub const SHARED_DROPDOWN_JS: &str = include_str!("../../src/dropdown-shared.js");
 
 /// Resolves `<plugin_id>/<rel_path>` to a real file, refusing anything that canonicalizes outside
 /// that plugin's own folder — shared between plugin_asset_server.rs and `read_plugin_asset`

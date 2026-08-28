@@ -71,117 +71,15 @@
   border-bottom: 1px solid var(--border);
 }
 
-/* ---------- Dropdown ---------- */
-/* One popover engine, one component — there's no separate "dropdown input" type. .dropdown-full
-   just stretches the trigger to fill its container instead of shrink-wrapping, for when a dropdown
-   sits in a form next to other full-width fields. A checkbox dropdown reuses the same markup with
-   checkbox rows in the menu and stays open on selection (data-multiselect on the root). */
-
-.dropdown {
-  position: relative;
-  display: inline-block;
-}
-
-.dropdown-full {
-  display: block;
-}
-
-.dropdown-trigger {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  font-family: inherit;
-  font-size: 14px;
-  background: var(--bg-raised);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--fg);
-  padding: 8px 10px;
-  cursor: pointer;
-  width: 100%;
-}
-
-.dropdown-trigger:hover {
-  border-color: #555;
-}
-
-.dropdown[data-open="true"] .dropdown-trigger {
-  border-color: var(--cyan);
-}
-
-.dropdown-value {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: left;
-}
-
-.dropdown-value.placeholder {
-  color: var(--fg-dim);
-}
-
-.dropdown-chevron {
-  flex: none;
-  color: var(--fg-dim);
-  font-size: 11px;
-  transition: transform 0.12s ease;
-}
-
-.dropdown[data-open="true"] .dropdown-chevron {
-  transform: rotate(180deg);
-}
-
-.dropdown-menu {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(100% + 4px);
-  z-index: 20;
-  background: var(--bg-raised);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 4px;
-  max-height: 240px;
-  overflow-y: auto;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  display: none;
-}
-
-.dropdown[data-open="true"] .dropdown-menu {
-  display: block;
-}
-
-.dropdown-option {
-  all: unset;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 7px 8px;
-  font-size: 14px;
-  color: var(--fg);
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.dropdown-option:hover,
-.dropdown-option.is-active {
-  background: var(--bg-hover);
-}
-
-.dropdown-option.is-selected {
-  color: var(--yellow);
-}
-
-.dropdown-option.is-empty {
-  color: var(--fg-dim);
-  cursor: default;
-}
-.dropdown-option.is-empty:hover {
-  background: none;
-}
+/* ---------- Dropdown (grouped/search-specific extras) ---------- */
+/* The core dropdown component (.dropdown/.dropdown-trigger/.dropdown-menu/.dropdown-option and
+   friends) moved to primitives-shared.css — a plugin can use the same look via
+   __lowarc-primitives.css, driven by the small standalone behavior in __lowarc-dropdown.js
+   (see that file's own header for why it's a second, simpler implementation rather than reusing
+   initDropdowns() below: grouping/multiselect/search integration are genuinely host-chrome-only
+   concerns, not something worth forcing a plugin to carry). What's left here is specific to the
+   grouped/searchable variant (the header search dropdown, Command Palette) — the group label/line/
+   chevron divider between categories, which a plain single-select dropdown never has. */
 
 /* A small title, a line, then (only when that group actually has more than initSearchbar's
    previewLimit) a chevron — one per category in a grouped searchbar result list (see
@@ -421,7 +319,12 @@
   position: fixed;
   bottom: 20px;
   right: 20px;
-  z-index: 100;
+  /* Above every popup (POPUP_Z_FLOOR=200 in editor.html, +10 per stacked level — never realistically
+     anywhere near 500) and above tooltips (300) — a toast is an urgent, dismissible notification,
+     the one thing that should stay visible no matter what dialog happens to be open on top of it,
+     the same reasoning style.css's .titlebar-controls comment already gives for staying reachable
+     above a popup backdrop. Below .titlebar-controls (1000), which stays topmost of all. */
+  z-index: 500;
   display: flex;
   flex-direction: column-reverse;
   gap: 8px;
@@ -650,6 +553,28 @@
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* A plain label/keys reference row (see editor.html's "shortcuts" popup) — not a settings list,
+   nothing here is interactive. */
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.shortcut-row:last-child {
+  border-bottom: none;
+}
+.shortcut-keys {
+  font-family: "Consolas", "SFMono-Regular", Menlo, monospace;
+  font-size: 12px;
+  color: var(--fg-muted);
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
 }
 
 /* Plain container for editor.html's Popup Base (see showPopup() there) — no layout of its own,

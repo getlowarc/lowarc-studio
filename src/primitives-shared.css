@@ -371,6 +371,120 @@
   opacity: 1;
 }
 
+/* ---------- Dropdown (single-select core) ---------- */
+/* Moved here from primitives.css so a plugin can use the real IDE dropdown look, not something
+   hand-rolled — behavior comes from a small standalone script (__lowarc-dropdown.js), since this
+   is CSS-only and dropdown genuinely needs JS to do anything (same reasoning .numeric-input was
+   kept OUT of this file for). The host's own fuller dropdown (grouped categories, multiselect,
+   search integration — primitives.js's initDropdowns) stays a separate, more capable
+   implementation in primitives.css/primitives.js; nothing here replaces it, this is just the
+   plain single-select case both happen to share the same look for. */
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdown-full {
+  display: block;
+}
+
+.dropdown-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: inherit;
+  font-size: 14px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fg);
+  padding: 8px 10px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.dropdown-trigger:hover {
+  border-color: #555;
+}
+
+.dropdown[data-open="true"] .dropdown-trigger {
+  border-color: var(--cyan);
+}
+
+.dropdown-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.dropdown-value.placeholder {
+  color: var(--fg-dim);
+}
+
+.dropdown-chevron {
+  flex: none;
+  color: var(--fg-dim);
+  font-size: 11px;
+  transition: transform 0.12s ease;
+}
+
+.dropdown[data-open="true"] .dropdown-chevron {
+  transform: rotate(180deg);
+}
+
+.dropdown-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  display: none;
+}
+
+.dropdown[data-open="true"] .dropdown-menu {
+  display: block;
+}
+
+.dropdown-option {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  font-size: 14px;
+  color: var(--fg);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.dropdown-option:hover,
+.dropdown-option.is-active {
+  background: var(--bg-hover);
+}
+
+.dropdown-option.is-selected {
+  color: var(--yellow);
+}
+
+.dropdown-option.is-empty {
+  color: var(--fg-dim);
+  cursor: default;
+}
+.dropdown-option.is-empty:hover {
+  background: none;
+}
+
 /* ---------- Progress bar ---------- */
 /* No fixed width of its own — sizes to whatever a caller sets (inline style, a wrapper, a flex
    item's own basis), so one primitive covers a full-width bar or a small footer indicator alike.
