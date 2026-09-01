@@ -453,10 +453,11 @@ fn start_export(app: AppHandle, state: State<'_, ExportState>, project_dir: Stri
         *guard = true;
     }
 
-    // Each of build_bootstrap's and export_folder's own log(...) calls is one fixed, known stage
-    // announced in a fixed order — 1 from build_bootstrap, 5 from export_folder today — so a plain
-    // running count against that fixed total is a real (if coarse) progress fraction, not a guess.
-    // Keep EXPORT_TOTAL_STEPS in sync if either function's own count of log(...) calls changes.
+    // Each of resolve_bootstrap's and export_folder's own log(...) calls is one fixed, known stage
+    // announced in a fixed order — 1 from resolve_bootstrap, 5 from export_folder today — so a
+    // plain running count against that fixed total is a real (if coarse) progress fraction, not a
+    // guess. Keep EXPORT_TOTAL_STEPS in sync if either function's own count of log(...) calls
+    // changes.
     const EXPORT_TOTAL_STEPS: u32 = 6;
     let step = Arc::new(AtomicU32::new(0));
     let log_handle = app.clone();
@@ -476,7 +477,7 @@ fn start_export(app: AppHandle, state: State<'_, ExportState>, project_dir: Stri
 
     let done_handle = app.clone();
     std::thread::spawn(move || {
-        let result = export::bootstrap_source::build_bootstrap(&*log)
+        let result = export::bootstrap_source::resolve_bootstrap(&*log)
             .map_err(|e| vec![e])
             .and_then(|bootstrap_exe| export::export_folder(&options, &bootstrap_exe, &*log));
 
@@ -577,7 +578,7 @@ fn start_plugin_session(app: AppHandle, id: String, session_id: String, shell: O
     sessions.start(&app, &folder, &desc, &id, &session_id)
 }
 
-/// Fire-and-forget write to a running session's stdin — see window.lowarc.sendSession() in
+/// Fire-and-forget write to a running session's stdin — see window.lowarc.session.send() in
 /// plugin_assets.rs. Whatever the session has to say back arrives separately, as a
 /// lowarc:sessionOutput emit (plugin_session.rs), not as this call's return value.
 #[tauri::command]

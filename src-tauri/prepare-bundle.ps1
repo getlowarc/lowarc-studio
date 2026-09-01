@@ -39,3 +39,34 @@ function Copy-BackendBinary($binaryName, $destDir) {
 Copy-BackendBinary "file_explorer_backend" (Join-Path $PSScriptRoot "..\plugins\file-explorer")
 Copy-BackendBinary "terminal_backend" (Join-Path $PSScriptRoot "..\plugins\terminal")
 Copy-BackendBinary "native_module_host" (Join-Path $PSScriptRoot "runtime-helpers")
+
+# lowarc-bootstrap.exe joins runtime-helpers/ the exact same way native_module_host.exe does above
+# — same destination, same generic unpack step on the installed-copy side (AppPaths::
+# ensure_installed_copy_resources -> unpack_installed_resources in app_paths.rs, which copies
+# every FILE under runtime-helpers/ with no per-name special-casing, so nothing there needed to
+# change for this to just work). What's different is where the binary comes from: it isn't part of
+# this workspace, it's `lowarc`'s own Bootstrap crate, in the sibling repo checked out next to this
+# one — this is the one place in the packaging process that dependency belongs. Building it here,
+# ONCE, at package time, is what lets export/bootstrap_source.rs stop needing that sibling checkout
+# at EXPORT time (see its own header comment) — an installed copy just uses the bundled binary this
+# produces, the same as any other end user's machine, no source checkout in sight. A packaging
+# machine without the sibling repo present still produces a working bundle for everything else;
+# only the export feature would fail at runtime with export/bootstrap_source.rs's own clear error,
+# same as it already does today when neither the sibling checkout nor a bundled copy exists.
+$siblingBootstrap = Join-Path $PSScriptRoot "..\..\lowarc\Bootstrap"
+if (Test-Path (Join-Path $siblingBootstrap "Cargo.toml")) {
+  Write-Host "prepare-bundle.ps1: building lowarc-bootstrap.exe from the sibling lowarc checkout..."
+  & cargo build --release --manifest-path (Join-Path $siblingBootstrap "Cargo.toml")
+  if ($LASTEXITCODE -ne 0) {
+    throw "prepare-bundle.ps1: building lowarc-bootstrap.exe failed (exit code $LASTEXITCODE)"
+  }
+  $builtBootstrap = Join-Path $siblingBootstrap "target\release\lowarc-bootstrap.exe"
+  if (-not (Test-Path $builtBootstrap)) {
+    throw "prepare-bundle.ps1: expected $builtBootstrap to exist after building it"
+  }
+  $helpersDir = Join-Path $PSScriptRoot "runtime-helpers"
+  New-Item -ItemType Directory -Force -Path $helpersDir | Out-Null
+  Copy-Item $builtBootstrap (Join-Path $helpersDir "lowarc-bootstrap.exe") -Force
+} else {
+  Write-Warning "prepare-bundle.ps1: no sibling lowarc checkout found at $siblingBootstrap — this bundle will ship without lowarc-bootstrap.exe, so its export feature won't work until one is added to runtime-helpers/ some other way."
+}

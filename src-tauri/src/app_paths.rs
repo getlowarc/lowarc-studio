@@ -78,12 +78,16 @@ impl AppPaths {
     pub fn themes() -> PathBuf {
         Self::user_data().join("themes")
     }
-    /// Where a native binary this app needs at runtime, but that isn't part of any one plugin
-    /// (just native_module_host today), lives for an INSTALLED copy. A source checkout doesn't use
-    /// this at all — native_module_host_path() (runtime/native_module.rs) resolves next to the
-    /// running exe there instead, since Cargo already puts every one of this workspace's binaries
-    /// in the same target/ directory as a normal side effect of building it. Distinct from
-    /// plugins() since native_module_host isn't a plugin and has no plugin.json of its own.
+    /// Where a native binary this app needs at runtime, but that isn't part of any one plugin,
+    /// lives for an INSTALLED copy — native_module_host (see runtime/native_module.rs) and,
+    /// since 2026-09-01, lowarc-bootstrap (see export/bootstrap_source.rs). A source checkout
+    /// doesn't use this for native_module_host at all — that one resolves next to the running exe
+    /// instead, since Cargo already puts every one of this workspace's binaries in the same
+    /// target/ directory as a normal side effect of building it. lowarc-bootstrap is different:
+    /// it isn't part of this workspace (it's `lowarc`'s own Bootstrap crate, a separate repo), so
+    /// bootstrap_source.rs checks here even in a source checkout, before falling back to building
+    /// one fresh from a sibling `lowarc` checkout — see that module's own comment. Distinct from
+    /// plugins() since neither of these is a plugin or has a plugin.json of its own.
     pub fn runtime_helpers() -> PathBuf {
         Self::user_data().join("runtime-helpers")
     }
