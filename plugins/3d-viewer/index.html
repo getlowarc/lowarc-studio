@@ -1,0 +1,84 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="__lowarc.css" />
+<link rel="stylesheet" href="__lowarc-primitives.css" />
+<link rel="stylesheet" href="__lowarc-theme.css" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; }
+  body { display: flex; flex-direction: column; }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    flex: none;
+  }
+  .toolbar .spacer { flex: 1; }
+  .software-badge {
+    display: none;
+    font-size: 11px;
+    color: var(--fg-dim);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 6px;
+  }
+  .software-badge.is-visible { display: inline-block; }
+
+  #container { position: relative; flex: 1; min-height: 0; }
+  #canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  /* Shown instead of the canvas when WebGL couldn't be obtained at all — not a per-file error
+     (that's #load-error below), a whole-environment one, so it doesn't belong to any one doc. */
+  #unavailable {
+    display: none;
+    position: absolute;
+    inset: 0;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    color: var(--fg-dim);
+    font-size: 13px;
+  }
+  #unavailable.is-visible { display: flex; }
+
+  #load-error {
+    display: none;
+    position: absolute;
+    inset: 0;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    color: var(--fg-dim);
+    font-size: 13px;
+  }
+  #load-error.is-visible { display: flex; }
+</style>
+</head>
+<body>
+  <script src="__lowarc.js"></script>
+  <div class="toolbar" id="toolbar">
+    <button type="button" class="btn btn-ghost btn-sm" id="frame-view" title="Frame the model in view">Frame</button>
+    <button type="button" class="btn btn-ghost btn-sm" id="toggle-wireframe" title="Toggle wireframe">Wireframe</button>
+    <button type="button" class="btn btn-ghost btn-sm" id="toggle-grid" title="Toggle reference grid">Grid</button>
+    <div class="spacer"></div>
+    <span class="software-badge" id="software-badge" title="No hardware GPU acceleration was detected — rendering through a software fallback, expect lower performance.">Software rendering</span>
+  </div>
+  <div id="container">
+    <canvas id="canvas"></canvas>
+    <div id="unavailable">
+      <div>3D preview unavailable — WebGL could not be initialized in this environment.</div>
+    </div>
+    <div id="load-error">
+      <div id="load-error-text">This file could not be loaded.</div>
+    </div>
+  </div>
+  <script type="module" src="viewer.js"></script>
+</body>
+</html>

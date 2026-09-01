@@ -1,0 +1,16 @@
+{
+  "name": "3D Viewer",
+  "version": "0.1.0",
+  "description": "Views self-contained 3D assets (.glb, .obj) via three.js, vendored from the npm package (r0.185.1, MIT — see vendor/three/LICENSE). No external references yet — a loose .gltf pointing at separate .bin/texture files, or an .obj's mtllib, isn't resolved.",
+  "contributes": {
+    "viewers": [
+      {
+        "id": "main",
+        "title": "3D",
+        "entry": "index.html",
+        "binary": true,
+        "extensions": [".glb", ".obj"]
+      }
+    ]
+  }
+}
