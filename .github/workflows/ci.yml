@@ -1,0 +1,32 @@
+name: CI
+
+# rust-toolchain.toml pins stable-x86_64-pc-windows-msvc — this app is Windows-only today (ConPTY,
+# native .dll modules, WebView2), so this only runs on windows-latest. Extend to other OSes once
+# the toolchain pin itself does.
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: src-tauri
+    steps:
+      - uses: actions/checkout@v4
+
+      # rustup on windows-latest already reads rust-toolchain.toml at the repo root, so no
+      # explicit toolchain-install step is needed — this just adds caching.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Build
+        run: cargo build
+
+      # Also builds and runs everything under tests/ (native/process/plugin-host/dev-run
+      # end-to-end coverage). folder_export_end_to_end.rs stays #[ignore]d by default since it
+      # needs a sibling `lowarc` checkout this runner doesn't have — see its own header comment.
+      - name: Test
+        run: cargo test
