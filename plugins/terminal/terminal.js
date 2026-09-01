@@ -75,7 +75,7 @@ function renderSidebar() {
 
 function sendResize(sessionId) {
   const instance = sessions.get(sessionId);
-  if (instance) window.lowarc.sendSession(sessionId, { type: "resize", cols: instance.term.cols, rows: instance.term.rows });
+  if (instance) window.lowarc.session.send(sessionId, { type: "resize", cols: instance.term.cols, rows: instance.term.rows });
 }
 
 // A single rAF after making a container visible/creating a terminal wasn't always enough —
@@ -134,19 +134,19 @@ function createInstance(shell) {
   term.loadAddon(fitAddon);
   term.open(container);
 
-  term.onData((data) => window.lowarc.sendSession(sessionId, { type: "input", data }));
+  term.onData((data) => window.lowarc.session.send(sessionId, { type: "input", data }));
 
   const resolvedShell = shell || configuredShell || null;
   sessions.set(sessionId, { term, fitAddon, container, sidebarItem: null, label: `${instanceCounter}: ${resolvedShell || "Default"}` });
   updateEmptyState();
-  window.lowarc.startSession(sessionId, resolvedShell);
+  window.lowarc.session.start(sessionId, resolvedShell);
   switchTo(sessionId);
 }
 
 function closeInstance(sessionId) {
   const instance = sessions.get(sessionId);
   if (!instance) return;
-  window.lowarc.stopSession(sessionId);
+  window.lowarc.session.stop(sessionId);
   instance.term.dispose();
   instance.container.remove();
   sessions.delete(sessionId);

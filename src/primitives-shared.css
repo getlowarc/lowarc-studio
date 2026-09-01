@@ -8,11 +8,17 @@
    `<link rel="stylesheet" href="__lowarc-primitives.css">` and get the exact same buttons/inputs/
    checkboxes/progress-bar/setting-row look as the host, entirely opt-in, for close to zero styling
    work of their own. Every section here works with nothing but plain markup and class names — no
-   host JS required — which is the actual bar for belonging in this file, not primitives.css:
-   .numeric-input/.numeric-steppers deliberately stayed OUT (moved back 2026-08-27) despite looking
-   like a natural fit, because its steppers are 100% JS-driven (initNumericInputs() in
-   primitives.js) with no native fallback — a plugin linking just this CSS would get buttons that
-   visibly do nothing on click, worse than no widget at all. primitives.css itself stays host-only
+   HOST-ONLY JS required — which is the actual bar for belonging in this file, not primitives.css.
+   .numeric-input/.numeric-steppers and .tooltip-popup are the two exceptions, and only because
+   they each ship with a companion in __lowarc.js: window.lowarc.initNumericInputs(root) and
+   window.lowarc.initTooltips(root) do the same job as their host-only namesakes in primitives.js
+   (separate copies on purpose — the harness ones are the plugin-facing contract and shouldn't
+   secretly depend on a host-only script a plugin can never load). Before 2026-09-01 both were left
+   out for the opposite reason: a plugin linking just this CSS with no way to wire the behavior
+   would get either buttons that visibly do nothing, or a tooltip that never appears — that's now
+   solved by the harness call instead of by leaving the CSS out. .tooltip-popup's max-width/wrapping
+   below is ALSO not a byte-for-byte copy of the host's own rule for that reason — see
+   window.lowarc.initTooltips()'s own comment in plugin_assets.rs. primitives.css itself stays host-only
    for the same reason at a larger scale: it's packed with chrome-specific classes (.rail, .tab-bar,
    .console-tabs, .manage-list, ...) that assume the host's own DOM structure and JS-driven
    interaction (dropdowns, drag-reorder, toasts, popups, floating menus). If a section doesn't work
@@ -324,6 +330,100 @@
 .input:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* ---------- Numeric input ---------- */
+/* Deliberately type="text" + inputmode="numeric" (see window.lowarc.initNumericInputs() in
+   __lowarc.js), never type="number" — a native number input's spin arrows can't be restyled to
+   match the app, so this sidesteps them entirely with its own drawn steppers instead. */
+
+.numeric-input {
+  display: flex;
+  align-items: stretch;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  width: fit-content;
+}
+
+.numeric-input:hover {
+  border-color: #555;
+}
+
+.numeric-input input {
+  font-family: inherit;
+  font-size: 14px;
+  background: transparent;
+  border: none;
+  color: var(--fg);
+  padding: 8px 10px;
+  width: 90px;
+  text-align: right;
+}
+
+.numeric-input input::placeholder {
+  color: var(--fg-dim);
+}
+
+.numeric-input input:focus-visible {
+  outline: none;
+}
+
+.numeric-steppers {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+}
+
+.numeric-steppers button {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 50%;
+  font-size: 9px;
+  line-height: 1;
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+
+.numeric-steppers button:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.numeric-steppers button:first-child {
+  border-bottom: 1px solid var(--border);
+}
+
+/* ---------- Tooltip ---------- */
+/* Pairs with window.lowarc.initTooltips() in __lowarc.js. max-width + wrapping (not nowrap) is
+   load-bearing here, unlike the host's own ".tooltip-popup" in primitives.css: this element is
+   "position: fixed" WITHIN WHICHEVER IFRAME LOADS IT, which for a plugin means a narrow panel, not
+   the app window — a long tooltip at nowrap width would just be wider than the whole panel and get
+   clipped no matter how its left/top get computed, which is exactly what happened the first time a
+   plugin tried this (see initTooltips()'s own comment). Wrapping is what actually keeps it visible. */
+.tooltip-popup {
+  position: fixed;
+  max-width: 240px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--fg);
+  white-space: normal;
+  word-break: break-all;
+  pointer-events: none;
+  z-index: 300;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+.tooltip-popup.is-visible {
+  opacity: 1;
 }
 
 /* ---------- Checkbox ---------- */

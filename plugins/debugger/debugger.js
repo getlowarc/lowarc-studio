@@ -74,7 +74,7 @@ function renderBreakpoints() {
     del.addEventListener("click", () => {
       breakpoints.splice(index, 1);
       renderBreakpoints();
-      window.lowarc.setBreakpoints(breakpoints);
+      window.lowarc.debug.setBreakpoints(breakpoints);
     });
     row.appendChild(del);
 
@@ -118,7 +118,7 @@ document.getElementById("bp-add-btn").addEventListener("click", () => {
   if (!bp) return;
   breakpoints.push(bp);
   renderBreakpoints();
-  window.lowarc.setBreakpoints(breakpoints);
+  window.lowarc.debug.setBreakpoints(breakpoints);
 });
 
 // The plugin has no project access of its own (no window.__TAURI__, no filesystem) — the only way
@@ -186,7 +186,7 @@ document.getElementById("clear-trace-btn").addEventListener("click", () => {
 });
 
 document.getElementById("pause-resume-btn").addEventListener("click", () => {
-  window.lowarc[paused ? "resumeRun" : "pauseRun"]();
+  window.lowarc.debug[paused ? "resume" : "pause"]();
   // No local state flip here — lowarc:devRunState (below) is now the single authoritative source
   // for paused/running, pushed by the host whenever it actually changes for ANY reason, not just
   // this button. That's what makes the toolbar's own Pause button (which this plugin has no other
@@ -195,7 +195,7 @@ document.getElementById("pause-resume-btn").addEventListener("click", () => {
 
 document.getElementById("step-btn").addEventListener("click", () => {
   const count = Math.max(1, Number(document.getElementById("step-count").value) || 1);
-  window.lowarc.stepRun(count);
+  window.lowarc.debug.step(count);
 });
 
 // Every frame trace that reaches a plugin implies the run is currently paused — free-running ticks

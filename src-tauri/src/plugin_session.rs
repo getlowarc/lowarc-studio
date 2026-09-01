@@ -78,7 +78,7 @@ impl SessionRegistry {
         Ok(())
     }
 
-    /// Fire-and-forget, matching window.lowarc.sendSession() on the caller's side — there's no
+    /// Fire-and-forget, matching window.lowarc.session.send() on the caller's side — there's no
     /// reply to a raw stdin write, only whatever the session eventually emits as output.
     pub fn send(&self, session_id: &str, message: &Value) -> Result<(), String> {
         let mut sessions = self.sessions.lock().unwrap();

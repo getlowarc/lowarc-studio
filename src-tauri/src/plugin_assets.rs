@@ -169,6 +169,33 @@ pub const HARNESS_JS: &str = r#"(function () {
         window.parent.postMessage({ type: "host", action: "createFile", id, opts: opts || {} }, "*");
       });
     },
+    // Asks the host to show THIS plugin's own inspector contribution (a plugin.json panel with
+    // location: "inspector") right now, opening the Inspector panel if it's closed, and passing
+    // context straight through as a lowarc:inspectorContext emit to whatever's now showing.
+    // Fire-and-forget — the caller has nothing to wait on, same as openFile. A plugin with no
+    // inspector contribution declared just gets silently ignored by the host, same "nothing to do"
+    // shape as showMenu/openPopup targeting something that doesn't exist. This exists because the
+    // Inspector, unlike the sidebar or console, has no permanent icon/tab of its own for a person
+    // to click — something IN a plugin (a node getting clicked, e.g.) has to be able to ask for it
+    // instead.
+    //
+    // onlyIfOpen (default false): when true, this is a silent no-op unless the Inspector panel is
+    // ALREADY open — never forces it open, never switches its content if it was closed. For a
+    // continuous interaction that touches a node repeatedly (dragging it around, say) that already
+    // opened the Inspector once on its own — a background drag shouldn't be able to yank the panel
+    // open or hijack whatever it was already showing.
+    openInspector(context, onlyIfOpen) {
+      window.parent.postMessage({ type: "host", action: "openInspector", context: context ?? null, onlyIfOpen: Boolean(onlyIfOpen) }, "*");
+    },
+    // Sends event/payload to every OTHER currently-mounted iframe belonging to THIS SAME plugin —
+    // never the caller itself, and never a different plugin's iframe. Fire-and-forget. Exists for
+    // a plugin with more than one simultaneous iframe that need to coordinate (e.g. Node Graph's
+    // Inspector drawer editing a node that a separate canvas iframe actually owns and renders) —
+    // there was previously no way for two iframes of the same plugin to talk to each other at all,
+    // only host-to-plugin and plugin-to-host.
+    broadcastToSelf(event, payload) {
+      window.parent.postMessage({ type: "host", action: "broadcastToSelf", event, payload: payload ?? null }, "*");
+    },
     // Fire-and-forget, same reasoning as markDirty/requestClose/openFile — a file explorer (or
     // anything else that mutates the filesystem) tells the host a path is gone or moved so the
     // host can flag that path's own tab as missing, if it happens to be open. Nothing for the
@@ -181,18 +208,24 @@ pub const HARNESS_JS: &str = r#"(function () {
     },
     // A "session": true plugin's own UI (Terminal, so far) manages its own instances — each open
     // terminal tab is its own sessionId, chosen by the plugin itself (a UUID is fine; the host
-    // never needs to parse it, only use it as an opaque map key). All three are fire-and-forget:
-    // startSession's session doesn't exist yet to reply through, sendSession's replies (if any)
-    // arrive separately as lowarc:sessionOutput emits tagged with that same sessionId, and
-    // stopSession has nothing to report back beyond the process simply no longer running.
-    startSession(sessionId, shell) {
-      window.parent.postMessage({ type: "host", action: "startSession", sessionId, shell: shell || null }, "*");
-    },
-    sendSession(sessionId, message) {
-      window.parent.postMessage({ type: "host", action: "sendSession", sessionId, message }, "*");
-    },
-    stopSession(sessionId) {
-      window.parent.postMessage({ type: "host", action: "stopSession", sessionId }, "*");
+    // never needs to parse it, only use it as an opaque map key). Namespaced under `session`
+    // (2026-09-01) rather than sitting flat as startSession/sendSession/stopSession — this is a
+    // generic mechanism any "session": true plugin could use, not something tied to the file-
+    // lifecycle/host-chrome calls that make up most of this object, and grouping it makes that
+    // boundary visible instead of just implied by a shared name prefix. All three are fire-and-
+    // forget: start's session doesn't exist yet to reply through, send's replies (if any) arrive
+    // separately as lowarc:sessionOutput emits tagged with that same sessionId, and stop has
+    // nothing to report back beyond the process simply no longer running.
+    session: {
+      start(sessionId, shell) {
+        window.parent.postMessage({ type: "host", action: "startSession", sessionId, shell: shell || null }, "*");
+      },
+      send(sessionId, message) {
+        window.parent.postMessage({ type: "host", action: "sendSession", sessionId, message }, "*");
+      },
+      stop(sessionId) {
+        window.parent.postMessage({ type: "host", action: "stopSession", sessionId }, "*");
+      },
     },
     // Unlike markDirty/requestClose/openFile, this one needs a real answer — a write can fail
     // (disk full, permissions, the file having been deleted from under it), and the caller needs
@@ -243,23 +276,108 @@ pub const HARNESS_JS: &str = r#"(function () {
         window.parent.postMessage({ type: "host", action: "getSettings", id }, "*");
       });
     },
-    // Debugger primitives — generic, not scoped to any one plugin (any plugin could build a run
-    // monitor, not just the first-party Debugger one). Fire-and-forget, same reasoning as
-    // requestClose/markDirty: a failure (e.g. "no run is active") has nothing for the caller
-    // itself to branch on, so the host just surfaces it as its own toast. setBreakpoints always
-    // sends the WHOLE list — same "frontend always resends everything" convention plugin
-    // settings/commands already use, one fewer state-sync mechanism to get wrong.
-    pauseRun() {
-      window.parent.postMessage({ type: "host", action: "pauseRun" }, "*");
+    // Run-debugging primitives — generic, not scoped to any one plugin (any plugin could build a
+    // run monitor, not just the first-party Debugger one). Namespaced under `debug` (2026-09-01),
+    // same reasoning as `session` above: a distinct, generic mini-API, not another file/host-
+    // chrome call sitting flat among them. Fire-and-forget, same reasoning as requestClose/
+    // markDirty: a failure (e.g. "no run is active") has nothing for the caller itself to branch
+    // on, so the host just surfaces it as its own toast. setBreakpoints always sends the WHOLE
+    // list — same "frontend always resends everything" convention plugin settings/commands
+    // already use, one fewer state-sync mechanism to get wrong.
+    debug: {
+      pause() {
+        window.parent.postMessage({ type: "host", action: "pauseRun" }, "*");
+      },
+      resume() {
+        window.parent.postMessage({ type: "host", action: "resumeRun" }, "*");
+      },
+      step(count) {
+        window.parent.postMessage({ type: "host", action: "stepRun", count: count || 1 }, "*");
+      },
+      setBreakpoints(breakpoints) {
+        window.parent.postMessage({ type: "host", action: "setBreakpoints", breakpoints: breakpoints || [] }, "*");
+      },
     },
-    resumeRun() {
-      window.parent.postMessage({ type: "host", action: "resumeRun" }, "*");
+    // A plain DOM utility, not a host round-trip like everything else here — wires up any
+    // ".numeric-input" markup (see __lowarc-primitives.css) with real, working steppers. This is
+    // the ENTIRE reason that CSS class is safe to expose to plugins at all: a native
+    // type="number" input's spin arrows can't be restyled to match the app (hence the drawn
+    // ".numeric-steppers" buttons instead), and CSS alone would just be buttons that visibly do
+    // nothing on click. Same clamp/read-attributes behavior as the host's own initNumericInputs()
+    // in primitives.js — kept as a separate copy on purpose, same as everything else in this file:
+    // this is the plugin-facing contract, and it shouldn't secretly depend on a host-only script a
+    // plugin can never load. Dispatches BOTH "input" and "change" so a caller can commit with a
+    // plain input.addEventListener("change", ...), the exact same pattern already used for every
+    // other field type — no special-casing just because this one has stepper buttons too.
+    initNumericInputs(root) {
+      (root || document).querySelectorAll(".numeric-input").forEach((el) => {
+        if (el.dataset.numericInit) return;
+        el.dataset.numericInit = "true";
+        const input = el.querySelector("input");
+        const up = el.querySelector(".stepper-up");
+        const down = el.querySelector(".stepper-down");
+        const min = input.hasAttribute("min") ? Number(input.min) : -Infinity;
+        const max = input.hasAttribute("max") ? Number(input.max) : Infinity;
+        const step = input.hasAttribute("step") ? Number(input.step) : 1;
+        const clamp = (n) => Math.min(max, Math.max(min, n));
+        const bump = (delta) => {
+          input.value = clamp((Number(input.value) || 0) + delta);
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+        };
+        if (up) up.addEventListener("click", () => bump(step));
+        if (down) down.addEventListener("click", () => bump(-step));
+        input.addEventListener("blur", () => {
+          if (input.value === "") return;
+          input.value = clamp(Number(input.value) || 0);
+        });
+      });
     },
-    stepRun(count) {
-      window.parent.postMessage({ type: "host", action: "stepRun", count: count || 1 }, "*");
-    },
-    setBreakpoints(breakpoints) {
-      window.parent.postMessage({ type: "host", action: "setBreakpoints", breakpoints: breakpoints || [] }, "*");
+    // Same data-tooltip="..." convention as the host's own initTooltips() in primitives.js — wires
+    // up any element carrying that attribute (set once in markup, or any time via
+    // el.dataset.tooltip = "..."), a small delayed popup on hover, one shared ".tooltip-popup"
+    // element per document. NOT a byte-for-byte port, though, unlike most of this file's other
+    // pairs: the host's version only ever prefers a side and falls back once, which is fine in the
+    // full app window but was a real, shipped bug the first time a plugin tried it in its own
+    // narrow iframe — a "fixed" element here can only ever paint inside THIS iframe's own
+    // viewport, so a tooltip wider than the panel would just get cut off no matter which side it
+    // preferred. This version clamps fully inside window.innerWidth/innerHeight instead of only
+    // choosing a side, and pairs with ".tooltip-popup"'s max-width/wrapping in
+    // __lowarc-primitives.css for the same reason.
+    initTooltips(root) {
+      let tooltipEl = document.querySelector(".tooltip-popup");
+      if (!tooltipEl) {
+        tooltipEl = document.createElement("div");
+        tooltipEl.className = "tooltip-popup";
+        document.body.appendChild(tooltipEl);
+      }
+      let showTimer = null;
+      (root || document).querySelectorAll("[data-tooltip]").forEach((el) => {
+        if (el.dataset.tooltipInit) return;
+        el.dataset.tooltipInit = "true";
+
+        el.addEventListener("mouseenter", () => {
+          clearTimeout(showTimer);
+          showTimer = setTimeout(() => {
+            tooltipEl.textContent = el.dataset.tooltip;
+            tooltipEl.classList.add("is-visible");
+            const rect = el.getBoundingClientRect();
+            const tipRect = tooltipEl.getBoundingClientRect();
+            const fitsRight = rect.right + 8 + tipRect.width <= window.innerWidth;
+            const left = fitsRight ? rect.right + 8 : rect.left - tipRect.width - 8;
+            tooltipEl.style.left = `${Math.min(Math.max(4, left), Math.max(4, window.innerWidth - tipRect.width - 4))}px`;
+            tooltipEl.style.top = `${Math.min(Math.max(4, rect.top + rect.height / 2 - tipRect.height / 2), Math.max(4, window.innerHeight - tipRect.height - 4))}px`;
+          }, 400);
+        });
+        el.addEventListener("mouseleave", () => {
+          clearTimeout(showTimer);
+          tooltipEl.classList.remove("is-visible");
+        });
+        el.addEventListener("click", () => {
+          clearTimeout(showTimer);
+          tooltipEl.classList.remove("is-visible");
+        });
+      });
     },
   };
 })();
