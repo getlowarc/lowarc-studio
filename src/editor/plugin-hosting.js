@@ -1,0 +1,495 @@
+      // ---------- Plugin UI hosting ----------
+      // A plugin declares its panels statically (PluginDescriptor.contributes, read at scan time
+      // by list_installed_plugins) — the shell builds rail icons/console tabs straight from that,
+      // eagerly, whether or not the plugin has actually finished starting yet. Panel *content*
+      // (the iframe) is mounted lazily, the first time it's actually shown — the plugin process is
+      // already started at app launch (setup() in lib.rs) by the time anyone could click a rail
+      // icon, so there's no real need to gate on the live registerPanel confirmation as well; that
+      // event is still listened for below, just for visibility/logging rather than as a gate.
+      //
+      // pluginPanels: "pluginId::panelId" -> { pluginId, panel: {id,title,entry,...}, iframe }
+      // windowToPlugin: an iframe's contentWindow -> pluginId, so the message-relay listener below
+      // can trust *which* plugin a postMessage actually came from instead of the message's own
+      // (self-reported, therefore untrustworthy) claim. Open-file viewer iframes (see the
+      // tab-bar/open-files block further down) register in this same map — one trust mechanism,
+      // shared by both kinds of plugin-hosted iframe.
+      const pluginPanels = new Map();
+      const windowToPlugin = new Map();
+
+      function panelKey(pluginId, panelId) {
+        return `${pluginId}::${panelId}`;
+      }
+
+      function mountPanelIframe(key, container) {
+        const entry = pluginPanels.get(key);
+        if (!entry) return null;
+        if (!entry.iframe) {
+          const iframe = document.createElement("iframe");
+          iframe.className = "plugin-panel-frame";
+          iframe.dataset.pluginId = entry.pluginId; // lets a command look up this plugin's own mounted iframe by id, see runCommand()
+          iframe.setAttribute("sandbox", "allow-scripts");
+          container.appendChild(iframe);
+          entry.iframe = iframe;
+          windowToPlugin.set(iframe.contentWindow, entry.pluginId);
+          // Session-mode plugins (Terminal, so far — plugin.json's "session": true) start their
+          // own sessions on demand (window.lowarc.session.start(), see plugin_session.rs) — one
+          // per instance it wants running, not one the host auto-starts at mount time. Terminal
+          // requests its first instance itself, the moment its own script runs, the exact same
+          // way it requests every instance after that.
+          // A panel has no filesystem access of its own, so if it needs to know the project root
+          // (a file explorer does; most panels won't care) it's a URL fragment, not a postMessage
+          // pushed after load (synchronous and readable the instant the plugin's own script
+          // starts — no push-arrival-timing race to get wrong). Src is assigned once the
+          // (cached, near-instant) plugin asset port is known — callers here get the iframe
+          // element back synchronously to toggle classes on; they don't need the navigation
+          // itself to have started yet.
+          pluginAssetUrl(entry.pluginId, entry.panel.entry, `project=${encodeURIComponent(projectPath)}`).then((url) => {
+            iframe.src = url;
+          });
+          // So a freshly-mounted panel (the file explorer, most importantly) gets the current
+          // dirty/error/missing snapshot right away instead of waiting for the next change.
+          iframe.addEventListener("load", () => broadcastFileStatus());
+          // Same cross-iframe click reasoning as the viewer iframes' own focus listener (see
+          // mountFileInGroup) — a click landing inside this panel never bubbles up to this
+          // document, so any open menu/dropdown would otherwise stay stuck open.
+          iframe.addEventListener("focus", () => closeAllOverlays());
+        }
+        return entry.iframe;
+      }
+
+      // Generalizes what showSidebarPanel used to be into something any tab-strip region can use
+      // (console joins in Phase 4) — shows contribution `id` from `slot` inside the element with id
+      // `containerId`, mounting it (once, ever — cached below, regardless of source) the first time
+      // it's actually shown. Host and plugin content are treated identically here: every
+      // contribution gets the same reused per-tab wrapper (.host-panel-frame's existing show/hide
+      // convention — flex column, 100%/100%, toggled via .is-active — not a new class just for
+      // this), and mount(el) is free to build whatever it wants inside it, including delegating
+      // straight to mountPanelIframe() the way a plugin adapter's mount() does; a plain iframe as
+      // that wrapper's sole flex child fills it exactly the same as a host panel's own toolbar+list
+      // markup does today.
+      const slotTabMounted = new Map(); // "slot::id" -> the wrapper element already mounted for it
+
+      function showSlotTab(slot, containerId, id) {
+        const container = document.getElementById(containerId);
+        container.classList.add("hosts-plugin");
+        // Only the per-tab WRAPPER's own is-active is cleared here — never a mounted plugin
+        // iframe's own .plugin-panel-frame.is-active nested inside one, which mount() sets exactly
+        // once and never touches again (see the wrapper comment above). Clearing it here too would
+        // un-set it permanently, since nothing would ever re-add it on a later show (mount() only
+        // runs the first time) — the panel would come back empty on the second visit.
+        container.querySelectorAll(".host-panel-frame").forEach((f) => f.classList.remove("is-active"));
+
+        const contribution = getSlot(slot).find((c) => c.id === id);
+        if (!contribution) return;
+
+        const mountKey = `${slot}::${id}`;
+        let el = slotTabMounted.get(mountKey);
+        if (!el) {
+          el = document.createElement("div");
+          el.className = "host-panel-frame";
+          container.appendChild(el);
+          try {
+            contribution.mount(el);
+          } catch (err) {
+            const errorEl = document.createElement("div");
+            errorEl.style.color = "var(--danger)";
+            errorEl.style.padding = "12px";
+            errorEl.textContent = `This panel failed to load: ${err}`;
+            el.appendChild(errorEl);
+            showToast({ variant: "error", message: `"${id}" failed to render: ${err}`, source: contribution.pluginId || null });
+          }
+          slotTabMounted.set(mountKey, el);
+        }
+        el.classList.add("is-active");
+        if (contribution.onShow) contribution.onShow();
+      }
+
+      // ---------- In-editor managers (host sidebar panels: __module-manager, __plugin-manager) ---
+      // A quality-of-life alternative to the standalone Modules/Plugins pages (see file-modules-item/
+      // file-plugins-item below) that never leaves the editor — deliberately separate surfaces, not
+      // one replacing the other (Nolan: "those will be separate things"). Both wrap the exact same
+      // Tauri commands the standalone pages already use — nothing new on the backend, just a
+      // narrower-sidebar-shaped front end (single-column accordion instead of those pages' wide
+      // two-pane list+detail layout, which needs more width than the sidebar's 240px default has).
+      // One factory instead of two near-duplicate blocks, since a module manager and a plugin
+      // manager are the same shape apart from which commands they call and which extra fields a
+      // row shows — config.extraFields(item) is the only part that actually differs between them.
+      function createManagerPanel(config) {
+        const CHEVRON_SVG = '<svg viewBox="0 0 10 10" fill="none"><path d="M3 1l4 4-4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        const CHECK_SVG = '<svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>';
+
+        let items = [];
+        let expandedId = null;
+        let listEl = null;
+
+        async function load() {
+          try {
+            items = await invoke(config.listCommand);
+          } catch (err) {
+            showToast({ variant: "error", message: String(err) });
+            items = [];
+          }
+          if (!items.some((i) => i.id === expandedId)) expandedId = null;
+          render();
+        }
+
+        function render() {
+          listEl.innerHTML = "";
+          if (items.length === 0) {
+            const empty = document.createElement("div");
+            empty.className = "plugin-manager-empty";
+            empty.textContent = `No ${config.nounPlural} installed.`;
+            listEl.appendChild(empty);
+            return;
+          }
+          for (const item of items) listEl.appendChild(renderRow(item));
+        }
+
+        function renderRow(item) {
+          const row = document.createElement("div");
+          row.className = "plugin-manager-row";
+
+          const header = document.createElement("button");
+          header.type = "button";
+          header.className = "plugin-manager-row-header";
+
+          const dot = document.createElement("span");
+          dot.className = "status-dot" + (item.disabled ? "" : " is-enabled");
+          dot.dataset.tooltip = item.disabled ? "Disabled" : "Enabled";
+          header.appendChild(dot);
+
+          const name = document.createElement("span");
+          name.className = "plugin-manager-row-name";
+          name.textContent = item.name;
+          header.appendChild(name);
+
+          const chevron = document.createElement("span");
+          chevron.className = "plugin-manager-row-chevron" + (expandedId === item.id ? " expanded" : "");
+          chevron.innerHTML = CHEVRON_SVG;
+          header.appendChild(chevron);
+
+          header.addEventListener("click", () => {
+            expandedId = expandedId === item.id ? null : item.id;
+            render();
+          });
+          row.appendChild(header);
+
+          if (expandedId === item.id) row.appendChild(renderRowBody(item));
+          return row;
+        }
+
+        function renderRowBody(item) {
+          const body = document.createElement("div");
+          body.className = "plugin-manager-row-body";
+
+          const sub = document.createElement("div");
+          sub.className = "plugin-manager-row-sub";
+          sub.textContent = item.id + (item.version ? ` · v${item.version}` : "");
+          body.appendChild(sub);
+
+          for (const field of config.extraFields(item)) {
+            const fieldEl = document.createElement("div");
+            fieldEl.className = "plugin-manager-row-desc";
+            fieldEl.textContent = field.label ? `${field.label}: ${field.value}` : field.value;
+            body.appendChild(fieldEl);
+          }
+
+          const actions = document.createElement("div");
+          actions.className = "plugin-manager-row-actions";
+
+          const enabledLabel = document.createElement("label");
+          enabledLabel.className = "checkbox-row";
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.checked = !item.disabled;
+          const box = document.createElement("span");
+          box.className = "checkbox-box";
+          box.innerHTML = CHECK_SVG;
+          const enabledText = document.createElement("span");
+          enabledText.textContent = "Enabled";
+          enabledLabel.appendChild(checkbox);
+          enabledLabel.appendChild(box);
+          enabledLabel.appendChild(enabledText);
+          checkbox.addEventListener("change", async () => {
+            try {
+              await invoke(config.enableCommand, { id: item.id, enabled: checkbox.checked });
+              await load();
+            } catch (err) {
+              showToast({ variant: "error", message: String(err) });
+            }
+          });
+          actions.appendChild(enabledLabel);
+
+          const removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.className = "btn btn-xs btn-danger";
+          removeBtn.textContent = "Remove";
+          removeBtn.addEventListener("click", async () => {
+            const confirmed = await showPopup("manager-remove", { nounSingular: config.nounSingular, name: item.name });
+            if (!confirmed) return;
+            try {
+              await invoke(config.removeCommand, { id: item.id });
+              expandedId = null;
+              await load();
+            } catch (err) {
+              showToast({ variant: "error", message: String(err) });
+            }
+          });
+          actions.appendChild(removeBtn);
+
+          body.appendChild(actions);
+          return body;
+        }
+
+        function mount(el) {
+          const toolbar = document.createElement("div");
+          toolbar.className = "plugin-manager-toolbar";
+          const addBtn = document.createElement("button");
+          addBtn.type = "button";
+          addBtn.className = "btn btn-sm btn-outline";
+          addBtn.innerHTML = `<svg viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg> Add ${config.nounSingular}…`;
+
+          const progressEl = document.createElement("div");
+          progressEl.className = "progress";
+          progressEl.style.flex = "1";
+          progressEl.style.display = "none";
+          progressEl.innerHTML = '<div class="progress-fill"></div>';
+
+          // This panel lives in editor.html's own top-level document (not an iframe, unlike the
+          // standalone Modules/Plugins pages), so listening for the raw Tauri event directly here
+          // is the proven pattern — no postMessage relay needed, same as dev-run-log/dev-run-ended.
+          window.__TAURI__.event.listen("install-progress", (event) => {
+            if (event.payload.kind !== config.nounSingular.toLowerCase()) return;
+            setProgress(progressEl, event.payload.totalBytes ? event.payload.bytesDone / event.payload.totalBytes : 0);
+          });
+
+          addBtn.addEventListener("click", async () => {
+            const sourceDir = await openDialog({ directory: true, title: `Choose a ${config.nounSingular.toLowerCase()} folder to install` });
+            if (!sourceDir) return;
+
+            addBtn.disabled = true;
+            progressEl.style.display = "";
+            setProgress(progressEl, 0);
+
+            try {
+              const id = await invoke(config.installCommand, { sourceDir });
+              showToast({ variant: "success", message: `Installed "${id}".` });
+              expandedId = id;
+              await load();
+            } catch (err) {
+              showToast({ variant: "error", message: String(err) });
+            } finally {
+              addBtn.disabled = false;
+              progressEl.style.display = "none";
+            }
+          });
+          toolbar.appendChild(addBtn);
+          toolbar.appendChild(progressEl);
+          el.appendChild(toolbar);
+
+          listEl = document.createElement("div");
+          listEl.className = "plugin-manager-list";
+          el.appendChild(listEl);
+
+          initTooltips();
+        }
+
+        return { mount, onShow: load };
+      }
+
+      // Keyed with no "::" so a reserved id can never collide with panelKey()'s "pluginId::panelId"
+      // shape. order is negative so both managers sort ahead of any plugin-contributed icon (which
+      // defaults to order 0) regardless of how many plugins are installed — matching the fixed
+      // "Modules, then Plugins, then everything else" position this HTML used to hard-code.
+      const pluginManagerPanel = createManagerPanel({
+        listCommand: "list_installed_plugins",
+        enableCommand: "set_plugin_enabled",
+        removeCommand: "remove_plugin",
+        installCommand: "install_plugin",
+        nounSingular: "Plugin",
+        nounPlural: "plugins",
+        extraFields: (item) => [{ value: item.description || "No description." }, { label: "Command", value: item.command }],
+      });
+      contribute("sidebar", {
+        id: "__plugin-manager",
+        sourceType: "host",
+        label: "Plugins",
+        order: -10,
+        iconHtml:
+          '<svg viewBox="0 0 16 16" fill="none"><path d="M5.5 2v3M10.5 2v3M4 5h8v2a4 4 0 0 1-4 4 4 4 0 0 1-4-4V5Z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" /><path d="M8 11v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" /></svg>',
+        mount: pluginManagerPanel.mount,
+        onShow: pluginManagerPanel.onShow,
+      });
+
+      const moduleManagerPanel = createManagerPanel({
+        listCommand: "list_installed_modules",
+        enableCommand: "set_module_enabled",
+        removeCommand: "remove_module",
+        installCommand: "install_module",
+        nounSingular: "Module",
+        nounPlural: "modules",
+        extraFields: (item) => [
+          { value: item.description || "No description." },
+          { label: "Load order", value: String(item.loadOrder) },
+          { label: "Requires", value: item.requires.length ? item.requires.join(", ") : "Nothing." },
+        ],
+      });
+      contribute("sidebar", {
+        id: "__module-manager",
+        sourceType: "host",
+        label: "Modules",
+        order: -20,
+        iconHtml:
+          '<svg viewBox="0 0 16 16" fill="none"><path d="M8 2l5.5 3.2v5.6L8 14l-5.5-3.2V5.2L8 2Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" /><path d="M8 8v6M8 8L2.5 4.8M8 8l5.5-3.2" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" /></svg>',
+        mount: moduleManagerPanel.mount,
+        onShow: moduleManagerPanel.onShow,
+      });
+
+      const FALLBACK_RAIL_ICON_SVG = '<svg viewBox="0 0 16 16" fill="none"><rect x="3" y="3" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.3" /></svg>';
+
+      // Strips anything that could execute if this SVG ends up in the HOST's own document (the
+      // rail lives in editor.html itself, not a sandboxed iframe — unlike a plugin's panel
+      // content, this has real Tauri access, so a plugin-supplied icon can't be trusted blindly).
+      // innerHTML already never runs a <script> tag it inserts, but inline event-handler
+      // attributes (onclick=, etc.) DO fire — those are the actual thing this strips.
+      function sanitizeSvg(root) {
+        root.querySelectorAll("script").forEach((el) => el.remove());
+        root.querySelectorAll("*").forEach((el) => {
+          for (const attr of Array.from(el.attributes)) {
+            const name = attr.name.toLowerCase();
+            if (name.startsWith("on") || (name === "href" && attr.value.trim().toLowerCase().startsWith("javascript:"))) {
+              el.removeAttribute(attr.name);
+            }
+          }
+        });
+      }
+
+      // Fetched as raw text over IPC (read_plugin_asset) rather than used as an <img src="..."> —
+      // inlining it as a real <svg> lets it inherit currentColor for free, the same as the
+      // fallback icon already does, which a rasterized <img> never could.
+      async function loadRailIconSvg(pluginId, railIcon) {
+        try {
+          const text = await invoke("read_plugin_asset", { pluginId, relPath: railIcon });
+          const doc = new DOMParser().parseFromString(text, "image/svg+xml");
+          if (doc.querySelector("parsererror")) return null;
+          const svg = doc.querySelector("svg");
+          if (!svg) return null;
+          sanitizeSvg(svg);
+          return svg;
+        } catch (err) {
+          return null;
+        }
+      }
+
+      // "__run" is the one console tab the app itself owns (dev-run + plugin log output) — every
+      // other key is a plugin-contributed tab, both registered via contribute("console", ...) and
+      // shown through the same showSlotTab() every other tab-strip region uses. activeConsoleTabKey
+      // is still tracked separately (rather than always re-querying the DOM for it) since
+      // requestNewTerminal() below needs it on every click, not just on activation.
+      let activeConsoleTabKey = "__run";
+
+      // Generalizes what activateConsoleTab(btn, key) used to be — takes just the key now (not a
+      // button reference) so it can be called both from a real click (via renderTabStrip's
+      // onActivate, below) and programmatically (startRun(), which has no click event to hand it).
+      // Manually re-toggling is-active here is redundant on the click path (primitives.js's
+      // initTabs() already did it, since #console-tabs is a [data-tabs] container) but necessary on
+      // the programmatic one — cheap enough either way not to bother with two separate functions.
+      function activateConsoleTab(key) {
+        document.querySelectorAll("#console-tabs .console-tab").forEach((t) => t.classList.remove("is-active"));
+        const btn = document.querySelector(`#console-tabs .console-tab[data-tab-value="${key}"]`);
+        if (btn) btn.classList.add("is-active");
+
+        activeConsoleTabKey = key;
+        showSlotTab("console", "console-body", key);
+
+        // The new-terminal controls only make sense while a session-mode tab (Terminal) is
+        // active — "__run" has no pluginPanels entry at all, so it falls through to hidden too.
+        const entry = key !== "__run" ? pluginPanels.get(key) : null;
+        document.getElementById("console-session-controls").style.display = entry && entry.session ? "flex" : "none";
+        document.getElementById("console-clear-run").style.display = key === "__run" ? "flex" : "none";
+      }
+
+      // ---------- Terminal's "new instance" controls (host chrome, not the plugin's own UI —
+      // see the console header comment) ----------
+      // Both just ask whichever session-mode tab is currently active to open another instance —
+      // the plugin itself (Terminal) owns creating the session and adding it to its own sidebar,
+      // this is only ever "tell the active session-mode iframe a new-instance request happened".
+      function requestNewTerminal(shell) {
+        const entry = pluginPanels.get(activeConsoleTabKey);
+        if (entry && entry.iframe) {
+          entry.iframe.contentWindow.postMessage({ type: "emit", event: "lowarc:newTerminal", payload: { shell } }, "*");
+        }
+      }
+
+      document.getElementById("console-new-session").addEventListener("click", () => requestNewTerminal(null));
+
+      const CONSOLE_SESSION_SHELL_OPTIONS = [
+        { value: "__default", label: "Default" },
+        { value: "powershell", label: "PowerShell" },
+        { value: "pwsh", label: "PowerShell 7 (pwsh)" },
+        { value: "cmd", label: "Command Prompt" },
+        { value: "bash", label: "Bash" },
+        { value: "zsh", label: "Zsh" },
+      ];
+      document.getElementById("console-session-menu-trigger").addEventListener("click", (e) => {
+        e.stopPropagation();
+        openMenuFromTrigger(e.currentTarget, CONSOLE_SESSION_SHELL_OPTIONS).then((value) => {
+          if (value) requestNewTerminal(value === "__default" ? null : value);
+        });
+      });
+
+      // ---------- Maximize console (permanent, like Close — not scoped to any one tab) ----------
+      let consoleMaximized = false;
+      function setConsoleMaximized(maximized) {
+        consoleMaximized = maximized;
+        document.getElementById("console-expand").classList.toggle("is-active", maximized);
+        if (maximized) {
+          // Not calc(100vh - Npx) — CSS Grid doesn't shrink the *other* explicit/auto rows to
+          // make room for one row that would overflow the container, it just lets the grid
+          // overflow instead (confirmed live: the CSS var applied correctly but nothing visually
+          // grew). Computing the real leftover pixels here, from the shell's own actual height
+          // minus what the menu bar/status bar/divider genuinely take up, is what actually
+          // collapses the center row to ~0 instead of merely overflowing past it.
+          const shellHeight = shell.getBoundingClientRect().height;
+          const menuHeight = document.querySelector(".menu-bar").getBoundingClientRect().height;
+          const statusHeight = document.querySelector(".status-bar").getBoundingClientRect().height;
+          const dividerHeight = 4; // the fixed 4px row between the center view and the console
+          const available = shellHeight - menuHeight - statusHeight - dividerHeight;
+          shell.style.setProperty("--console-height", `${Math.max(PANELS.console.min, available)}px`);
+        } else {
+          applyPanel("console"); // restores the normal, persisted (draggable) size
+        }
+      }
+      document.getElementById("console-expand").addEventListener("click", () => setConsoleMaximized(!consoleMaximized));
+
+      function appendConsoleLine(level, message) {
+        const panel = document.getElementById("console-run-panel");
+        const line = document.createElement("div");
+        line.className = "line";
+        line.textContent = message;
+        if (level === "error") line.style.color = "var(--danger)";
+        else if (level === "warn" || level === "warning") line.style.color = "var(--yellow)";
+        panel.appendChild(line);
+        panel.scrollTop = panel.scrollHeight;
+      }
+
+      // order:-10 so Run always sorts first, matching its old fixed "always first" position in the
+      // static HTML. closeable:false — nothing currently renders a per-tab close control for ANY
+      // console tab (Terminal manages closing its own sessions through its own UI, not a host-drawn
+      // X), so this is forward-looking metadata, not something consumed yet. mount(el) just
+      // re-parents the one #console-run-panel element that already exists and that
+      // appendConsoleLine() already writes into regardless of migration — its own "is-active" class
+      // (already set in its static HTML) is left untouched and permanent, exactly like a plugin
+      // sidebar iframe's is-active is (see showSlotTab's wrapper comment); the WRAPPER's is-active
+      // is what actually governs visibility once mounted.
+      contribute("console", {
+        id: "__run",
+        sourceType: "host",
+        label: "Run",
+        order: -10,
+        closeable: false,
+        mount(el) {
+          el.appendChild(document.getElementById("console-run-panel"));
+        },
+      });
+
