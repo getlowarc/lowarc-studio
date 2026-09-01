@@ -1,10 +1,10 @@
 {
   "name": "Node Graph",
   "version": "0.1.0",
-  "description": "A visual node-graph editor for .lan (LowArc Node) files — boxes, sockets, and connections. Pure editing surface for now: nothing here feeds into the runtime/compiler yet, this just lets you draw and save a graph.",
+  "description": "A visual node-graph editor for .lan (LowArc Node) files — boxes and connections. Pure editing surface for now: nothing here feeds into the runtime/compiler yet, this just lets you draw and save a graph.",
   "contributes": {
     "panels": [
-      { "id": "main", "title": "Node Graph", "location": "sidebar", "entry": "panel.html", "railIcon": "icon.svg" }
+      { "id": "node", "title": "Node Graph", "location": "inspector", "entry": "inspector.html" }
     ],
     "viewers": [
       {
@@ -14,5 +14,8 @@
         "extensions": [".lan"]
       }
     ]
-  }
+  },
+  "settings": [
+    { "key": "showBadges", "label": "Show node/connection badges", "type": "checkbox", "hint": "Small indicators for attached files, port type, and connection counts." }
+  ]
 }

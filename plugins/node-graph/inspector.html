@@ -1,0 +1,169 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="__lowarc.css" />
+<link rel="stylesheet" href="__lowarc-primitives.css" />
+<link rel="stylesheet" href="__lowarc-theme.css" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); }
+  body { display: flex; flex-direction: column; padding: 10px; gap: 16px; overflow-y: auto; }
+
+  .ng-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .ng-field-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--fg-dim);
+  }
+
+  .ng-file-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .ng-file-row .ng-file-path {
+    flex: 1;
+    min-width: 0;
+    font-family: var(--font-mono, monospace);
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ng-files-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .ng-files-empty {
+    font-size: 12px;
+    color: var(--fg-dim);
+  }
+
+  .ng-new-node-row {
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .ng-new-node-row .btn {
+    width: 100%;
+  }
+
+  .ng-xy-row {
+    display: flex;
+    gap: 8px;
+  }
+  .ng-xy-row .numeric-input {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
+  .ng-xy-row .numeric-input input {
+    width: 100%;
+    min-width: 0;
+    text-align: left;
+  }
+
+  .ng-socket-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .ng-connected-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .ng-connected-row {
+    font-size: 12px;
+    padding: 5px 8px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .ng-connected-row:hover {
+    border-color: var(--cyan);
+  }
+  .ng-connected-empty {
+    font-size: 12px;
+    color: var(--fg-dim);
+  }
+
+  /* Tooltip styling now comes from the shared __lowarc-primitives.css (".tooltip-popup"), wired up
+     via window.lowarc.initTooltips() in inspector.js — no local copy needed anymore. */
+</style>
+</head>
+<body>
+  <script src="__lowarc.js"></script>
+
+  <div class="ng-field">
+    <label class="ng-field-label" for="ng-label-input">Label</label>
+    <input type="text" class="input" id="ng-label-input" autocomplete="off" />
+  </div>
+
+  <div class="ng-field">
+    <span class="ng-field-label">Position</span>
+    <div class="ng-xy-row">
+      <div class="numeric-input">
+        <input type="text" inputmode="numeric" id="ng-x-input" step="1" placeholder="X" aria-label="X position" />
+        <div class="numeric-steppers">
+          <button type="button" class="stepper-up" aria-label="Increase X">▲</button>
+          <button type="button" class="stepper-down" aria-label="Decrease X">▼</button>
+        </div>
+      </div>
+      <div class="numeric-input">
+        <input type="text" inputmode="numeric" id="ng-y-input" step="1" placeholder="Y" aria-label="Y position" />
+        <div class="numeric-steppers">
+          <button type="button" class="stepper-up" aria-label="Increase Y">▲</button>
+          <button type="button" class="stepper-down" aria-label="Decrease Y">▼</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ng-field">
+    <span class="ng-field-label">Files</span>
+    <div class="ng-files-list" id="ng-files-list"></div>
+    <button type="button" class="btn btn-sm btn-ghost" id="ng-attach-file-btn">Attach File…</button>
+  </div>
+
+  <div class="ng-field">
+    <div class="ng-socket-section-header">
+      <span class="ng-field-label">Input</span>
+      <label class="checkbox-row">
+        <input type="checkbox" id="ng-has-input" />
+        <span class="checkbox-box"><svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg></span>
+      </label>
+    </div>
+    <div class="ng-connected-list" id="ng-inputs-list"></div>
+  </div>
+
+  <div class="ng-field">
+    <div class="ng-socket-section-header">
+      <span class="ng-field-label">Output</span>
+      <label class="checkbox-row">
+        <input type="checkbox" id="ng-has-output" />
+        <span class="checkbox-box"><svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg></span>
+      </label>
+    </div>
+    <div class="ng-connected-list" id="ng-outputs-list"></div>
+  </div>
+
+  <div class="ng-new-node-row">
+    <button type="button" class="btn btn-md" id="ng-new-node-btn">+ New Node</button>
+  </div>
+
+  <script src="inspector.js"></script>
+</body>
+</html>

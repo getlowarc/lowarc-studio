@@ -13,28 +13,19 @@
   #container { position: relative; flex: 1; min-height: 0; }
 
   /* One of these per open file, same "several documents, one instance" shape monaco.js/
-     media-viewer.js already use. */
+     media-viewer.js already use. No toolbar — every action here (add a node, split a wire, delete)
+     is reachable from a right-click, so the whole viewport stays nothing but the canvas. */
   .ng-doc {
     position: absolute;
     inset: 0;
     display: none;
-    flex-direction: column;
   }
-  .ng-doc.is-active { display: flex; }
+  .ng-doc.is-active { display: block; }
 
-  .ng-toolbar {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 6px 10px;
-    border-bottom: 1px solid var(--border);
-    flex: none;
-  }
   .ng-viewport {
-    flex: 1;
-    min-height: 0;
+    position: absolute;
+    inset: 0;
     overflow: auto;
-    position: relative;
     cursor: grab;
   }
   .ng-viewport.is-panning { cursor: grabbing; }
@@ -47,6 +38,18 @@
        so empty space still reads as "a surface", not a void. */
     background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
     background-size: 24px 24px;
+  }
+
+  .ng-error {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    text-align: center;
+    color: var(--danger);
+    font-size: 13px;
   }
 
   .ng-connections {
@@ -82,87 +85,141 @@
     pointer-events: none;
   }
 
+  /* Deliberately NOT overflow:hidden here — that would also clip the badges, which are meant to
+     stick out past this box's own edges (see ".ng-badge" below). Truncation for a long label lives
+     on ".ng-node-label" instead, scoped to just the text. */
   .ng-node {
     position: absolute;
-    min-width: 160px;
+    min-width: 140px;
+    padding: 8px 14px;
     background: var(--bg-raised);
     border: 1px solid var(--border);
     border-radius: 6px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    box-sizing: border-box;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
     user-select: none;
+    cursor: grab;
+  }
+  .ng-node-label {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ng-node.is-dragging {
+    cursor: grabbing;
   }
   .ng-node.is-selected {
     border-color: var(--cyan);
     box-shadow: 0 0 0 1px var(--cyan), 0 2px 8px rgba(0, 0, 0, 0.25);
   }
-  .ng-node-title {
-    padding: 6px 10px;
-    font-size: 13px;
-    font-weight: 600;
-    border-bottom: 1px solid var(--border);
-    cursor: grab;
-    border-top-left-radius: 6px;
-    border-top-right-radius: 6px;
-    background: var(--bg-hover);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  /* Hovering a connected-node row in the Inspector's Input/Output list — a lighter, temporary
+     "here it is" versus the persistent cyan selection styling above. An outline (not a border
+     color swap) so it never fights with is-selected's own border if both apply to the same node
+     at once. */
+  .ng-node.is-hover-highlight {
+    outline: 2px solid var(--yellow);
+    outline-offset: 2px;
   }
-  .ng-node.is-dragging .ng-node-title {
-    cursor: grabbing;
-  }
-  .ng-node-title-input {
-    width: 100%;
-    font: inherit;
-    font-weight: 600;
-    background: var(--bg);
-    color: var(--fg);
-    border: 1px solid var(--cyan);
-    border-radius: 3px;
-    padding: 1px 4px;
-  }
-  .ng-node-body {
-    display: flex;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 8px 0;
-  }
-  .ng-node-sockets {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-width: 0;
-    flex: 1;
-  }
+  /* A node's own single input/output — at most one of each (see the locked schema: a port is no
+     longer a named, listed thing). ".ng-socket" is the actual pointer target: it spans the node's
+     full height at that edge, much easier to grab than the small dot alone would be. ".ng-socket-
+     dot" is purely the visual circle, centered inside it and otherwise inert (pointer-events:none)
+     so hover/click always resolve to the wrapper. */
   .ng-socket {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    color: var(--fg-dim);
-    padding: 1px 10px;
-    white-space: nowrap;
+    position: absolute;
+    top: 0;
+    height: 100%;
+    width: 26px;
+    cursor: crosshair;
   }
-  .ng-node-sockets.is-outputs .ng-socket {
-    flex-direction: row-reverse;
-    text-align: right;
+  .ng-socket.ng-in {
+    left: -18px;
+  }
+  .ng-socket.ng-out {
+    right: -18px;
   }
   .ng-socket-dot {
-    width: 10px;
-    height: 10px;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 12px;
+    height: 12px;
     border-radius: 50%;
     background: var(--bg);
     border: 2px solid var(--fg-dim);
-    flex: none;
-    cursor: crosshair;
+    pointer-events: none;
   }
-  .ng-socket-dot:hover {
+  .ng-socket:hover .ng-socket-dot {
     border-color: var(--cyan);
     background: var(--cyan);
   }
   .ng-socket-dot.is-connected {
     border-color: var(--cyan);
   }
+
+  /* ---------- Badges ---------- */
+  /* Small, fixed-size, wordless indicators — see node-graph.js's "Badges" section for what each
+     one means. Always the same size regardless of content: "+99" (the widest possible value) has
+     to fit exactly as well as a single "S" does, so a badge never grows to fit more text — the
+     count caps out visually instead. Real meaning only ever shows in a tooltip, on hover. */
+  .ng-badge {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 15px;
+    border-radius: 999px;
+    background: var(--bg-raised);
+    border: 1.5px solid var(--border);
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--fg);
+    user-select: none;
+  }
+  .ng-badge-files {
+    top: -8px;
+    left: -8px;
+    border-color: var(--cyan);
+  }
+  .ng-badge-porttype {
+    top: -8px;
+    right: -8px;
+  }
+  /* Inset from the edge (not sticking out past it, like the two above) so these never overlap the
+     socket hit areas, which occupy the space just outside the node's own left/right edges. */
+  .ng-badge-inputs {
+    bottom: -8px;
+    left: 8px;
+  }
+  .ng-badge-outputs {
+    bottom: -8px;
+    right: 8px;
+  }
+
+  .ng-badge-fo {
+    overflow: visible;
+  }
+  .ng-badge.ng-badge-connection {
+    position: static;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+    /* ".ng-connections" (the enclosing SVG) sets pointer-events:none so empty space between wires
+       never blocks canvas panning — that's an inherited property, so without this override the
+       badge (real HTML content, via foreignObject) would silently inherit "none" too and never
+       receive hover/click at all. */
+    pointer-events: auto;
+  }
+
+  /* Tooltip styling now comes from the shared __lowarc-primitives.css (".tooltip-popup"), wired up
+     via window.lowarc.initTooltips() in node-graph.js — no local copy needed anymore. */
 </style>
 </head>
 <body>
