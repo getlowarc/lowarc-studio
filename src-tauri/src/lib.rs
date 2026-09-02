@@ -440,9 +440,9 @@ fn stop_dev_run(state: State<'_, RunState>) -> Result<(), String> {
 }
 
 /// Folder-mode export only for now — see export::export_folder's own header for why a folder is a
-/// real, complete output shape rather than a stopgap. Runs on its own thread (the runtime build
-/// step alone can take real time) and reports progress the same way dev-run does: `export-log`
-/// events while it runs, one `export-ended` event when it's done either way.
+/// real, complete output shape rather than a stopgap. Runs on its own thread (copying modules and
+/// the runtime is real, if brief, disk I/O) and reports progress the same way dev-run does:
+/// `export-log` events while it runs, one `export-ended` event when it's done either way.
 #[tauri::command]
 fn start_export(app: AppHandle, state: State<'_, ExportState>, project_dir: String, output_dir: String, name: String, diagnostics_log: bool) -> Result<(), String> {
     {
@@ -453,12 +453,12 @@ fn start_export(app: AppHandle, state: State<'_, ExportState>, project_dir: Stri
         *guard = true;
     }
 
-    // Each of resolve_bootstrap's and export_folder's own log(...) calls is one fixed, known stage
-    // announced in a fixed order — 1 from resolve_bootstrap, 5 from export_folder today — so a
-    // plain running count against that fixed total is a real (if coarse) progress fraction, not a
-    // guess. Keep EXPORT_TOTAL_STEPS in sync if either function's own count of log(...) calls
+    // export_folder's own log(...) calls are 5 fixed, known stages announced in a fixed order —
+    // resolve_runtime() locates an already-built binary and never logs at all — so a plain
+    // running count against that fixed total is a real (if coarse) progress fraction, not a
+    // guess. Keep EXPORT_TOTAL_STEPS in sync if export_folder's own count of log(...) calls
     // changes.
-    const EXPORT_TOTAL_STEPS: u32 = 6;
+    const EXPORT_TOTAL_STEPS: u32 = 5;
     let step = Arc::new(AtomicU32::new(0));
     let log_handle = app.clone();
     let log: Arc<dyn Fn(&str) + Send + Sync> = Arc::new(move |message: &str| {
@@ -477,9 +477,9 @@ fn start_export(app: AppHandle, state: State<'_, ExportState>, project_dir: Stri
 
     let done_handle = app.clone();
     std::thread::spawn(move || {
-        let result = export::bootstrap_source::resolve_bootstrap(&*log)
+        let result = export::runtime_source::resolve_runtime()
             .map_err(|e| vec![e])
-            .and_then(|bootstrap_exe| export::export_folder(&options, &bootstrap_exe, &*log));
+            .and_then(|runtime_exe| export::export_folder(&options, &runtime_exe, &*log));
 
         *done_handle.state::<ExportState>().0.lock().unwrap() = false;
         let payload = match &result {

@@ -79,15 +79,17 @@ impl AppPaths {
         Self::user_data().join("themes")
     }
     /// Where a native binary this app needs at runtime, but that isn't part of any one plugin,
-    /// lives for an INSTALLED copy — native_module_host (see runtime/native_module.rs) and,
-    /// since 2026-09-01, lowarc-bootstrap (see export/bootstrap_source.rs). A source checkout
-    /// doesn't use this for native_module_host at all — that one resolves next to the running exe
-    /// instead, since Cargo already puts every one of this workspace's binaries in the same
-    /// target/ directory as a normal side effect of building it. lowarc-bootstrap is different:
-    /// it isn't part of this workspace (it's `lowarc`'s own Bootstrap crate, a separate repo), so
-    /// bootstrap_source.rs checks here even in a source checkout, before falling back to building
-    /// one fresh from a sibling `lowarc` checkout — see that module's own comment. Distinct from
-    /// plugins() since neither of these is a plugin or has a plugin.json of its own.
+    /// lives for an INSTALLED copy — native_module_host (see runtime/native_module.rs) and
+    /// lowarc_runtime, the exported/standalone engine binary (see export/runtime_source.rs).
+    /// Both are genuine binary targets of this same Cargo workspace (src/bin auto-discovery), so
+    /// a SOURCE checkout doesn't need this at all — they resolve next to the running exe instead,
+    /// since Cargo already puts every one of this workspace's binaries in the same target/
+    /// directory as a normal side effect of building it. An installed copy has no such guarantee
+    /// (Tauri doesn't bundle a sibling binary just because it happened to exist in the same build
+    /// output directory), so both resolvers fall back to here, populated by
+    /// ensure_installed_copy_resources() from this app's own bundled resources on first run — see
+    /// prepare-bundle.ps1 for how they get into that bundle. Distinct from plugins() since neither
+    /// of these is a plugin or has a plugin.json of its own.
     pub fn runtime_helpers() -> PathBuf {
         Self::user_data().join("runtime-helpers")
     }

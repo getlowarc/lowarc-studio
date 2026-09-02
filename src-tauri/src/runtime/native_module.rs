@@ -45,19 +45,29 @@ pub fn platform_library_file_name(base: &str) -> String {
     }
 }
 
-/// A source checkout finds this next to the running exe — it's built by the same Cargo package
-/// (src/bin auto-discovery), landing in the same target/ directory as lowarc-studio.exe itself as
-/// a normal side effect of building the workspace. An installed copy has no such guarantee (Tauri
-/// doesn't bundle a sibling binary just because it happened to exist in the same build output
-/// directory) — it resolves via AppPaths::runtime_helpers() instead, which
-/// AppPaths::ensure_installed_copy_resources() populates from this app's own bundled resources on
-/// first run. See prepare-bundle.ps1 for how it gets into that resource bundle in the first place.
-fn native_module_host_path() -> Result<PathBuf, String> {
+/// Tried next to the running exe FIRST, in every context this function can run in:
+///   - A source checkout of LowArc Studio: built by the same Cargo package (src/bin
+///     auto-discovery), landing in the same target/ directory as lowarc-studio.exe itself as a
+///     normal side effect of building the workspace — always found here.
+///   - The exported, standalone runtime (bin/lowarc_runtime.rs): export::export_folder copies
+///     this binary in right alongside it whenever the project actually needs a native-kind module
+///     — always found here too, since an export is a flat, self-contained folder with everything
+///     it needs already sitting next to the exe. There is no "installed copy" concept for an
+///     export at all; it's always this case.
+///   - An installed copy of LowArc Studio itself: Tauri doesn't bundle a sibling binary just
+///     because it happened to exist in the same build output directory, so it genuinely isn't
+///     next to the exe here — falls back to AppPaths::runtime_helpers(), which
+///     AppPaths::ensure_installed_copy_resources() populates from this app's own bundled
+///     resources on first run (see prepare-bundle.ps1 for how it gets into that bundle).
+/// An existence check rather than a dev/installed branch on purpose — it's what makes the first
+/// two cases above resolve identically with no special-casing for which one is actually running.
+pub(crate) fn native_module_host_path() -> Result<PathBuf, String> {
     let name = if cfg!(windows) { "native_module_host.exe" } else { "native_module_host" };
-    if crate::app_paths::AppPaths::dev_root().is_some() {
-        let exe = std::env::current_exe().map_err(|e| format!("could not resolve the current executable: {e}"))?;
-        let dir = exe.parent().ok_or("the current executable has no parent directory")?;
-        return Ok(dir.join(name));
+    let exe = std::env::current_exe().map_err(|e| format!("could not resolve the current executable: {e}"))?;
+    let dir = exe.parent().ok_or("the current executable has no parent directory")?;
+    let next_to_exe = dir.join(name);
+    if next_to_exe.is_file() {
+        return Ok(next_to_exe);
     }
     Ok(crate::app_paths::AppPaths::runtime_helpers().join(name))
 }
