@@ -25,8 +25,15 @@ jobs:
       - name: Build
         run: cargo build
 
-      # Also builds and runs everything under tests/ (native/process/plugin-host/dev-run
-      # end-to-end coverage). folder_export_end_to_end.rs stays #[ignore]d by default since it
-      # needs a sibling `lowarc` checkout this runner doesn't have — see its own header comment.
+      # Clean as of the runtime-binary-target rework — no rustfmt.toml exists yet (this codebase's
+      # own style runs wider than rustfmt's 100-char default on long, single-line, well-commented
+      # statements throughout), so `cargo fmt --check` isn't run here; it would fail on style this
+      # codebase already deliberately uses, not on anything actually wrong.
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      # Also builds and runs everything under tests/ (native/process/plugin-host/dev-run/export
+      # end-to-end coverage, folder_export_end_to_end.rs included — no external checkout needed
+      # for any of it any more, see that file's own header comment).
       - name: Test
         run: cargo test

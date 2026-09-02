@@ -2,9 +2,12 @@
 target/
 src-tauri/gen/schemas/
 
-# Node, if/when a frontend build step gets added
+# Node, if/when a frontend build step gets added. dist/ is anchored to the root (unlike
+# node_modules/, harmless unanchored everywhere) — unanchored it would also match a future
+# plugin's own dist/ build output folder, silently untracking real plugin source and undermining
+# the /plugins/* tracking-by-default rule below.
 node_modules/
-dist/
+/dist/
 
 # Per-user runtime state written by a source build (AppPaths.user_data() == the repo root when
 # running from source, same reasoning as lowarc's own AppPaths) — installed modules, plugins,
