@@ -6,6 +6,7 @@
 // Bootstrap's.
 
 use lowarc_studio_lib::runtime;
+use lowarc_studio_lib::runtime::runtime_loader::LogFn;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
@@ -46,7 +47,7 @@ fn runs_a_native_module_end_to_end_via_dlopen() {
     let trace_path = temp_dir("trace").join("trace.txt");
     std::env::set_var("LOWARC_STUDIO_TEST_TRACE", &trace_path);
 
-    let log: Arc<dyn Fn(runtime::runtime_loader::LogLevel, &str) + Send + Sync> = {
+    let log: LogFn = {
         let messages = Arc::new(Mutex::new(Vec::<String>::new()));
         Arc::new(move |_level, msg| messages.lock().unwrap().push(msg.to_string()))
     };

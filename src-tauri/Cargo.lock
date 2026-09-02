@@ -2210,6 +2210,7 @@ dependencies = [
  "base64 0.22.1",
  "log",
  "mime_guess",
+ "parking_lot",
  "portable-pty",
  "serde",
  "serde_json",

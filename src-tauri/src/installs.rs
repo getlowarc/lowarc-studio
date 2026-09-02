@@ -163,6 +163,12 @@ pub fn remove_module(modules_dir: &Path, id: &str) -> Result<(), String> {
 }
 
 pub fn remove_plugin(plugins_dir: &Path, id: &str) -> Result<(), String> {
+    // A destructive op (remove_dir_all), so this checks id itself rather than trusting a caller to
+    // only ever pass one straight from a real scanned list — same reasoning as
+    // AppPaths::is_valid_component_id's other callers.
+    if !crate::app_paths::AppPaths::is_valid_component_id(id) {
+        return Err(format!("Invalid plugin id \"{id}\"."));
+    }
     let folder = plugins_dir.join(id);
     if !folder.is_dir() {
         return Err(format!("No installed plugin with id \"{id}\"."));

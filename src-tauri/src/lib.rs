@@ -14,13 +14,14 @@ mod theme;
 use app_paths::AppPaths;
 use installs::{ModuleListItem, PluginListItem};
 use projects::RecentProject;
-use runtime::runtime_loader::LogLevel;
+use runtime::runtime_loader::{LogFn, LogLevel};
 use settings::Settings;
 use theme::ThemePreset;
 use std::collections::HashSet;
 use std::path::PathBuf;
+use parking_lot::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 /// The debug-control handles for the one active dev-run, if any. A second start_dev_run while one
@@ -82,7 +83,7 @@ fn start_dev_run(
     let step_request = Arc::new(AtomicU32::new(0));
 
     {
-        let mut guard = state.0.lock().unwrap();
+        let mut guard = state.0.lock();
         if guard.is_some() {
             return Err("A run is already active — stop it before starting another.".into());
         }
@@ -97,7 +98,7 @@ fn start_dev_run(
     let modules = AppPaths::modules();
 
     let log_handle = app.clone();
-    let log: Arc<dyn Fn(LogLevel, &str) + Send + Sync> = Arc::new(move |level, message| {
+    let log: LogFn = Arc::new(move |level, message| {
         let _ = log_handle.emit("dev-run-log", serde_json::json!({"level": log_level_str(level), "message": message}));
     });
 
@@ -115,7 +116,7 @@ fn start_dev_run(
         // handed to game modules at start, a separate concept from Studio's own settings.json.
         let result = runtime::start_run(&entry, &project, &modules, target_fps, serde_json::json!({}), stop_flag, log, debug);
 
-        *done_handle.state::<RunState>().0.lock().unwrap() = None;
+        *done_handle.state::<RunState>().0.lock() = None;
         let payload = match &result {
             Ok(()) => serde_json::json!({"ok": true}),
             Err(errors) => serde_json::json!({"ok": false, "errors": errors}),
@@ -131,7 +132,7 @@ fn start_dev_run(
 /// impossible to race) would let one more tick slip through right after this call returns.
 #[tauri::command]
 fn pause_dev_run(state: State<'_, RunState>) -> Result<(), String> {
-    match state.0.lock().unwrap().as_ref() {
+    match state.0.lock().as_ref() {
         Some(active) => {
             active.step_request.store(0, Ordering::SeqCst);
             active.pause_flag.store(true, Ordering::SeqCst);
@@ -143,7 +144,7 @@ fn pause_dev_run(state: State<'_, RunState>) -> Result<(), String> {
 
 #[tauri::command]
 fn resume_dev_run(state: State<'_, RunState>) -> Result<(), String> {
-    match state.0.lock().unwrap().as_ref() {
+    match state.0.lock().as_ref() {
         Some(active) => {
             active.step_request.store(0, Ordering::SeqCst);
             active.pause_flag.store(false, Ordering::SeqCst);
@@ -158,7 +159,7 @@ fn resume_dev_run(state: State<'_, RunState>) -> Result<(), String> {
 /// silently pausing-then-stepping on the caller's behalf.
 #[tauri::command]
 fn step_dev_run(state: State<'_, RunState>, count: Option<u32>) -> Result<(), String> {
-    match state.0.lock().unwrap().as_ref() {
+    match state.0.lock().as_ref() {
         Some(active) => {
             if !active.pause_flag.load(Ordering::SeqCst) {
                 return Err("Pause the run before stepping.".into());
@@ -175,7 +176,7 @@ fn step_dev_run(state: State<'_, RunState>, count: Option<u32>) -> Result<(), St
 /// everything" convention plugin settings/commands already use.
 #[tauri::command]
 fn set_breakpoints(state: State<'_, BreakpointState>, breakpoints: Vec<runtime::runtime_loader::Breakpoint>) {
-    *state.0.lock().unwrap() = breakpoints;
+    *state.0.lock() = breakpoints;
 }
 
 #[tauri::command]
@@ -430,7 +431,7 @@ fn delete_theme_preset(name: String) -> Result<(), String> {
 
 #[tauri::command]
 fn stop_dev_run(state: State<'_, RunState>) -> Result<(), String> {
-    match state.0.lock().unwrap().as_ref() {
+    match state.0.lock().as_ref() {
         Some(active) => {
             active.stop_flag.store(true, Ordering::SeqCst);
             Ok(())
@@ -446,7 +447,7 @@ fn stop_dev_run(state: State<'_, RunState>) -> Result<(), String> {
 #[tauri::command]
 fn start_export(app: AppHandle, state: State<'_, ExportState>, project_dir: String, output_dir: String, name: String, diagnostics_log: bool) -> Result<(), String> {
     {
-        let mut guard = state.0.lock().unwrap();
+        let mut guard = state.0.lock();
         if *guard {
             return Err("An export is already in progress — wait for it to finish before starting another.".into());
         }
@@ -481,7 +482,7 @@ fn start_export(app: AppHandle, state: State<'_, ExportState>, project_dir: Stri
             .map_err(|e| vec![e])
             .and_then(|runtime_exe| export::export_folder(&options, &runtime_exe, &*log));
 
-        *done_handle.state::<ExportState>().0.lock().unwrap() = false;
+        *done_handle.state::<ExportState>().0.lock() = false;
         let payload = match &result {
             Ok(path) => serde_json::json!({"ok": true, "path": path.to_string_lossy()}),
             Err(errors) => serde_json::json!({"ok": false, "errors": errors}),
@@ -535,6 +536,9 @@ fn list_installed_plugins() -> Vec<PluginListItem> {
 /// instead of needing anything to persist between calls.
 #[tauri::command]
 fn invoke_plugin(app: AppHandle, id: String, method: String, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    if !AppPaths::is_valid_component_id(&id) {
+        return Err(format!("Invalid plugin id \"{id}\"."));
+    }
     if settings::load().disabled_plugins.iter().any(|p| p == &id) {
         return Err(format!("Plugin \"{id}\" is disabled."));
     }
@@ -567,6 +571,9 @@ fn invoke_plugin(app: AppHandle, id: String, method: String, params: serde_json:
 /// command no longer reaches into Settings on any plugin's behalf.
 #[tauri::command]
 fn start_plugin_session(app: AppHandle, id: String, session_id: String, shell: Option<String>, sessions: State<plugin_session::SessionRegistry>) -> Result<(), String> {
+    if !AppPaths::is_valid_component_id(&id) {
+        return Err(format!("Invalid plugin id \"{id}\"."));
+    }
     if settings::load().disabled_plugins.iter().any(|p| p == &id) {
         return Err(format!("Plugin \"{id}\" is disabled."));
     }
@@ -580,15 +587,19 @@ fn start_plugin_session(app: AppHandle, id: String, session_id: String, shell: O
 
 /// Fire-and-forget write to a running session's stdin — see window.lowarc.session.send() in
 /// plugin_assets.rs. Whatever the session has to say back arrives separately, as a
-/// lowarc:sessionOutput emit (plugin_session.rs), not as this call's return value.
+/// lowarc:sessionOutput emit (plugin_session.rs), not as this call's return value. `id` is the
+/// calling plugin's own id (from the host's windowToPlugin, same as start_plugin_session) —
+/// SessionRegistry::send() verifies session_id actually belongs to it before writing anything.
 #[tauri::command]
-fn send_to_plugin_session(session_id: String, message: serde_json::Value, sessions: State<plugin_session::SessionRegistry>) -> Result<(), String> {
-    sessions.send(&session_id, &message)
+fn send_to_plugin_session(id: String, session_id: String, message: serde_json::Value, sessions: State<plugin_session::SessionRegistry>) -> Result<(), String> {
+    sessions.send(&id, &session_id, &message)
 }
 
+/// `id` is the calling plugin's own id — SessionRegistry::stop() verifies session_id belongs to it
+/// before killing anything, same as send() above.
 #[tauri::command]
-fn stop_plugin_session(session_id: String, sessions: State<plugin_session::SessionRegistry>) {
-    sessions.stop(&session_id);
+fn stop_plugin_session(id: String, session_id: String, sessions: State<plugin_session::SessionRegistry>) {
+    sessions.stop(&id, &session_id);
 }
 
 #[tauri::command]

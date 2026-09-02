@@ -9,10 +9,11 @@
 // No OS signal handling (Ctrl+C, window-close) yet — a module's own requestStop is the only way a
 // run currently ends early. Worth adding before this is more than a first pass.
 
-use lowarc_studio_lib::runtime::{self, runtime_loader::LogLevel};
+use lowarc_studio_lib::runtime::{self, runtime_loader::LogFn};
+use parking_lot::Mutex;
 use std::io::Write;
 use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 fn fatal(message: &str) -> ! {
     eprintln!("{message}");
@@ -30,13 +31,12 @@ fn main() {
     let diagnostics_log = runtime::LaunchConfig::read(&dir).map(|l| l.diagnostics_log).unwrap_or(false);
     let diag_file: Option<Mutex<std::fs::File>> = if diagnostics_log { std::fs::File::create(dir.join("diagnostics.log")).ok().map(Mutex::new) } else { None };
 
-    let log: Arc<dyn Fn(LogLevel, &str) + Send + Sync> = Arc::new(move |level, message| {
+    let log: LogFn = Arc::new(move |level, message| {
         let line = format!("[{level:?}] {message}");
         println!("{line}");
         if let Some(file) = &diag_file {
-            if let Ok(mut f) = file.lock() {
-                let _ = writeln!(f, "{line}");
-            }
+            let mut f = file.lock();
+            let _ = writeln!(f, "{line}");
         }
     });
 

@@ -17,8 +17,9 @@ use std::ffi::CString;
 use std::io::{self, BufRead, Write};
 use std::os::raw::c_char;
 use std::path::PathBuf;
+use parking_lot::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Mutex, OnceLock};
+use std::sync::OnceLock;
 
 type RequestStopFn = extern "C" fn();
 type StartFn = extern "C" fn(*const c_char, RequestStopFn);
@@ -35,7 +36,7 @@ fn stdout_lock() -> &'static Mutex<()> {
 }
 
 fn write_line(value: &Value) {
-    let _guard = stdout_lock().lock().unwrap();
+    let _guard = stdout_lock().lock();
     let mut out = io::stdout();
     let _ = writeln!(out, "{value}");
     let _ = out.flush();
@@ -73,7 +74,7 @@ fn main() {
     };
 
     let start: StartFn = match lib.symbol("lowarc_module_start") {
-        Ok(p) => unsafe { std::mem::transmute(p) },
+        Ok(p) => unsafe { std::mem::transmute::<*mut std::ffi::c_void, StartFn>(p) },
         Err(e) => fatal(&format!("module is missing lowarc_module_start: {e}")),
     };
     let frame_fn: Option<FrameFn> = lib.symbol("lowarc_module_frame").ok().map(|p| unsafe { std::mem::transmute(p) });

@@ -60,7 +60,7 @@ fn list_presets_in(dir: &Path) -> Vec<ThemePreset> {
         .filter_map(|entry| std::fs::read_to_string(entry.path()).ok())
         .filter_map(|text| serde_json::from_str::<ThemePreset>(&text).ok())
         .collect();
-    presets.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    presets.sort_by_key(|p| p.name.to_lowercase());
     presets
 }
 
@@ -153,16 +153,16 @@ enum Resolved {
     /// query, so no Rust-side "what does the OS currently prefer" lookup is needed at all, unlike
     /// theme.js's own JS-side matchMedia listener.
     FollowSystem,
-    Fixed(ThemeColors),
+    Fixed(Box<ThemeColors>),
 }
 
 fn resolve(theme_mode: &str) -> Resolved {
     match theme_mode {
         "system" => Resolved::FollowSystem,
-        "light" => Resolved::Fixed(light_theme()),
-        "dark" => Resolved::Fixed(dark_theme()),
+        "light" => Resolved::Fixed(Box::new(light_theme())),
+        "dark" => Resolved::Fixed(Box::new(dark_theme())),
         name => match list_presets().into_iter().find(|p| p.name == name) {
-            Some(preset) => Resolved::Fixed(preset.colors),
+            Some(preset) => Resolved::Fixed(Box::new(preset.colors)),
             None => Resolved::FollowSystem,
         },
     }

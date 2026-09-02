@@ -17,7 +17,7 @@ pub mod project;
 pub mod runtime_loader;
 
 use manifest::{Manifest, ModuleInfo};
-use runtime_loader::{DebugHooks, LogLevel, RunContext};
+use runtime_loader::{DebugHooks, LogFn, RunContext};
 use serde::Deserialize;
 use serde_json::Value;
 use std::path::Path;
@@ -36,7 +36,7 @@ pub fn start_run(
     target_fps: u32,
     settings: Value,
     stop_flag: Arc<AtomicBool>,
-    log: Arc<dyn Fn(LogLevel, &str) + Send + Sync>,
+    log: LogFn,
     debug: DebugHooks,
 ) -> Result<(), Vec<String>> {
     let preset = project::ProjectPreset::load(project_dir).map_err(|e| vec![e])?;
@@ -85,7 +85,7 @@ impl LaunchConfig {
 /// everything it names) lives in — for a real export, the exported runtime's own directory; a
 /// plain PathBuf rather than "wherever the current exe is" so this stays testable without an
 /// actual built binary.
-pub fn run_from_launch_dir(dir: &Path, stop_flag: Arc<AtomicBool>, log: Arc<dyn Fn(LogLevel, &str) + Send + Sync>) -> Result<(), Vec<String>> {
+pub fn run_from_launch_dir(dir: &Path, stop_flag: Arc<AtomicBool>, log: LogFn) -> Result<(), Vec<String>> {
     let launch = LaunchConfig::read(dir).map_err(|e| vec![e])?;
 
     let entry_file = dir.join(&launch.source);

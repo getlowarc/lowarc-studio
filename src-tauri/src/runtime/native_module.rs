@@ -59,6 +59,7 @@ pub fn platform_library_file_name(base: &str) -> String {
 ///     next to the exe here — falls back to AppPaths::runtime_helpers(), which
 ///     AppPaths::ensure_installed_copy_resources() populates from this app's own bundled
 ///     resources on first run (see prepare-bundle.ps1 for how it gets into that bundle).
+///
 /// An existence check rather than a dev/installed branch on purpose — it's what makes the first
 /// two cases above resolve identically with no special-casing for which one is actually running.
 pub(crate) fn native_module_host_path() -> Result<PathBuf, String> {

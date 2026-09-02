@@ -11,11 +11,12 @@
 // and every loader's `run` is expected to return once that flag is observed, not exit anything.
 
 use crate::runtime::manifest::ModuleInfo;
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU32};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -24,6 +25,10 @@ pub enum LogLevel {
     Warn,
     Error,
 }
+
+/// The one shape every "give me a callback to log through" spot in this module needs — named so
+/// it's spelled once, not independently re-typed (and drifting) at every call site.
+pub type LogFn = Arc<dyn Fn(LogLevel, &str) + Send + Sync>;
 
 /// A pause condition, evaluated purely against the wire-protocol traffic every module already
 /// produces (log lines, frame requests/replies) — deliberately nothing here assumes any
@@ -120,7 +125,7 @@ impl DebugHooks {
 /// evaluated at their own natural point instead (see spawn_and_run and spawn_stdout_reader), since
 /// none of those three have a frame reply at all.
 pub fn check_frame_breakpoints(breakpoints: &Mutex<Vec<Breakpoint>>, module: &str, reply: &Value) -> Option<Breakpoint> {
-    let list = breakpoints.lock().unwrap();
+    let list = breakpoints.lock();
     list.iter()
         .find(|bp| match bp {
             Breakpoint::ModuleError { module: target } => {
@@ -133,17 +138,17 @@ pub fn check_frame_breakpoints(breakpoints: &Mutex<Vec<Breakpoint>>, module: &st
 }
 
 pub fn check_frame_count_breakpoint(breakpoints: &Mutex<Vec<Breakpoint>>, frame_index: u64) -> Option<Breakpoint> {
-    let list = breakpoints.lock().unwrap();
+    let list = breakpoints.lock();
     list.iter().find(|bp| matches!(bp, Breakpoint::FrameCount { count } if *count == frame_index)).cloned()
 }
 
 pub fn check_module_start_breakpoint(breakpoints: &Mutex<Vec<Breakpoint>>, module: &str) -> Option<Breakpoint> {
-    let list = breakpoints.lock().unwrap();
+    let list = breakpoints.lock();
     list.iter().find(|bp| matches!(bp, Breakpoint::ModuleStart { module: target } if target == module)).cloned()
 }
 
 pub fn check_log_level_breakpoint(breakpoints: &Mutex<Vec<Breakpoint>>, level: LogLevel, module: &str) -> Option<Breakpoint> {
-    let list = breakpoints.lock().unwrap();
+    let list = breakpoints.lock();
     list.iter()
         .find(|bp| matches!(bp, Breakpoint::LogLevel { level: target_level, module: target_module } if *target_level == level && target_module.as_deref().map_or(true, |m| m == module)))
         .cloned()
@@ -158,7 +163,7 @@ pub struct RunContext<'a> {
     pub target_fps: u32,
     pub settings: Value,
     pub stop_flag: Arc<AtomicBool>,
-    pub log: Arc<dyn Fn(LogLevel, &str) + Send + Sync>,
+    pub log: LogFn,
     pub debug: DebugHooks,
 }
 

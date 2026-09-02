@@ -231,8 +231,20 @@ mod tests {
     #[test]
     fn editor_panel_layout_round_trips() {
         let path = temp_file("panel_layout");
-        let mut settings = Settings::default();
-        settings.editor_panels = PanelLayout { sidebar_open: true, sidebar_size: 300.0, sidebar_active_key: Some("terminal:main".to_string()), right_open: false, right_size: 260.0, console_open: true, console_size: 180.0, split_open: true, split_ratio: 0.35 };
+        let settings = Settings {
+            editor_panels: PanelLayout {
+                sidebar_open: true,
+                sidebar_size: 300.0,
+                sidebar_active_key: Some("terminal:main".to_string()),
+                right_open: false,
+                right_size: 260.0,
+                console_open: true,
+                console_size: 180.0,
+                split_open: true,
+                split_ratio: 0.35,
+            },
+            ..Settings::default()
+        };
         save_to(&path, &settings).unwrap();
         let loaded = load_from(&path);
         assert_eq!(loaded.editor_panels, settings.editor_panels);

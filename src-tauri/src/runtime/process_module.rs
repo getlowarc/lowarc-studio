@@ -6,6 +6,7 @@
 // callback instead of a Diag file, and {"requestStop":true} sets the run's shared stop flag
 // instead of a process-wide global — this crate can run more than one session in its lifetime.
 
+use parking_lot::Mutex;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Write};
@@ -13,16 +14,14 @@ use std::path::Path;
 use std::process::{Child, ChildStdin};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crate::runtime::child_process::{parse_log_severity, resolve_command, spawn_piped, STDERR_LOG_TRUNCATE_CHARS};
 use crate::runtime::manifest::{order_by_requires, ModuleInfo};
-use crate::runtime::runtime_loader::{self, Breakpoint, FrameModuleTrace, FrameTrace, LogLevel, RunContext, RuntimeLoader};
+use crate::runtime::runtime_loader::{self, Breakpoint, FrameModuleTrace, FrameTrace, LogFn, LogLevel, RunContext, RuntimeLoader};
 
 pub const DESCRIPTOR_NAME: &str = "process.json";
-
-type LogFn = Arc<dyn Fn(LogLevel, &str) + Send + Sync>;
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
@@ -111,7 +110,7 @@ impl ProcessModule {
         let mut line = serde_json::to_string(&message).unwrap_or_default();
         line.push('\n');
         {
-            let mut stdin = self.stdin.lock().unwrap();
+            let mut stdin = self.stdin.lock();
             if stdin.write_all(line.as_bytes()).and_then(|_| stdin.flush()).is_err() {
                 self.dead.store(true, Ordering::SeqCst);
                 return json!({"ok": false, "error": "failed to write to module process"});
@@ -182,7 +181,7 @@ impl ProcessModule {
 
     fn kill(&self) {
         self.dead.store(true, Ordering::SeqCst);
-        let mut child = self.child.lock().unwrap();
+        let mut child = self.child.lock();
         for _ in 0..25 {
             if matches!(child.try_wait(), Ok(Some(_))) {
                 return;

@@ -445,10 +445,23 @@ pub const SHARED_DROPDOWN_JS: &str = include_str!("../../src/dropdown-shared.js"
 /// (lib.rs), since both need the exact same path-traversal protection and there's no reason for
 /// two copies of security-critical logic to drift apart.
 pub fn resolve_asset_path(plugin_id: &str, rel_path: &str) -> Option<PathBuf> {
-    if plugin_id.is_empty() || rel_path.is_empty() {
+    if rel_path.is_empty() {
         return None;
     }
-    let plugin_root = AppPaths::plugins().join(plugin_id).canonicalize().ok()?;
+    // plugin_id has to name exactly one folder directly under plugins() — reject anything that
+    // could shift plugin_root itself outside that directory (a bare "..", an embedded path
+    // separator, or a "." component) before it's ever joined onto a real path. Without this, a
+    // plugin_id of ".." would make plugin_root canonicalize to plugins()'s own parent, and the
+    // starts_with(plugin_root) check below would then accept any rel_path reachable from there —
+    // the check has to hold on plugin_id itself, not just on the eventual resolved path.
+    if !AppPaths::is_valid_component_id(plugin_id) {
+        return None;
+    }
+    let plugins_root = AppPaths::plugins().canonicalize().ok()?;
+    let plugin_root = plugins_root.join(plugin_id).canonicalize().ok()?;
+    if !plugin_root.starts_with(&plugins_root) {
+        return None;
+    }
     let resolved = plugin_root.join(rel_path).canonicalize().ok()?;
     // The load-bearing check: canonicalize resolves ".." components for real, so this catches a
     // request trying to climb out of the plugin's own folder regardless of how it's spelled.
@@ -456,4 +469,40 @@ pub fn resolve_asset_path(plugin_id: &str, rel_path: &str) -> Option<PathBuf> {
         return None;
     }
     Some(resolved)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolve_asset_path_rejects_a_traversal_via_plugin_id() {
+        // Regression test for a real path-traversal bug: plugin_id used to be joined onto
+        // plugins() and canonicalized BEFORE being checked, so a plugin_id of ".." shifted the
+        // confinement boundary itself to plugins()'s own parent — letting any rel_path reachable
+        // from there (e.g. settings.json, one directory up from plugins/ in a dev checkout) through
+        // the starts_with(plugin_root) check below it. Both files genuinely exist on disk here.
+        assert!(resolve_asset_path("..", "settings.json").is_none());
+        assert!(resolve_asset_path("..", "recent.json").is_none());
+    }
+
+    #[test]
+    fn resolve_asset_path_rejects_other_traversal_shapes_in_plugin_id() {
+        assert!(resolve_asset_path(".", "settings.json").is_none());
+        assert!(resolve_asset_path("foo/../..", "settings.json").is_none());
+        assert!(resolve_asset_path("foo\\..\\..", "settings.json").is_none());
+    }
+
+    #[test]
+    fn resolve_asset_path_still_resolves_a_real_plugin_asset() {
+        // Sanity check the fix didn't break the legitimate case.
+        let plugins_dir = AppPaths::plugins();
+        let some_plugin = std::fs::read_dir(&plugins_dir)
+            .expect("plugins/ should exist in a dev checkout")
+            .filter_map(|e| e.ok())
+            .find(|e| e.path().is_dir())
+            .expect("at least one plugin folder should exist");
+        let plugin_id = some_plugin.file_name().to_string_lossy().into_owned();
+        assert!(resolve_asset_path(&plugin_id, "plugin.json").is_some());
+    }
 }

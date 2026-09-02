@@ -163,6 +163,20 @@ impl AppPaths {
         }
         unpack_installed_resources(resource_dir, &Self::plugins(), &Self::runtime_helpers())
     }
+
+    /// True for a name that's safe to join as a single path component onto some other directory
+    /// without checking anything further — rejects an empty string, a bare "." or "..", or
+    /// anything containing a path separator, any of which could otherwise turn `dir.join(name)`
+    /// into a path outside `dir`. Named for its original and most common use (a plugin/module id
+    /// is always meant to name exactly one folder directly under plugins()/modules() — see
+    /// plugin_host::protocol::PluginDescriptor's own note that a plugin's real identity is its
+    /// folder name), but the same check applies anywhere a single path component is about to be
+    /// joined onto a directory (projects::create_project's own project name, say) — every such
+    /// spot should check it first, same reasoning as plugin_assets::resolve_asset_path's identical
+    /// check on the plugin_id half of an asset request.
+    pub fn is_valid_component_id(id: &str) -> bool {
+        !id.is_empty() && id != "." && id != ".." && !id.contains('/') && !id.contains('\\')
+    }
 }
 
 /// The real logic behind ensure_installed_copy_resources(), minus its dev_root() guard — split out

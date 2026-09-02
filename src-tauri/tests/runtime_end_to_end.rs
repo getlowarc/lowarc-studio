@@ -4,9 +4,10 @@
 // Stop. Not a unit test of one function — the same standard as lowarc/Bootstrap's smoke tests.
 
 use lowarc_studio_lib::runtime;
-use lowarc_studio_lib::runtime::runtime_loader::{Breakpoint, DebugHooks, FrameTrace, LogLevel};
+use lowarc_studio_lib::runtime::runtime_loader::{Breakpoint, DebugHooks, FrameTrace, LogFn};
+use parking_lot::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
 fn temp_dir(name: &str) -> std::path::PathBuf {
@@ -64,11 +65,11 @@ while ($line = [Console]::In.ReadLine()) {{
     .unwrap();
 }
 
-fn collecting_logger() -> (Arc<dyn Fn(LogLevel, &str) + Send + Sync>, Arc<Mutex<Vec<String>>>) {
+fn collecting_logger() -> (LogFn, Arc<Mutex<Vec<String>>>) {
     let messages = Arc::new(Mutex::new(Vec::new()));
     let sink = messages.clone();
-    let log: Arc<dyn Fn(LogLevel, &str) + Send + Sync> = Arc::new(move |_level, msg| {
-        sink.lock().unwrap().push(msg.to_string());
+    let log: LogFn = Arc::new(move |_level, msg| {
+        sink.lock().push(msg.to_string());
     });
     (log, messages)
 }
@@ -96,7 +97,7 @@ fn runs_a_process_module_end_to_end_via_its_own_request_stop() {
     let result = runtime::start_run(&entry, &project_dir, &modules_dir, 30, serde_json::json!({}), stop_flag, log, runtime::runtime_loader::DebugHooks::disabled());
 
     assert!(result.is_ok(), "expected the run to complete cleanly, got {result:?}");
-    let messages = messages.lock().unwrap();
+    let messages = messages.lock();
     assert!(
         messages.iter().any(|m| m.contains("hello from the studio runtime")),
         "expected the module's own log line to reach the caller, got {messages:?}"
@@ -216,7 +217,7 @@ fn a_frame_count_breakpoint_pauses_the_run_automatically() {
 
     let last_trace_cb = last_trace.clone();
     let on_frame: Arc<dyn Fn(FrameTrace) + Send + Sync> = Arc::new(move |trace| {
-        *last_trace_cb.lock().unwrap() = Some(trace);
+        *last_trace_cb.lock() = Some(trace);
     });
 
     let debug = DebugHooks { pause_flag: pause_flag.clone(), step_request: Arc::new(AtomicU32::new(0)), breakpoints, on_frame };
@@ -230,7 +231,7 @@ fn a_frame_count_breakpoint_pauses_the_run_automatically() {
     std::thread::sleep(Duration::from_millis(1000));
 
     assert!(pause_flag.load(Ordering::SeqCst), "the run should have paused itself on hitting the frame-count breakpoint");
-    let trace = last_trace.lock().unwrap().clone().expect("expected a frame trace to accompany the breakpoint hit");
+    let trace = last_trace.lock().clone().expect("expected a frame trace to accompany the breakpoint hit");
     assert_eq!(trace.frame_index, 3);
     assert!(
         matches!(trace.triggered, Some(Breakpoint::FrameCount { count: 3 })),
@@ -240,7 +241,7 @@ fn a_frame_count_breakpoint_pauses_the_run_automatically() {
 
     // Confirm it's genuinely stopped, not just paused-and-still-ticking.
     std::thread::sleep(Duration::from_millis(300));
-    assert_eq!(last_trace.lock().unwrap().as_ref().unwrap().frame_index, 3, "should stay paused at frame 3, not keep advancing");
+    assert_eq!(last_trace.lock().as_ref().unwrap().frame_index, 3, "should stay paused at frame 3, not keep advancing");
 
     stop_flag.store(true, Ordering::SeqCst);
     let result = handle.join().unwrap();

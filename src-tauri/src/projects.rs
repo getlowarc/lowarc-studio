@@ -130,6 +130,15 @@ fn create_project_in(recents_file: &Path, parent_dir: &Path, name: &str) -> Resu
     if name.is_empty() {
         return Err("Project name can't be empty.".into());
     }
+    // Same reasoning as export::sanitize_name and AppPaths::is_valid_component_id's other
+    // callers: name is about to be joined onto parent_dir, so it can't be allowed to contain a
+    // path separator or a bare "."/".." — otherwise a typed name could land the new project
+    // folder somewhere other than inside parent_dir. Rejected outright rather than silently
+    // stripped (unlike sanitize_name's auto-derived export folder name) since this is a user
+    // directly naming their own project in a dialog that already has a place to show the error.
+    if !AppPaths::is_valid_component_id(name) {
+        return Err("Project name can't contain a path separator, or be \".\" or \"..\".".into());
+    }
     let project_dir = parent_dir.join(name);
     if project_dir.exists() {
         return Err(format!("{} already exists.", project_dir.display()));
@@ -217,6 +226,17 @@ mod tests {
         create_project_in(&recents_file, &base, "dup").unwrap();
         let err = create_project_in(&recents_file, &base, "dup").expect_err("creating the same project twice must fail");
         assert!(err.contains("already exists"));
+    }
+
+    #[test]
+    fn create_project_rejects_a_name_that_would_escape_parent_dir() {
+        let base = temp_dir("no_traversal_parent");
+        let recents_file = base.join("recent.json");
+        for bad_name in ["..", ".", "../elsewhere", "sub/dir"] {
+            let err = create_project_in(&recents_file, &base, bad_name).expect_err(&format!("{bad_name:?} should be rejected"));
+            assert!(err.contains("path separator"), "got: {err}");
+        }
+        assert!(!base.parent().unwrap().join("elsewhere").exists(), "must not have created anything outside base");
     }
 
     #[test]
