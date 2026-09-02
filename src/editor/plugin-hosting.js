@@ -43,9 +43,11 @@
           // (cached, near-instant) plugin asset port is known — callers here get the iframe
           // element back synchronously to toggle classes on; they don't need the navigation
           // itself to have started yet.
-          pluginAssetUrl(entry.pluginId, entry.panel.entry, `project=${encodeURIComponent(projectPath)}`).then((url) => {
-            iframe.src = url;
-          });
+          pluginAssetUrl(entry.pluginId, entry.panel.entry, `project=${encodeURIComponent(projectPath)}`)
+            .then((url) => {
+              iframe.src = url;
+            })
+            .catch(reportError);
           // So a freshly-mounted panel (the file explorer, most importantly) gets the current
           // dirty/error/missing snapshot right away instead of waiting for the next change.
           iframe.addEventListener("load", () => broadcastFileStatus());
@@ -116,7 +118,6 @@
       // row shows — config.extraFields(item) is the only part that actually differs between them.
       function createManagerPanel(config) {
         const CHEVRON_SVG = '<svg viewBox="0 0 10 10" fill="none"><path d="M3 1l4 4-4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-        const CHECK_SVG = '<svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>';
 
         let items = [];
         let expandedId = null;
@@ -204,7 +205,7 @@
           checkbox.checked = !item.disabled;
           const box = document.createElement("span");
           box.className = "checkbox-box";
-          box.innerHTML = CHECK_SVG;
+          box.innerHTML = CHECKMARK_SVG;
           const enabledText = document.createElement("span");
           enabledText.textContent = "Enabled";
           enabledLabel.appendChild(checkbox);
@@ -395,9 +396,15 @@
       // initTabs() already did it, since #console-tabs is a [data-tabs] container) but necessary on
       // the programmatic one — cheap enough either way not to bother with two separate functions.
       function activateConsoleTab(key) {
-        document.querySelectorAll("#console-tabs .console-tab").forEach((t) => t.classList.remove("is-active"));
+        document.querySelectorAll("#console-tabs .console-tab").forEach((t) => {
+          t.classList.remove("is-active");
+          t.setAttribute("aria-selected", "false");
+        });
         const btn = document.querySelector(`#console-tabs .console-tab[data-tab-value="${key}"]`);
-        if (btn) btn.classList.add("is-active");
+        if (btn) {
+          btn.classList.add("is-active");
+          btn.setAttribute("aria-selected", "true");
+        }
 
         activeConsoleTabKey = key;
         showSlotTab("console", "console-body", key);

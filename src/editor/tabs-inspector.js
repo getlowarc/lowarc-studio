@@ -243,7 +243,9 @@
             const file = openFiles.get(contribution.id);
             if (!file) return;
             tab.title = contribution.id;
-            tab.classList.toggle("is-active", contribution.id === groupActiveFilePath[groupId]);
+            const isActiveFile = contribution.id === groupActiveFilePath[groupId];
+            tab.classList.toggle("is-active", isActiveFile);
+            tab.setAttribute("aria-selected", String(isActiveFile));
             tab.classList.add(file.missing ? "status-missing" : file.dirty ? "status-dirty" : "status-clean");
             // Same per-language glyph the file explorer shows (window.lowarcIconClass, vendored
             // vendor/seti-icons/) — inserted first so it sits before the label, same reading order
@@ -471,7 +473,18 @@
         removeContribution(`center-${fromGroupId}`, path);
         unmountFileFromGroup(path, file.iframe, fromGroupId, file.pluginId);
 
-        file.iframe = await mountFileInGroup(path, contents ?? "", viewer, targetGroupId);
+        try {
+          file.iframe = await mountFileInGroup(path, contents ?? "", viewer, targetGroupId);
+        } catch (err) {
+          // The old iframe (and its center-${fromGroupId} contribution) is already gone above —
+          // closing the file outright, rather than leaving it half-moved with a stale iframe
+          // reference and no tab in either group, is the least surprising outcome of a failed
+          // remount, same reasoning as openFile's own catch around this same call.
+          showToast({ variant: "error", message: String(err) });
+          openFiles.delete(path);
+          renderTabBar(fromGroupId);
+          return;
+        }
         file.groupId = targetGroupId;
         contribute(`center-${targetGroupId}`, { id: path, sourceType: "plugin", pluginId: file.pluginId, label: file.title, closeable: true });
 
@@ -530,7 +543,13 @@
         // there's no OTHER per-open group picker, matching the toolbar-level (not per-tab) split
         // button this pairs with.
         const groupId = targetGroupId;
-        const iframe = await mountFileInGroup(path, contents, viewer, groupId);
+        let iframe;
+        try {
+          iframe = await mountFileInGroup(path, contents, viewer, groupId);
+        } catch (err) {
+          showToast({ variant: "error", message: String(err) });
+          return;
+        }
 
         openFiles.set(path, { title: fileTitle(path), dirty: false, missing: false, hasErrors: false, pluginId: viewer.pluginId, iframe, groupId });
         contribute(`center-${groupId}`, { id: path, sourceType: "plugin", pluginId: viewer.pluginId, label: fileTitle(path), closeable: true });

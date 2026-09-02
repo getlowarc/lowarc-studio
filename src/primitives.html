@@ -252,10 +252,10 @@
           <h2>Popup</h2>
           <p style="color: var(--fg-dim); font-size: 13px; margin: 0 0 12px">No named sizes — width is set per popup with a plain <code>style="width: …"</code> on <code>.popup</code>, the same way its title, body, and buttons are already set per instance. Always centered; when the body content runs taller than the viewport, only the body scrolls — the header and buttons stay put.</p>
           <div style="display: flex; gap: 12px; flex-wrap: wrap">
-            <button type="button" class="btn btn-md btn-outline" onclick="openPopup('popup-sm-example')">Open confirm (320px)</button>
-            <button type="button" class="btn btn-md btn-outline" onclick="openPopup('popup-md-example')">Open form (default)</button>
-            <button type="button" class="btn btn-md btn-outline" onclick="openPopup('popup-lg-example')">Open details (600px)</button>
-            <button type="button" class="btn btn-md btn-outline" onclick="openPopup('popup-xl-example')">Open changelog (tall + scrolling)</button>
+            <button type="button" class="btn btn-md btn-outline" id="popup-sm-trigger">Open confirm (320px)</button>
+            <button type="button" class="btn btn-md btn-outline" id="popup-md-trigger">Open form (default)</button>
+            <button type="button" class="btn btn-md btn-outline" id="popup-lg-trigger">Open details (600px)</button>
+            <button type="button" class="btn btn-md btn-outline" id="popup-xl-trigger">Open changelog (tall + scrolling)</button>
           </div>
         </div>
 
@@ -358,86 +358,149 @@
         </div>
       </div>
 
-      <!-- Popup backdrops live outside .page-body's .section flow on purpose: they're fixed-
-           position overlays, not document content, and .section h2's gallery-heading style
-           (uppercase, underlined) would otherwise leak onto a popup's real title if nested inside
-           one. -->
-      <div class="popup-backdrop" data-popup id="popup-sm-example">
-        <div class="popup" style="width: 320px">
-          <div class="popup-header">
-            <h2>Delete module?</h2>
-            <button type="button" class="popup-close" data-popup-close data-tooltip="Close" aria-label="Close"><svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg></button>
-          </div>
-          <div class="popup-body">This removes Physics from the project. This can't be undone.</div>
-          <div class="popup-actions">
-            <button type="button" class="btn btn-md btn-ghost" data-popup-close>Cancel</button>
-            <button type="button" class="btn btn-md btn-danger" data-popup-close>Delete</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="popup-backdrop" data-popup id="popup-md-example">
-        <div class="popup">
-          <div class="popup-header">
-            <h2>New project name</h2>
-            <button type="button" class="popup-close" data-popup-close data-tooltip="Close" aria-label="Close"><svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg></button>
-          </div>
-          <div class="popup-body">
-            <div class="field">
-              <input class="input" type="text" placeholder="my-game" autocomplete="off" />
-            </div>
-          </div>
-          <div class="popup-actions">
-            <button type="button" class="btn btn-md btn-ghost" data-popup-close>Cancel</button>
-            <button type="button" class="btn btn-md btn-confirm" data-popup-close>Create</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="popup-backdrop" data-popup id="popup-lg-example">
-        <div class="popup" style="width: 600px">
-          <div class="popup-header">
-            <h2>Module details</h2>
-            <button type="button" class="popup-close" data-popup-close data-tooltip="Close" aria-label="Close"><svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg></button>
-          </div>
-          <div class="popup-body">
-            <p style="margin-top: 0">Physics — a 2D rigid-body solver with collision detection, joints, and a fixed-timestep integrator. Depends on nothing else in the module store.</p>
-            <p style="margin-bottom: 0">This is a wider popup — the kind of size a details or settings panel needs instead of a short prompt.</p>
-          </div>
-          <div class="popup-actions">
-            <button type="button" class="btn btn-md btn-ghost" data-popup-close>Close</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="popup-backdrop" data-popup id="popup-xl-example">
-        <div class="popup" style="width: 720px">
-          <div class="popup-header">
-            <h2>Changelog</h2>
-            <button type="button" class="popup-close" data-popup-close data-tooltip="Close" aria-label="Close"><svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg></button>
-          </div>
-          <div class="popup-body">
-            <p style="margin-top: 0">Width is a plain inline style here (720px) — there's no named size this popup is picking from, same as its title and buttons are just set directly for this instance.</p>
-            <p><strong>0.4.0</strong> — Added the checkbox-dropdown multiselect. Searchbar now closes on outside click. Fixed the numeric input stepper not respecting its max.</p>
-            <p><strong>0.3.0</strong> — Sidebar tab and header tab navigation primitives. Icon support on all button types.</p>
-            <p><strong>0.2.0</strong> — Toast system with four semantic variants. Popup system with header/body/actions.</p>
-            <p><strong>0.1.0</strong> — First pass at buttons, dropdowns, inputs, and checkboxes.</p>
-            <p style="margin-bottom: 0">This entry list is long enough to run past the popup's height — notice the header above and the Close button below stay put while only this body scrolls.</p>
-          </div>
-          <div class="popup-actions">
-            <button type="button" class="btn btn-md btn-ghost" data-popup-close>Close</button>
-          </div>
-        </div>
-      </div>
     </div>
+
+    <!-- showPopup()'s stack (see primitives.js) — a sibling of the page's main content so nothing
+         (a .section's overflow, .page-body's own layout) can clip it. Empty by default; showPopup()
+         creates and removes each instance's own .popup-backdrop/.popup on demand. -->
+    <div class="popup-stack" id="popup-stack"></div>
 
     <script src="primitives.js"></script>
     <script>
       initDropdowns();
       initNumericInputs();
       initTabs();
-      initPopups();
       initTooltips();
+
+      // ---------- Popup contributions ----------
+      // The four examples below used to be hand-authored static HTML toggled by an older,
+      // simpler element-toggle popup pair (openPopup(id)/closePopup(id)) — that system is gone
+      // now (every other page already used the Base popup stack), so these are contributed the
+      // same way a real page's popups are: see editor/menus.js's "new-project" contribution for
+      // another example of this exact pattern.
+      contribute("popups", {
+        id: "popup-sm-example",
+        sourceType: "host",
+        title: "Delete module?",
+        size: 320,
+        mount(container, ctx) {
+          const body = document.createElement("div");
+          body.className = "popup-body";
+          body.textContent = "This removes Physics from the project. This can't be undone.";
+          container.appendChild(body);
+
+          const actions = document.createElement("div");
+          actions.className = "popup-actions";
+          const cancelBtn = document.createElement("button");
+          cancelBtn.type = "button";
+          cancelBtn.className = "btn btn-md btn-ghost";
+          cancelBtn.textContent = "Cancel";
+          cancelBtn.addEventListener("click", () => ctx.close(null));
+          const deleteBtn = document.createElement("button");
+          deleteBtn.type = "button";
+          deleteBtn.className = "btn btn-md btn-danger";
+          deleteBtn.textContent = "Delete";
+          deleteBtn.addEventListener("click", () => ctx.close(true));
+          actions.appendChild(cancelBtn);
+          actions.appendChild(deleteBtn);
+          container.appendChild(actions);
+        },
+      });
+
+      contribute("popups", {
+        id: "popup-md-example",
+        sourceType: "host",
+        title: "New project name",
+        mount(container, ctx) {
+          const body = document.createElement("div");
+          body.className = "popup-body";
+          const field = document.createElement("div");
+          field.className = "field";
+          const input = document.createElement("input");
+          input.className = "input";
+          input.type = "text";
+          input.placeholder = "my-game";
+          input.autocomplete = "off";
+          field.appendChild(input);
+          body.appendChild(field);
+          container.appendChild(body);
+
+          const actions = document.createElement("div");
+          actions.className = "popup-actions";
+          const cancelBtn = document.createElement("button");
+          cancelBtn.type = "button";
+          cancelBtn.className = "btn btn-md btn-ghost";
+          cancelBtn.textContent = "Cancel";
+          cancelBtn.addEventListener("click", () => ctx.close(null));
+          const createBtn = document.createElement("button");
+          createBtn.type = "button";
+          createBtn.className = "btn btn-md btn-confirm";
+          createBtn.textContent = "Create";
+          createBtn.addEventListener("click", () => ctx.close(input.value));
+          actions.appendChild(cancelBtn);
+          actions.appendChild(createBtn);
+          container.appendChild(actions);
+        },
+      });
+
+      contribute("popups", {
+        id: "popup-lg-example",
+        sourceType: "host",
+        title: "Module details",
+        size: 600,
+        mount(container, ctx) {
+          const body = document.createElement("div");
+          body.className = "popup-body";
+          body.innerHTML =
+            '<p style="margin-top: 0">Physics — a 2D rigid-body solver with collision detection, joints, and a fixed-timestep integrator. Depends on nothing else in the module store.</p>' +
+            '<p style="margin-bottom: 0">This is a wider popup — the kind of size a details or settings panel needs instead of a short prompt.</p>';
+          container.appendChild(body);
+
+          const actions = document.createElement("div");
+          actions.className = "popup-actions";
+          const closeBtn = document.createElement("button");
+          closeBtn.type = "button";
+          closeBtn.className = "btn btn-md btn-ghost";
+          closeBtn.textContent = "Close";
+          closeBtn.addEventListener("click", () => ctx.close(null));
+          actions.appendChild(closeBtn);
+          container.appendChild(actions);
+        },
+      });
+
+      contribute("popups", {
+        id: "popup-xl-example",
+        sourceType: "host",
+        title: "Changelog",
+        size: 720,
+        mount(container, ctx) {
+          const body = document.createElement("div");
+          body.className = "popup-body";
+          body.innerHTML =
+            '<p style="margin-top: 0">Width is a plain `size` here (720) — there\'s no named size this popup is picking from, same as its title and buttons are just set directly for this instance.</p>' +
+            "<p><strong>0.4.0</strong> — Added the checkbox-dropdown multiselect. Searchbar now closes on outside click. Fixed the numeric input stepper not respecting its max.</p>" +
+            "<p><strong>0.3.0</strong> — Sidebar tab and header tab navigation primitives. Icon support on all button types.</p>" +
+            "<p><strong>0.2.0</strong> — Toast system with four semantic variants. Popup system with header/body/actions.</p>" +
+            "<p><strong>0.1.0</strong> — First pass at buttons, dropdowns, inputs, and checkboxes.</p>" +
+            '<p style="margin-bottom: 0">This entry list is long enough to run past the popup\'s height — notice the header above and the Close button below stay put while only this body scrolls.</p>';
+          container.appendChild(body);
+
+          const actions = document.createElement("div");
+          actions.className = "popup-actions";
+          const closeBtn = document.createElement("button");
+          closeBtn.type = "button";
+          closeBtn.className = "btn btn-md btn-ghost";
+          closeBtn.textContent = "Close";
+          closeBtn.addEventListener("click", () => ctx.close(null));
+          actions.appendChild(closeBtn);
+          container.appendChild(actions);
+        },
+      });
+
+      document.getElementById("popup-sm-trigger").addEventListener("click", () => showPopup("popup-sm-example"));
+      document.getElementById("popup-md-trigger").addEventListener("click", () => showPopup("popup-md-example"));
+      document.getElementById("popup-lg-trigger").addEventListener("click", () => showPopup("popup-lg-example"));
+      document.getElementById("popup-xl-trigger").addEventListener("click", () => showPopup("popup-xl-example"));
       initSearchbar(document.getElementById("module-search"), {
         options: [
           { value: "physics", label: "Physics" },

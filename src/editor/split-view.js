@@ -71,11 +71,16 @@
             document.body.style.userSelect = "";
             el.removeEventListener("pointermove", onMove);
             el.removeEventListener("pointerup", onUp);
+            el.removeEventListener("pointercancel", onUp);
             savePanelLayout();
           };
 
           el.addEventListener("pointermove", onMove);
           el.addEventListener("pointerup", onUp);
+          // pointercancel (lost capture — a system dialog, alt-tab, touch/pen interruption) gets
+          // the exact same cleanup as pointerup: the ratio just stays wherever the drag left it,
+          // same as a normal release, nothing to revert.
+          el.addEventListener("pointercancel", onUp);
         });
       }
       initSplitDividerDrag();
@@ -266,14 +271,18 @@
             return;
           }
           if (data.action === "sendSession") {
-            if (windowToPlugin.get(event.source) && typeof data.sessionId === "string") {
-              invoke("send_to_plugin_session", { sessionId: data.sessionId, message: data.message ?? null });
+            const pluginId = windowToPlugin.get(event.source);
+            if (pluginId && typeof data.sessionId === "string") {
+              invoke("send_to_plugin_session", { id: pluginId, sessionId: data.sessionId, message: data.message ?? null }).catch((err) => {
+                showToast({ variant: "error", message: String(err) });
+              });
             }
             return;
           }
           if (data.action === "stopSession") {
-            if (windowToPlugin.get(event.source) && typeof data.sessionId === "string") {
-              invoke("stop_plugin_session", { sessionId: data.sessionId });
+            const pluginId = windowToPlugin.get(event.source);
+            if (pluginId && typeof data.sessionId === "string") {
+              invoke("stop_plugin_session", { id: pluginId, sessionId: data.sessionId });
             }
             return;
           }
@@ -504,11 +513,14 @@
             document.body.style.userSelect = "";
             el.removeEventListener("pointermove", onMove);
             el.removeEventListener("pointerup", onUp);
+            el.removeEventListener("pointercancel", onUp);
             savePanelLayout();
           };
 
           el.addEventListener("pointermove", onMove);
           el.addEventListener("pointerup", onUp);
+          // Same reasoning as initSplitDividerDrag's own pointercancel handling above.
+          el.addEventListener("pointercancel", onUp);
         });
       }
 

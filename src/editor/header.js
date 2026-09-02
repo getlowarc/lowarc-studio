@@ -263,6 +263,10 @@
         closeFloatingMenu();
         const list = document.getElementById("floating-menu-list");
         list.classList.add("notif-panel-list");
+        // Not a menu — a read-only list with per-row dismiss buttons, not a set of actions the
+        // overlay itself resolves a choice from (see floatingMenuResolve below).
+        list.setAttribute("role", "region");
+        list.setAttribute("aria-label", "Notifications");
         renderNotificationList(list);
         floatingMenuResolve = () => {}; // nothing to resolve — dismissal alone is the only outcome
 

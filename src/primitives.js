@@ -4,6 +4,35 @@
 // needs a real data source to filter against, so it's exposed as a function (initSearchbar)
 // instead of auto-init, and a toast has no fixed markup to init — it's created on demand.
 
+// The one checkmark glyph this app uses — a checkbox's own check, a menu's checked-item indicator
+// (menus.js), a manager panel's "Enabled" checkbox (plugin-hosting.js) — defined once here (loads
+// first, see editor.html's script order) rather than hand-copied at each of those.
+const CHECKMARK_SVG = '<svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>';
+
+// Appends a .popup-actions row with a Cancel button plus one other action button — the shape most
+// simple popups need (a delete/discard confirmation, a create-with-validation form's Cancel+Create
+// pair), hand-built identically at several popup contributions before this existed. Returns the
+// confirm button so a caller needing more than a bare click listener (new-project's own async
+// validation, triggered by Enter in its input too — see menus.js) can hold onto it.
+function appendConfirmActions(container, { cancelLabel = "Cancel", confirmLabel, confirmVariant = "confirm", onCancel, onConfirm } = {}) {
+  const actions = document.createElement("div");
+  actions.className = "popup-actions";
+  const cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.className = "btn btn-md btn-ghost";
+  cancelBtn.textContent = cancelLabel;
+  if (onCancel) cancelBtn.addEventListener("click", onCancel);
+  const confirmBtn = document.createElement("button");
+  confirmBtn.type = "button";
+  confirmBtn.className = `btn btn-md btn-${confirmVariant}`;
+  confirmBtn.textContent = confirmLabel;
+  if (onConfirm) confirmBtn.addEventListener("click", onConfirm);
+  actions.appendChild(cancelBtn);
+  actions.appendChild(confirmBtn);
+  container.appendChild(actions);
+  return confirmBtn;
+}
+
 // Also matches .searchbar[data-open] (the header's command-center search — see initSearchbar
 // below) even though it has no [data-dropdown] attribute of its own; it's a bespoke widget, not
 // one of the data-attribute-driven primitives above, but shares the same open/closed convention
@@ -129,8 +158,12 @@ function initTabs(root = document) {
       const tab = e.target.closest("[data-tab-value]");
       if (!tab || !el.contains(tab)) return;
 
-      el.querySelectorAll("[data-tab-value]").forEach((t) => t.classList.remove("is-active"));
+      el.querySelectorAll("[data-tab-value]").forEach((t) => {
+        t.classList.remove("is-active");
+        if (t.getAttribute("role") === "tab") t.setAttribute("aria-selected", "false");
+      });
       tab.classList.add("is-active");
+      if (tab.getAttribute("role") === "tab") tab.setAttribute("aria-selected", "true");
       el.dispatchEvent(new CustomEvent("tab-change", { bubbles: true, detail: { value: tab.dataset.tabValue } }));
     });
   });
@@ -241,9 +274,14 @@ function initReorderable(container, { itemSelector = "[data-tab-value]", keyAttr
       placeIndicatorIn(activeContainer, pos, item);
     };
 
-    const onUp = (upEvent) => {
+    const removeListeners = () => {
       container.removeEventListener("pointermove", onMove);
       container.removeEventListener("pointerup", onUp);
+      container.removeEventListener("pointercancel", onCancel);
+    };
+
+    const onUp = (upEvent) => {
+      removeListeners();
       if (!dragging) return;
 
       item.releasePointerCapture(upEvent.pointerId);
@@ -262,8 +300,23 @@ function initReorderable(container, { itemSelector = "[data-tab-value]", keyAttr
       }
     };
 
+    // A pointercancel (lost pointer capture — a system dialog, alt-tab, a touch/pen interruption)
+    // interrupts a drag the same way pointerup would, but without a real "drop" to commit — item
+    // was never actually moved in the DOM during the drag (only the indicator was), so just
+    // dropping the indicator and clearing state IS the revert; nothing to undo beyond that.
+    const onCancel = (cancelEvent) => {
+      removeListeners();
+      if (!dragging) return;
+
+      item.releasePointerCapture(cancelEvent.pointerId);
+      item.classList.remove("is-dragging");
+      activeContainer.classList.remove("is-reordering");
+      indicator.remove();
+    };
+
     container.addEventListener("pointermove", onMove);
     container.addEventListener("pointerup", onUp);
+    container.addEventListener("pointercancel", onCancel);
   });
 
   // A genuine drag still ends in a real click event on release (pointerup with no movement since
@@ -590,45 +643,6 @@ function reportError(err) {
   showToast({ variant: "error", message: String(err) });
 }
 
-// ---------- Popup ----------
-
-function openPopup(idOrEl) {
-  const el = typeof idOrEl === "string" ? document.getElementById(idOrEl) : idOrEl;
-  if (!el) return;
-  el.classList.add("is-open");
-  const focusable = el.querySelector("input, textarea, select, button, [tabindex]");
-  if (focusable) focusable.focus();
-}
-
-function closePopup(idOrEl) {
-  const el = typeof idOrEl === "string" ? document.getElementById(idOrEl) : idOrEl;
-  if (!el) return;
-  el.classList.remove("is-open");
-}
-
-// Wires every [data-popup] backdrop found under root: clicking the backdrop itself (not its
-// contents) closes it, and any [data-popup-close] inside (a header's X, a Cancel button) does too.
-function initPopups(root = document) {
-  root.querySelectorAll("[data-popup]").forEach((el) => {
-    if (el.dataset.popupInit) return;
-    el.dataset.popupInit = "true";
-
-    el.addEventListener("click", (e) => {
-      if (e.target === el) closePopup(el);
-    });
-
-    el.querySelectorAll("[data-popup-close]").forEach((btn) => {
-      btn.addEventListener("click", () => closePopup(el));
-    });
-  });
-}
-
-document.addEventListener("keydown", (e) => {
-  if (e.key !== "Escape") return;
-  const open = document.querySelector(".popup-backdrop.is-open");
-  if (open) closePopup(open);
-});
-
 // ---------- Popup (Base) ----------
 // A "popups" slot in the shared registry above, but unlike a persistent region
 // (sidebar/inspector/console in editor.html) it's a STACK, not a single mounted slot: showing one
@@ -638,13 +652,12 @@ document.addEventListener("keydown", (e) => {
 // the way a region's mounted content is, since a popup has no reason to stay in the DOM once
 // closed and a nested open of the same id needs its own independent instance.
 //
-// Deliberately reuses .popup-backdrop/.popup/.popup-header/.popup-body/.popup-actions as-is, but
-// WITHOUT ever adding the "is-open" class openPopup()/closePopup() above toggle — this file also
-// has a document-level Escape listener keyed on ".popup-backdrop.is-open" (for the simple,
-// element-toggle popup system above, still used as-is by modules.html/plugins.html/settings.html's
-// own popups), and this stack has its own Escape handling below; adding "is-open" here would make
-// that other listener match these instances too and fight over closing them. Visibility here is a
-// plain inline style.display instead.
+// Reuses .popup-backdrop/.popup/.popup-header/.popup-body/.popup-actions — this used to also be
+// shared with an older, simpler element-toggle system (openPopup(id)/closePopup(id) plus a
+// [data-popup]/[data-popup-close] markup convention), which is why visibility here has always been
+// a plain inline style.display rather than the "is-open" class that older system toggled. That
+// older system is gone now (every page that had it has migrated to this one), but the plain
+// style.display stays — it's not tied to the old system, just how this one has always worked.
 //
 // Any page that wants this needs a `<div class="popup-stack" id="popup-stack"></div>` in its own
 // markup (a sibling of the page's main content, same "nothing can clip it" placement reasoning as
@@ -680,9 +693,26 @@ function topPopup() {
 // directly; a HOST contribution's mount() runs in this same script, though, so it's wrapped in
 // try/catch below — the same reasoning already applied to a host sidebar panel's mount() in
 // editor.html.
+const FOCUSABLE_SELECTOR = "input, textarea, select, button, [tabindex]";
+
+// Every element inside `el` that's actually reachable by Tab right now — used both to pick the
+// popup's initial focus target and to trap Tab at the popup's own boundary. Computed fresh on
+// every call rather than cached once, since mount()'d content (or a popup's own async rendering)
+// can add/remove focusable elements over the popup's lifetime. offsetParent === null filters out
+// anything hidden (display:none, or a not-currently-visible tab/section within the popup body).
+function focusableIn(el) {
+  return Array.from(el.querySelectorAll(FOCUSABLE_SELECTOR)).filter((node) => node.offsetParent !== null && !node.disabled);
+}
+
 function showPopup(id, target) {
   const contribution = getSlot("popups").find((c) => c.id === id);
   if (!contribution) return Promise.reject(new Error(`showPopup(): no popup contributed with id "${id}"`));
+
+  // Restored once this instance closes (see close() below) — without this, closing a popup whose
+  // content focused something inside itself (see the initial-focus call at the end of this
+  // function) drops focus to <body> the moment backdrop.remove() takes that element out of the
+  // document, leaving a keyboard user with no idea where they are any more.
+  const previouslyFocused = document.activeElement;
 
   return new Promise((resolve) => {
     const depth = popupStack.length;
@@ -731,12 +761,36 @@ function showPopup(id, target) {
       const idx = popupStack.indexOf(instance);
       if (idx !== -1) popupStack.splice(idx, 1);
       backdrop.remove();
+      // Only if it's still a real, visible part of the page — the thing that opened this popup
+      // may itself be gone by now (a manager row this popup just confirmed deleting, say), and
+      // focusing a detached/hidden element either throws or silently does nothing useful.
+      if (previouslyFocused && document.body.contains(previouslyFocused) && previouslyFocused.offsetParent !== null) {
+        previouslyFocused.focus();
+      }
       resolve(result === undefined ? null : result);
     };
     instance.close = close;
 
     backdrop.addEventListener("click", (e) => {
       if (e.target === backdrop && instance.closeOnBackdrop) close(null);
+    });
+
+    // Focus trap: Tab/Shift+Tab wraps at the popup's own first/last focusable element instead of
+    // escaping to whatever's behind the (visually blocking, but not otherwise inert) backdrop.
+    // Only intercepts the wrap-around case — everything in between still tabs through normally.
+    box.addEventListener("keydown", (e) => {
+      if (e.key !== "Tab") return;
+      const focusables = focusableIn(box);
+      if (!focusables.length) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     });
 
     try {
@@ -754,7 +808,7 @@ function showPopup(id, target) {
     popupStack.push(instance);
     initTooltips(box);
 
-    const focusable = box.querySelector("input, textarea, select, button, [tabindex]");
+    const focusable = focusableIn(box)[0];
     if (focusable) focusable.focus();
   });
 }
@@ -889,7 +943,7 @@ function renderSettingRow(entry, value, onCommit) {
     checkbox.checked = value === "true";
     const box = document.createElement("span");
     box.className = "checkbox-box";
-    box.innerHTML = '<svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>';
+    box.innerHTML = CHECKMARK_SVG;
     const text = document.createElement("span");
     text.textContent = entry.label;
     rowLabel.appendChild(checkbox);
@@ -1251,21 +1305,12 @@ function createManagerPage(config) {
       body.textContent = `This deletes "${ctx.target.name}" from disk. This can't be undone.`;
       container.appendChild(body);
 
-      const actions = document.createElement("div");
-      actions.className = "popup-actions";
-      const cancelBtn = document.createElement("button");
-      cancelBtn.type = "button";
-      cancelBtn.className = "btn btn-md btn-ghost";
-      cancelBtn.textContent = "Cancel";
-      cancelBtn.addEventListener("click", () => ctx.close(false));
-      const removeBtn = document.createElement("button");
-      removeBtn.type = "button";
-      removeBtn.className = "btn btn-md btn-danger";
-      removeBtn.textContent = "Remove";
-      removeBtn.addEventListener("click", () => ctx.close(true));
-      actions.appendChild(cancelBtn);
-      actions.appendChild(removeBtn);
-      container.appendChild(actions);
+      appendConfirmActions(container, {
+        confirmLabel: "Remove",
+        confirmVariant: "danger",
+        onCancel: () => ctx.close(false),
+        onConfirm: () => ctx.close(true),
+      });
     },
   });
 
@@ -1364,7 +1409,7 @@ function createManagerPage(config) {
     checkbox.checked = !item.disabled;
     const box = document.createElement("span");
     box.className = "checkbox-box";
-    box.innerHTML = '<svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>';
+    box.innerHTML = CHECKMARK_SVG;
     const enabledText = document.createElement("span");
     enabledText.textContent = "Enabled";
     enabledLabel.appendChild(checkbox);

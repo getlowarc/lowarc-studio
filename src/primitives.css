@@ -237,13 +237,10 @@
 
 /* ---------- Drag-to-reorder ---------- */
 /* See initReorderable() in primitives.js. Only ever active on a container carrying
-   data-reorderable — the cursor affordance below is scoped the same way, so a tab strip that
-   hasn't opted in never even hints that dragging does anything. */
-[data-reorderable] > [data-tab-value],
-[data-reorderable] > [data-panel-key] {
-  cursor: grab;
-}
-
+   data-reorderable. Every strip this applies to (the rail, editor file tabs, console tabs) is
+   click-first — switching panel/file/tab — with drag-to-reorder layered on as a secondary
+   affordance, so the resting cursor stays pointer; grab would read as "drag me", not "click me".
+   The open hand only shows up once a drag actually starts, via .is-reordering below. */
 [data-reorderable].is-reordering {
   cursor: grabbing;
 }
@@ -438,10 +435,6 @@
   justify-content: center;
   z-index: 50;
   padding: 24px;
-}
-
-.popup-backdrop.is-open {
-  display: flex;
 }
 
 .popup {

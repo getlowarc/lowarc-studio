@@ -48,6 +48,18 @@
         const menu = document.getElementById(id);
         const trigger = document.getElementById(`${id}-trigger`);
 
+        // Static markup, so the roles are applied here rather than hand-repeated on every item —
+        // the same ARIA shape openMenuOverlay's dynamically-built menus use (menuitem/menuitemcheckbox/
+        // separator), just applied once at setup instead of per render since this content never changes.
+        const list = menu.querySelector(".menu-dropdown-list");
+        if (list) {
+          list.setAttribute("role", "menu");
+          list.querySelectorAll(".menu-dropdown-item").forEach((item) => {
+            item.setAttribute("role", item.querySelector(".menu-dropdown-item-check") ? "menuitemcheckbox" : "menuitem");
+          });
+          list.querySelectorAll(".menu-dropdown-divider").forEach((div) => div.setAttribute("role", "separator"));
+        }
+
         trigger.addEventListener("click", (e) => {
           e.stopPropagation();
           const opening = !menu.classList.contains("is-open");
@@ -141,8 +153,6 @@
         });
       }
 
-      const MENU_CHECK_SVG = '<svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>';
-
       // items: [{label, value, disabled, checked}], a divider is {divider: true}. `checked` is
       // optional — only present it for a genuinely checkable menu (see the Rail/Console visibility
       // toggle below); omitting it on every item keeps an ordinary action menu (File/Edit/View, …)
@@ -154,11 +164,13 @@
           const list = document.getElementById("floating-menu-list");
           list.innerHTML = "";
           list.classList.remove("notif-panel-list");
+          list.setAttribute("role", "menu");
 
           for (const item of items) {
             if (item.divider) {
               const div = document.createElement("div");
               div.className = "menu-dropdown-divider";
+              div.setAttribute("role", "separator");
               list.appendChild(div);
               continue;
             }
@@ -166,10 +178,14 @@
             btn.type = "button";
             btn.className = "menu-dropdown-item";
             if (item.checked !== undefined) {
+              btn.setAttribute("role", "menuitemcheckbox");
+              btn.setAttribute("aria-checked", String(Boolean(item.checked)));
               const check = document.createElement("span");
               check.className = "menu-dropdown-item-check";
-              if (item.checked) check.innerHTML = MENU_CHECK_SVG;
+              if (item.checked) check.innerHTML = CHECKMARK_SVG;
               btn.appendChild(check);
+            } else {
+              btn.setAttribute("role", "menuitem");
             }
             const label = document.createElement("span");
             label.textContent = item.label;
@@ -189,18 +205,31 @@
 
       // Convenience for a real trigger element — opens just below it, same default corner
       // .menu-dropdown-list used to, minus the per-trigger CSS overrides that used to be needed
-      // for triggers near an edge (openMenuOverlay's own clamping replaces those).
+      // for triggers near an edge (openMenuOverlay's own clamping replaces those). Also owns
+      // aria-expanded on the trigger itself — every caller here is a flyout that markup already
+      // declares aria-haspopup="true" aria-expanded="false" on (account/settings/console-session),
+      // so this is the one place that needs to flip it, rather than every caller remembering to.
+      // .finally() rather than .then() since the menu can close via a chosen item, Escape, an
+      // outside click, or another menu opening on top of it — aria-expanded should go back to
+      // false (and focus return to the trigger) in every one of those cases, not just a
+      // deliberate selection. Standard menu-button pattern: whether or not a keyboard user
+      // actually Tab'd into the menu's own items, focus lands back on the button that opened it.
       function openMenuFromTrigger(triggerEl, items) {
         const rect = triggerEl.getBoundingClientRect();
-        return openMenuOverlay(items, { x: rect.left, y: rect.bottom + 2, gap: rect.height + 4 });
+        triggerEl.setAttribute("aria-expanded", "true");
+        return openMenuOverlay(items, { x: rect.left, y: rect.bottom + 2, gap: rect.height + 4 }).finally(() => {
+          triggerEl.setAttribute("aria-expanded", "false");
+          triggerEl.focus();
+        });
       }
 
       // ---------- Popup contributions (host) ----------
       // showPopup()/the "popups" stack itself now lives in primitives.js (promoted there once
       // settings.html/modules.html/plugins.html adopted it too — see the comment on it there for
       // the full mechanics). These are the three popups editor.html used to hand-author as static
-      // HTML + openPopup(id)/closePopup(id) (primitives.js's older, simple element-toggle pair —
-      // still used as-is by anything that hasn't migrated).
+      // HTML toggled by an older, simpler element-toggle pair (openPopup(id)/closePopup(id)) —
+      // that system is gone now, every page (including primitives.html's own showcase examples)
+      // has migrated to this one.
 
       contribute("popups", {
         id: "new-project",
@@ -227,21 +256,6 @@
           body.appendChild(errorEl);
           container.appendChild(body);
 
-          const actions = document.createElement("div");
-          actions.className = "popup-actions";
-          const cancelBtn = document.createElement("button");
-          cancelBtn.type = "button";
-          cancelBtn.className = "btn btn-md btn-ghost";
-          cancelBtn.textContent = "Cancel";
-          cancelBtn.addEventListener("click", () => ctx.close(null));
-          const createBtn = document.createElement("button");
-          createBtn.type = "button";
-          createBtn.className = "btn btn-md btn-confirm";
-          createBtn.textContent = "Create";
-          actions.appendChild(cancelBtn);
-          actions.appendChild(createBtn);
-          container.appendChild(actions);
-
           const create = async () => {
             try {
               const path = await invoke("create_project", { parentDir: ctx.target.parentDir, name: nameInput.value });
@@ -250,7 +264,7 @@
               errorEl.textContent = String(err);
             }
           };
-          createBtn.addEventListener("click", create);
+          appendConfirmActions(container, { confirmLabel: "Create", onCancel: () => ctx.close(null), onConfirm: create });
           nameInput.addEventListener("keydown", (e) => {
             if (e.key === "Enter") create();
           });
@@ -346,21 +360,12 @@
           body.textContent = `This deletes "${ctx.target.name}" from disk. This can't be undone.`;
           container.appendChild(body);
 
-          const actions = document.createElement("div");
-          actions.className = "popup-actions";
-          const cancelBtn = document.createElement("button");
-          cancelBtn.type = "button";
-          cancelBtn.className = "btn btn-md btn-ghost";
-          cancelBtn.textContent = "Cancel";
-          cancelBtn.addEventListener("click", () => ctx.close(false));
-          const removeBtn = document.createElement("button");
-          removeBtn.type = "button";
-          removeBtn.className = "btn btn-md btn-danger";
-          removeBtn.textContent = "Remove";
-          removeBtn.addEventListener("click", () => ctx.close(true));
-          actions.appendChild(cancelBtn);
-          actions.appendChild(removeBtn);
-          container.appendChild(actions);
+          appendConfirmActions(container, {
+            confirmLabel: "Remove",
+            confirmVariant: "danger",
+            onCancel: () => ctx.close(false),
+            onConfirm: () => ctx.close(true),
+          });
         },
       });
 
@@ -378,21 +383,12 @@
           body.textContent = `"${ctx.target.title}" has unsaved changes. Close it anyway?`;
           container.appendChild(body);
 
-          const actions = document.createElement("div");
-          actions.className = "popup-actions";
-          const cancelBtn = document.createElement("button");
-          cancelBtn.type = "button";
-          cancelBtn.className = "btn btn-md btn-ghost";
-          cancelBtn.textContent = "Cancel";
-          cancelBtn.addEventListener("click", () => ctx.close(false));
-          const discardBtn = document.createElement("button");
-          discardBtn.type = "button";
-          discardBtn.className = "btn btn-md btn-danger";
-          discardBtn.textContent = "Close Anyway";
-          discardBtn.addEventListener("click", () => ctx.close(true));
-          actions.appendChild(cancelBtn);
-          actions.appendChild(discardBtn);
-          container.appendChild(actions);
+          appendConfirmActions(container, {
+            confirmLabel: "Close Anyway",
+            confirmVariant: "danger",
+            onCancel: () => ctx.close(false),
+            onConfirm: () => ctx.close(true),
+          });
         },
       });
 

@@ -31,6 +31,7 @@
       function renderTabStrip(container, slot, opts) {
         const { itemClass = "sidebar-tab", anchorEl = null, iconBased = true, emptyText = null, onActivate, onToggleClose, onClose, decorate } = opts;
 
+        container.setAttribute("role", "tablist");
         container.querySelectorAll("[data-tab-value], .tab-bar-empty").forEach((el) => el.remove());
 
         // Filtered here, not inside getSlot() itself — hiding a tab/icon is purely about whether
@@ -54,14 +55,21 @@
           const tab = document.createElement(closeable ? "div" : "button");
           tab.className = itemClass;
           tab.dataset.tabValue = contribution.id;
+          tab.setAttribute("role", "tab");
+          tab.setAttribute("aria-selected", "false");
 
           if (closeable) {
-            tab.setAttribute("role", "button");
             tab.tabIndex = 0;
             tab.addEventListener("keydown", (e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
                 tab.click();
+              } else if ((e.key === "Delete" || e.key === "Backspace") && onClose) {
+                // The close button itself is deliberately NOT in the Tab order (see below) — this
+                // is the actual keyboard path to closing a tab, reachable the moment the tab
+                // itself has focus rather than requiring a second, invisible-until-hover target.
+                e.preventDefault();
+                onClose(contribution);
               }
             });
           } else {
@@ -94,6 +102,12 @@
             close.type = "button";
             close.className = "btn btn-icon-only btn-xs btn-ghost-danger file-tab-close";
             close.setAttribute("aria-label", `Close ${contribution.label}`);
+            // Visually hidden except on hover/active (see .file-tab-close in editor.html's CSS) —
+            // out of the Tab order entirely rather than a focusable target a keyboard user could
+            // land on without being able to see it. Still a real, mouse-clickable button; Delete/
+            // Backspace on the focused tab itself (see the keydown handler above) is the keyboard
+            // equivalent.
+            close.tabIndex = -1;
             close.innerHTML =
               '<svg viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>';
             close.addEventListener("click", (e) => {
@@ -174,7 +188,10 @@
           const activeKey = document.querySelector("#rail-tabs .sidebar-tab.is-active")?.dataset.tabValue;
           renderRailTabs();
           const btn = activeKey && document.querySelector(`#rail-tabs .sidebar-tab[data-tab-value="${activeKey}"]`);
-          if (btn) btn.classList.add("is-active");
+          if (btn) {
+            btn.classList.add("is-active");
+            btn.setAttribute("aria-selected", "true");
+          }
         } else if (slot === "console") {
           renderConsoleTabs();
           activateConsoleTab(activeConsoleTabKey);
@@ -191,6 +208,7 @@
           onToggleClose: (contribution, btn) => {
             if (!PANELS.sidebar.open) return false;
             btn.classList.remove("is-active");
+            btn.setAttribute("aria-selected", "false");
             setPanelOpen("sidebar", false);
           },
         });
@@ -344,6 +362,7 @@
         const restoredBtn = restoredSidebarActiveKey && document.querySelector(`#rail-tabs .sidebar-tab[data-tab-value="${restoredSidebarActiveKey}"]`);
         if (restoredBtn) {
           restoredBtn.classList.add("is-active");
+          restoredBtn.setAttribute("aria-selected", "true");
           showSlotTab("sidebar", "left-panel-body", restoredSidebarActiveKey);
         }
 
