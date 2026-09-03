@@ -420,7 +420,15 @@ function clearSelection(doc) {
 function selectNode(doc, nodeId) {
   clearSelection(doc);
   doc.selectedNode = nodeId;
-  doc.nodeEls.get(nodeId)?.classList.add("is-selected");
+  const el = doc.nodeEls.get(nodeId);
+  el?.classList.add("is-selected");
+  // Clicking a hover-highlighted Inspector connected-list row (see focusNode) selects this exact
+  // node AND rebuilds that list's DOM as part of re-pointing the Inspector here — which destroys
+  // the row that was still "hovered" without ever firing its mouseleave, so the lowarc:highlightNode
+  // {on:false} that would normally clear this never arrives. Since a click always follows hovering
+  // the row for THIS SAME node, clearing it here (selection superseding a stale hover) is exactly
+  // the right fix rather than requiring the user to re-hover/unhover it manually to clean it up.
+  el?.classList.remove("is-hover-highlight");
   renderConnections(doc);
 }
 
