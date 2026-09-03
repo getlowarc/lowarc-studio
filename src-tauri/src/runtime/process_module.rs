@@ -283,7 +283,12 @@ fn spawn_stderr_reader(stderr: std::process::ChildStderr, log: LogFn, name: Stri
 }
 
 /// Spawns one ProcessModule per `(info, descriptor)` pair, then drives them through the standard
-/// compile→start→frame-loop→stop lifecycle, sorted by each module's own manifest.load_order.
+/// compile→start→frame-loop→stop lifecycle, sorted into requires-order (see manifest::
+/// requires_rank — NOT just each module's own raw manifest.load_order; two modules can declare any
+/// loadOrder numbers regardless of what they actually require, so only a real requires-DFS
+/// guarantees a producer runs before its consumers, which the shared/publish design below depends
+/// on for correctness, not just tidiness).
+///
 /// Shared by ProcessLoader (real process.json modules) and NativeLoader (native.json modules
 /// bridged through the native_module_host helper process — see that file for why: it needs the
 /// exact same spawn/start/frame/stop shape a real process module gets, just with a synthetic
@@ -296,13 +301,12 @@ fn spawn_stderr_reader(stderr: std::process::ChildStderr, log: LogFn, name: Stri
 /// keeps its previous value). Every module's frame() call reads its own filtered view of it (only
 /// the ids it `requires` — see ProcessModule::frame) and may return new entries to publish under
 /// its OWN id, merged into `shared` the moment that module's frame() call returns. Because `started`
-/// is already sorted into requires-order (a module always runs after everything it requires — the
-/// exact same guarantee load_order_rank/order_by_requires already provides for other reasons), a
-/// consumer's frame() this same tick sees its dependency's output from THIS tick, not one tick
-/// stale — no separate synchronization or double-buffering needed, it falls out of the existing
-/// ordering for free. No new manifest field either: requires already means "I depend on this
-/// existing", so it doing double duty as the communication permission is the least arbitrary
-/// reading of it, not a second, parallel concept to keep in sync with the first.
+/// is sorted by requires_rank (see this function's own header above — a module always runs after
+/// everything it requires), a consumer's frame() this same tick sees its dependency's output from
+/// THIS tick, not one tick stale — no separate synchronization or double-buffering needed, it falls
+/// out of the existing ordering for free. No new manifest field either: requires already means "I
+/// depend on this existing", so it doing double duty as the communication permission is the least
+/// arbitrary reading of it, not a second, parallel concept to keep in sync with the first.
 pub fn spawn_and_run(descriptors: Vec<(&ModuleInfo, ProcessDescriptor)>, ctx: &RunContext) -> Result<(), String> {
     let mut spawned: Vec<ProcessModule> = Vec::new();
     for (info, desc) in &descriptors {
@@ -322,9 +326,18 @@ pub fn spawn_and_run(descriptors: Vec<(&ModuleInfo, ProcessDescriptor)>, ctx: &R
         }
     }
 
-    let load_order_rank: std::collections::HashMap<&str, i32> =
-        descriptors.iter().map(|(i, _)| (i.manifest.id.as_str(), i.manifest.load_order)).collect();
-    spawned.sort_by_key(|m| load_order_rank.get(m.id.as_str()).copied().unwrap_or(i32::MAX));
+    // Requires-order, not just raw loadOrder — the same DFS manifest::order_by_requires uses,
+    // exposed here as requires_rank() since this function only ever borrows its ModuleInfos (it
+    // doesn't own descriptors, so it can't consume-and-reorder the way order_by_requires does).
+    // This is what makes the "a consumer's frame() runs after its dependency's" guarantee spelled
+    // out in this function's own header comment actually hold — a plain loadOrder-only sort here
+    // would NOT have guaranteed it (two modules can declare any loadOrder numbers regardless of
+    // what they actually require), so run_from_launch_dir (which already called order_by_requires
+    // itself) and start_run (which resolves modules via project::resolve — plain BFS, not
+    // requires-ordered at all) would have disagreed on something this basic.
+    let module_infos: Vec<&ModuleInfo> = descriptors.iter().map(|(i, _)| *i).collect();
+    let requires_rank = crate::runtime::manifest::requires_rank(&module_infos);
+    spawned.sort_by_key(|m| requires_rank.get(&m.id).copied().unwrap_or(usize::MAX));
 
     if spawned.is_empty() {
         return Err("No runnable modules — nothing to run.".into());

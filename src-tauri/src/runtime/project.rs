@@ -56,33 +56,54 @@ pub fn resolve(preset: &ProjectPreset, modules_dir: &Path) -> Result<Vec<ModuleI
     let by_id = scan_store(modules_dir);
 
     let mut errors = Vec::new();
+    // Two separate trackers, not one: resolved_ids guards against reprocessing a module that's
+    // already been successfully resolved (and, same as before, against infinite requeueing on a
+    // dependency cycle among successfully-installed modules — nothing here ever re-expands a
+    // resolved module's own requires a second time). errored_ids only dedupes the ERROR MESSAGE
+    // for a given id — it does NOT prevent reprocessing the way resolved_ids does, since a missing
+    // id referenced optionally by one module and mandatorily by another has to still surface as an
+    // error the moment ANY mandatory reference to it shows up, however many optional references to
+    // the same still-missing id came first.
     let mut resolved_ids: HashSet<String> = HashSet::new();
+    let mut errored_ids: HashSet<String> = HashSet::new();
     let mut resolved: Vec<ModuleInfo> = Vec::new();
-    let mut queue: VecDeque<String> = preset.requires.iter().map(|d| d.id.clone()).collect();
+    // (id, optional) — a project's own top-level requires is always mandatory (see Dependency's
+    // own doc comment on why); only a MODULE's own manifest.requires can mark one optional.
+    let mut queue: VecDeque<(String, bool)> = preset.requires.iter().map(|d| (d.id.clone(), false)).collect();
 
-    while let Some(id) = queue.pop_front() {
-        if id.is_empty() || !resolved_ids.insert(id.clone()) {
-            continue; // already resolved (or already errored) — dependency cycles are fine
+    while let Some((id, optional)) = queue.pop_front() {
+        if id.is_empty() || resolved_ids.contains(&id) {
+            continue;
         }
 
         match by_id.get(&id) {
-            None => errors.push(format!("Module \"{id}\" is required but not installed.")),
+            None if optional => continue, // safe to be absent — see Dependency::optional
+            None => {
+                if errored_ids.insert(id.clone()) {
+                    errors.push(format!("Module \"{id}\" is required but not installed."));
+                }
+            }
             Some(folders) if folders.len() > 1 => {
-                let paths = folders.iter().map(|p| p.display().to_string()).collect::<Vec<_>>().join(", ");
-                errors.push(format!(
-                    "Module \"{id}\" is claimed by more than one installed module: {paths}. \
-                     Remove or rename one before this project can run."
-                ));
+                if errored_ids.insert(id.clone()) {
+                    let paths = folders.iter().map(|p| p.display().to_string()).collect::<Vec<_>>().join(", ");
+                    errors.push(format!(
+                        "Module \"{id}\" is claimed by more than one installed module: {paths}. \
+                         Remove or rename one before this project can run."
+                    ));
+                }
             }
             Some(folders) => {
                 let folder = folders[0].clone();
                 let Some(manifest) = Manifest::read(&folder) else {
-                    errors.push(format!("Module \"{id}\" at {} has an unreadable manifest.json.", folder.display()));
+                    if errored_ids.insert(id.clone()) {
+                        errors.push(format!("Module \"{id}\" at {} has an unreadable manifest.json.", folder.display()));
+                    }
                     continue;
                 };
+                resolved_ids.insert(id);
                 for dep in &manifest.requires {
                     if !dep.id.is_empty() {
-                        queue.push_back(dep.id.clone());
+                        queue.push_back((dep.id.clone(), dep.optional));
                     }
                 }
                 resolved.push(ModuleInfo { folder, manifest });
@@ -148,7 +169,7 @@ mod tests {
         write_module(&modules_dir, "a", "mod-a", &["mod-b"]);
         write_module(&modules_dir, "b", "mod-b", &[]);
 
-        let preset = ProjectPreset { requires: vec![Dependency { id: "mod-a".into(), version: "*".into() }], ..Default::default() };
+        let preset = ProjectPreset { requires: vec![Dependency { id: "mod-a".into(), version: "*".into(), ..Dependency::default() }], ..Default::default() };
         let resolved = resolve(&preset, &modules_dir).expect("expected a successful resolution");
 
         let ids: Vec<&str> = resolved.iter().map(|m| m.manifest.id.as_str()).collect();
@@ -159,7 +180,7 @@ mod tests {
     #[test]
     fn missing_module_is_a_visible_error_not_a_silent_skip() {
         let modules_dir = temp_dir("resolve_missing");
-        let preset = ProjectPreset { requires: vec![Dependency { id: "does-not-exist".into(), version: "*".into() }], ..Default::default() };
+        let preset = ProjectPreset { requires: vec![Dependency { id: "does-not-exist".into(), version: "*".into(), ..Dependency::default() }], ..Default::default() };
 
         let errors = resolve(&preset, &modules_dir).expect_err("a missing module must fail resolution");
         assert!(errors.iter().any(|e| e.contains("does-not-exist")), "error should name the missing module: {errors:?}");
@@ -171,8 +192,50 @@ mod tests {
         write_module(&modules_dir, "a-old", "mod-a", &[]);
         write_module(&modules_dir, "a-new", "mod-a", &[]);
 
-        let preset = ProjectPreset { requires: vec![Dependency { id: "mod-a".into(), version: "*".into() }], ..Default::default() };
+        let preset = ProjectPreset { requires: vec![Dependency { id: "mod-a".into(), version: "*".into(), ..Dependency::default() }], ..Default::default() };
         let errors = resolve(&preset, &modules_dir).expect_err("two modules claiming one id must fail, not silently pick one");
         assert!(errors.iter().any(|e| e.contains("more than one")), "error should explain the conflict: {errors:?}");
+    }
+
+    fn write_module_with_dep(modules_dir: &Path, folder_name: &str, id: &str, dep_id: &str, optional: bool) {
+        let dir = modules_dir.join(folder_name);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("manifest.json"),
+            format!(r#"{{"id":"{id}","name":"{id}","loadOrder":100,"requires":[{{"id":"{dep_id}","version":"*","optional":{optional}}}]}}"#),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn an_optional_missing_dependency_is_silently_left_out_not_an_error() {
+        let modules_dir = temp_dir("resolve_optional_missing");
+        write_module_with_dep(&modules_dir, "a", "mod-a", "does-not-exist", true);
+
+        let preset = ProjectPreset { requires: vec![Dependency { id: "mod-a".into(), version: "*".into(), ..Dependency::default() }], ..Default::default() };
+        let resolved = resolve(&preset, &modules_dir).expect("an optional-and-missing dependency should not fail resolution");
+
+        let ids: Vec<&str> = resolved.iter().map(|m| m.manifest.id.as_str()).collect();
+        assert_eq!(ids, vec!["mod-a"], "the module that declared it should still resolve, the missing optional dep should just be absent");
+    }
+
+    #[test]
+    fn a_mandatory_reference_still_errors_even_after_an_optional_one_saw_the_same_missing_id() {
+        // mod-a asks for "missing" optionally; mod-b asks for the SAME id mandatorily. Whichever
+        // gets queued first must not let the other's requirement go unnoticed.
+        let modules_dir = temp_dir("resolve_optional_then_mandatory");
+        write_module_with_dep(&modules_dir, "a", "mod-a", "missing", true);
+        write_module_with_dep(&modules_dir, "b", "mod-b", "missing", false);
+
+        let preset = ProjectPreset {
+            requires: vec![
+                Dependency { id: "mod-a".into(), version: "*".into(), ..Dependency::default() },
+                Dependency { id: "mod-b".into(), version: "*".into(), ..Dependency::default() },
+            ],
+            ..Default::default()
+        };
+        let errors = resolve(&preset, &modules_dir).expect_err("mod-b's mandatory requirement must still fail resolution");
+        assert!(errors.iter().any(|e| e.contains("missing")), "error should name the missing module: {errors:?}");
+        assert_eq!(errors.len(), 1, "the same missing id should only be reported once, not once per referencing module: {errors:?}");
     }
 }
