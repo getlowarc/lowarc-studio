@@ -46,6 +46,57 @@
     max-width: 100%;
     max-height: 100%;
   }
+
+  /* Audio has no picture of its own the way video has a first frame — this fills that same
+     visual space with a large icon plus a live frequency-bar visualizer (see media-viewer.js's
+     initVisualizer) instead of an empty pane, with the native <audio controls> bar pinned below
+     it (same play/pause/seek/volume controls as video already gets, nothing hand-rolled). */
+  .media-item.is-audio {
+    flex-direction: column;
+    gap: 16px;
+    padding: 32px;
+  }
+  .audio-visual {
+    position: relative;
+    width: 100%;
+    max-width: 480px;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--fg-dim);
+  }
+  .audio-visual svg {
+    width: 96px;
+    height: 96px;
+    opacity: 0.35;
+  }
+  .audio-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  /* Embedded cover art (ID3v2 APIC), when a file actually has one — a corner accent rather than
+     replacing the icon/visualizer, since the visualizer is still the "is this actually playing"
+     signal and shouldn't get covered up by a static image. */
+  .audio-thumb {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 72px;
+    height: 72px;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+  .media-item audio.audio-controls {
+    width: 100%;
+    max-width: 480px;
+    flex: none;
+  }
   /* Fit-to-window (the default) — scaled down to the viewport via object-fit, never larger than
      its own natural size (no "width/height: auto" upscale past 100% here on purpose, matching
      how an image viewer conventionally treats "fit"). A zoomed-in image gets explicit pixel

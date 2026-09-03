@@ -1,7 +1,7 @@
 {
   "name": "Media Viewer",
   "version": "0.1.0",
-  "description": "Views images and video in formats the browser already renders natively — no bundled decoder, unlike Monaco/xterm. Exotic formats (RAW, PSD, HEIC, TIFF) aren't supported yet.",
+  "description": "Views images, video, and audio in formats the browser already renders natively — no bundled decoder, unlike Monaco/xterm. Exotic formats (RAW, PSD, HEIC, TIFF) aren't supported yet.",
   "contributes": {
     "viewers": [
       {
@@ -11,7 +11,8 @@
         "binary": true,
         "extensions": [
           ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".svg", ".avif",
-          ".mp4", ".webm", ".ogg", ".ogv"
+          ".mp4", ".webm", ".ogv",
+          ".mp3", ".wav", ".flac", ".m4a", ".aac", ".opus", ".ogg"
         ]
       }
     ]
