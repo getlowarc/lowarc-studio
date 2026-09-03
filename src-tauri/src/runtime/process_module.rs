@@ -5,6 +5,15 @@
 // The only real differences from Bootstrap's copy: logging goes through a caller-supplied
 // callback instead of a Diag file, and {"requestStop":true} sets the run's shared stop flag
 // instead of a process-wide global — this crate can run more than one session in its lifetime.
+//
+// Genuinely new versus Bootstrap: inter-module communication. Every "frame" request now carries
+// a `"shared"` object, and every "frame" reply MAY carry a `"publish"` object — see
+// spawn_and_run's own comment below for the full design (the short version: a module publishes
+// under its own id, into a namespace only modules that actually `requires` it can see, and the
+// existing requires-ordering already guarantees a producer's frame runs before a consumer's in
+// the same tick). Native modules get this for free too — native_module_host.rs speaks this exact
+// same JSON wire protocol, translating "shared"/"publish" across the C ABI on its own side (see
+// that file's PublishFn).
 
 use parking_lot::Mutex;
 use serde::Deserialize;
@@ -55,6 +64,12 @@ pub struct ProcessModule {
     /// key on. A display name is decorative and not even guaranteed unique; the id is what a user
     /// actually knows and controls.
     pub id: String,
+    /// This module's own manifest.json requires, as plain ids — the same list that already
+    /// decides load order (see manifest::order_by_requires) doing double duty as the shared-state
+    /// visibility rule: this module's frame() only ever sees OTHER modules' published state for
+    /// ids in this list, never a module it never declared depending on. No separate permission
+    /// concept to introduce; requiring something already means "I depend on it existing."
+    requires: Vec<String>,
     pub wants_frames: bool,
     timeout: Duration,
     stdin: Mutex<ChildStdin>,
@@ -72,6 +87,7 @@ impl ProcessModule {
         desc: &ProcessDescriptor,
         name: String,
         id: String,
+        requires: Vec<String>,
         log: LogFn,
         stop_flag: Arc<AtomicBool>,
         breakpoints: Arc<Mutex<Vec<Breakpoint>>>,
@@ -92,6 +108,7 @@ impl ProcessModule {
         Ok(Self {
             name,
             id,
+            requires,
             wants_frames: desc.wants_frames,
             timeout: Duration::from_millis(desc.timeout_ms.max(1)),
             stdin: Mutex::new(stdin),
@@ -156,11 +173,18 @@ impl ProcessModule {
     /// all three to build this tick's `FrameModuleTrace` and to evaluate ModuleError/JsonMatch
     /// breakpoints against the reply. A module that doesn't want frames, or is already dead,
     /// contributes nothing to the trace rather than a fabricated empty one.
-    pub fn frame(&self, delta_seconds: f64) -> Option<(Value, Value, f64)> {
+    ///
+    /// `all_shared` is the FULL run-wide published-state map (module id -> whatever it last
+    /// published); this filters it down to just the entries this module actually `requires`
+    /// before it ever reaches the wire, so a module's own request payload only ever contains
+    /// state it declared a dependency on — see this file's own header comment for why.
+    pub fn frame(&self, delta_seconds: f64, all_shared: &serde_json::Map<String, Value>) -> Option<(Value, Value, f64)> {
         if !self.wants_frames || self.dead.load(Ordering::SeqCst) {
             return None;
         }
-        let request = json!({"phase": "frame", "delta": delta_seconds});
+        let shared: serde_json::Map<String, Value> =
+            self.requires.iter().filter_map(|dep_id| all_shared.get(dep_id).map(|v| (dep_id.clone(), v.clone()))).collect();
+        let request = json!({"phase": "frame", "delta": delta_seconds, "shared": shared});
         let started = Instant::now();
         let reply = self.request(request.clone());
         let duration_ms = started.elapsed().as_secs_f64() * 1000.0;
@@ -266,6 +290,19 @@ fn spawn_stderr_reader(stderr: std::process::ChildStderr, log: LogFn, name: Stri
 /// descriptor pointing at the helper instead of one read from disk). The "compile" phase is a
 /// harmless no-op for a native-bridging module — native_module_host answers it immediately with
 /// no work to do — so this lifecycle doesn't need to know which kind of module it's driving.
+///
+/// Inter-module communication, in full: `shared` below is one run-wide map, module id -> whatever
+/// that module last published (persists frame to frame; a key nobody's touched yet this tick just
+/// keeps its previous value). Every module's frame() call reads its own filtered view of it (only
+/// the ids it `requires` — see ProcessModule::frame) and may return new entries to publish under
+/// its OWN id, merged into `shared` the moment that module's frame() call returns. Because `started`
+/// is already sorted into requires-order (a module always runs after everything it requires — the
+/// exact same guarantee load_order_rank/order_by_requires already provides for other reasons), a
+/// consumer's frame() this same tick sees its dependency's output from THIS tick, not one tick
+/// stale — no separate synchronization or double-buffering needed, it falls out of the existing
+/// ordering for free. No new manifest field either: requires already means "I depend on this
+/// existing", so it doing double duty as the communication permission is the least arbitrary
+/// reading of it, not a second, parallel concept to keep in sync with the first.
 pub fn spawn_and_run(descriptors: Vec<(&ModuleInfo, ProcessDescriptor)>, ctx: &RunContext) -> Result<(), String> {
     let mut spawned: Vec<ProcessModule> = Vec::new();
     for (info, desc) in &descriptors {
@@ -274,6 +311,7 @@ pub fn spawn_and_run(descriptors: Vec<(&ModuleInfo, ProcessDescriptor)>, ctx: &R
             desc,
             info.manifest.name.clone(),
             info.manifest.id.clone(),
+            info.manifest.requires.iter().map(|d| d.id.clone()).collect(),
             ctx.log.clone(),
             ctx.stop_flag.clone(),
             ctx.debug.breakpoints.clone(),
@@ -315,6 +353,11 @@ pub fn spawn_and_run(descriptors: Vec<(&ModuleInfo, ProcessDescriptor)>, ctx: &R
         }
     }
 
+    // Run-wide, not per-tick — see spawn_and_run's own comment above for the full design. Lives
+    // right here (not behind an Arc<Mutex<_>>) since driver::run's tick closure is the only thing
+    // that ever touches it, on this one thread, never concurrently with anything else.
+    let mut shared: serde_json::Map<String, Value> = serde_json::Map::new();
+
     let mut frame_index: u64 = 0;
     crate::runtime::driver::run(ctx.target_fps, &ctx.stop_flag, &ctx.debug.pause_flag, &ctx.debug.step_request, |delta| {
         frame_index += 1;
@@ -322,7 +365,10 @@ pub fn spawn_and_run(descriptors: Vec<(&ModuleInfo, ProcessDescriptor)>, ctx: &R
         let mut triggered: Option<Breakpoint> = None;
 
         for m in &started {
-            let Some((request, reply, duration_ms)) = m.frame(delta) else { continue };
+            let Some((request, reply, duration_ms)) = m.frame(delta, &shared) else { continue };
+            if let Some(publish) = reply.get("publish").and_then(|p| p.as_object()) {
+                shared.entry(m.id.clone()).or_insert_with(|| Value::Object(Default::default())).as_object_mut().unwrap().extend(publish.clone());
+            }
             if triggered.is_none() {
                 triggered = runtime_loader::check_frame_breakpoints(&ctx.debug.breakpoints, &m.id, &reply);
             }

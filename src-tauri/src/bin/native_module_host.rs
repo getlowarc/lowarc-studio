@@ -5,10 +5,20 @@
 //
 // Speaks the exact same wire protocol as a process.json module (runtime::process_module) — one
 // JSON object per line on stdin/stdout, compile/start/frame/stop phases, {"log":...}/
-// {"requestStop":true} notifications — so NativeLoader can drive it through process_module's
-// existing spawn/compile/start/frame-loop/stop lifecycle unchanged, same as a real process module.
-// "compile" is a no-op here (native code is already compiled); replied to immediately so the
-// shared lifecycle doesn't need to know which kind of module it's talking to.
+// {"requestStop":true} notifications, and now "shared"/"publish" for inter-module communication
+// too (see process_module.rs's own header comment for the full design) — so NativeLoader can
+// drive it through process_module's existing spawn/compile/start/frame-loop/stop lifecycle
+// unchanged, same as a real process module. "compile" is a no-op here (native code is already
+// compiled); replied to immediately so the shared lifecycle doesn't need to know which kind of
+// module it's talking to.
+//
+// "shared" crosses the C ABI the same way "settings" already does at start() — serialized to a
+// JSON string, handed across as a plain `*const c_char`. "publish" goes the other way via a
+// callback (PublishFn), the same shape request_stop already is: the module calls it zero or more
+// times during frame() with a JSON *object* string, and whatever it passed gets merged (by key,
+// last call wins on a collision) into PUBLISH_BUFFER, which this process reads back out and sends
+// as this frame's reply once frame_fn returns. A callback rather than a return value sidesteps any
+// question of who owns/frees a string handed back across the FFI boundary — nothing has to.
 
 use lowarc_studio_lib::dylib::Library;
 use lowarc_studio_lib::runtime::native_module::{platform_library_file_name, NativeDescriptor};
@@ -22,8 +32,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
 
 type RequestStopFn = extern "C" fn();
+type PublishFn = extern "C" fn(*const c_char);
 type StartFn = extern "C" fn(*const c_char, RequestStopFn);
-type FrameFn = extern "C" fn(f64);
+type FrameFn = extern "C" fn(f64, *const c_char, PublishFn);
 type StopFn = extern "C" fn();
 
 /// Serializes stdout writes — the module's own request_stop() callback can fire from a thread the
@@ -33,6 +44,30 @@ type StopFn = extern "C" fn();
 fn stdout_lock() -> &'static Mutex<()> {
     static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
     LOCK.get_or_init(|| Mutex::new(()))
+}
+
+/// What this frame's publish() calls have accumulated so far — cleared right before each frame()
+/// call, read back out (and included in the reply) right after it returns. A module's own
+/// request_stop() callback can already fire from a thread it created itself (see stdout_lock's
+/// comment); publish() is documented as frame()-only (called synchronously, from the same thread
+/// frame() itself runs on) specifically so this doesn't need the same cross-thread story — a plain
+/// Mutex is enough, not because publish() couldn't race but because a well-behaved module never
+/// gives it the chance to.
+fn publish_buffer() -> &'static Mutex<Map<String, Value>> {
+    static BUFFER: OnceLock<Mutex<Map<String, Value>>> = OnceLock::new();
+    BUFFER.get_or_init(|| Mutex::new(Map::new()))
+}
+
+/// The module calls this any number of times during frame() with a JSON *object* string — anything
+/// else (unparseable, or valid JSON that isn't an object) is silently dropped rather than killing
+/// the module's whole frame over one malformed publish call.
+extern "C" fn publish(json_str: *const c_char) {
+    if json_str.is_null() {
+        return;
+    }
+    let Ok(s) = (unsafe { std::ffi::CStr::from_ptr(json_str) }).to_str() else { return };
+    let Ok(Value::Object(obj)) = serde_json::from_str::<Value>(s) else { return };
+    publish_buffer().lock().extend(obj);
 }
 
 fn write_line(value: &Value) {
@@ -100,13 +135,21 @@ fn main() {
                 reply(true, Map::new());
             }
             "frame" => {
+                let mut extra = Map::new();
                 if started.load(Ordering::SeqCst) {
                     if let Some(f) = frame_fn {
                         let delta = msg.get("delta").and_then(|d| d.as_f64()).unwrap_or(0.0);
-                        f(delta);
+                        let shared = msg.get("shared").cloned().unwrap_or_else(|| Value::Object(Map::new())).to_string();
+                        let shared_c = CString::new(shared).unwrap_or_else(|_| CString::new("{}").unwrap());
+                        publish_buffer().lock().clear();
+                        f(delta, shared_c.as_ptr(), publish);
+                        let published = std::mem::take(&mut *publish_buffer().lock());
+                        if !published.is_empty() {
+                            extra.insert("publish".into(), Value::Object(published));
+                        }
                     }
                 }
-                reply(true, Map::new());
+                reply(true, extra);
             }
             "stop" => {
                 if started.load(Ordering::SeqCst) {
