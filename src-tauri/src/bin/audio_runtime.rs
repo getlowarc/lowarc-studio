@@ -109,7 +109,24 @@ fn main() {
     // A platform/environment with no real audio output at all shouldn't fail the whole module —
     // see this file's own header comment. Every "frame" reply below just reports nothing playing
     // in that case, same shape input_runtime.rs uses for an unavailable gamepad backend.
-    let stream = DeviceSinkBuilder::open_default_sink().ok();
+    //
+    // The tricky part: on some environments with no real device (a locked-down or headless CI
+    // runner, confirmed live — this is not a hypothetical) opening the default sink doesn't fail
+    // quickly, it just hangs indefinitely instead. A bare `.ok()` on that call would never even
+    // get the chance to turn an Err into a graceful None — this module's own "start" reply, and
+    // every module after it in the same run (spawn_and_run starts modules one at a time), would
+    // sit frozen on it forever. Racing it against a bounded timeout on a background thread is
+    // what actually makes the "missing hardware degrades gracefully" promise true rather than
+    // aspirational; a device open that eventually succeeds after the deadline is simply never
+    // collected — one leaked thread for the life of this otherwise-short-lived process is a fine
+    // price for never hanging. (No named type for the channel here on purpose — DeviceSinkBuilder
+    // ::open_default_sink()'s own return type is verbose to spell out; letting the compiler infer
+    // it from the closure below is simpler and just as correct.)
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = tx.send(DeviceSinkBuilder::open_default_sink().ok());
+    });
+    let stream = rx.recv_timeout(std::time::Duration::from_secs(3)).ok().flatten();
     let mixer = stream.as_ref().map(|s| s.mixer());
 
     let mut project_root: Option<PathBuf> = None;

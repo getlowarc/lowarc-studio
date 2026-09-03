@@ -12,6 +12,7 @@
 use lowarc_studio_lib::runtime;
 use lowarc_studio_lib::runtime::runtime_loader::{Breakpoint, DebugHooks, FrameTrace, LogFn};
 use parking_lot::Mutex;
+use rodio::DeviceSinkBuilder;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -144,9 +145,24 @@ fn noop_logger() -> LogFn {
     Arc::new(|_level, _msg| {})
 }
 
+/// A locked-down or headless environment (a CI runner, confirmed live — not hypothetical) can
+/// have no real audio output at all, and opening the default device can hang rather than fail
+/// quickly in that case (see audio_runtime.rs's own header comment on why it races this against a
+/// timeout on a background thread). These tests need a genuinely working device to prove anything
+/// real, so they skip — not fail — when one isn't available within a few seconds, same
+/// environment-tolerance shape as the `if !cfg!(windows)` guards already used throughout this
+/// suite for platform-specific fixtures.
+fn audio_device_available() -> bool {
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = tx.send(DeviceSinkBuilder::open_default_sink().is_ok());
+    });
+    rx.recv_timeout(Duration::from_secs(3)).unwrap_or(false)
+}
+
 #[test]
 fn the_audio_module_plays_a_real_file_and_reports_when_it_finishes() {
-    if !cfg!(windows) {
+    if !cfg!(windows) || !audio_device_available() {
         return; // director fixture is a PowerShell script, same scoping as the other e2e tests
     }
 
@@ -224,7 +240,7 @@ fn the_audio_module_plays_a_real_file_and_reports_when_it_finishes() {
 
 #[test]
 fn pausing_holds_position_and_resuming_continues_it() {
-    if !cfg!(windows) {
+    if !cfg!(windows) || !audio_device_available() {
         return;
     }
 
