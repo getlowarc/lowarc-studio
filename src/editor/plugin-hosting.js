@@ -118,10 +118,26 @@
       // row shows — config.extraFields(item) is the only part that actually differs between them.
       function createManagerPanel(config) {
         const CHEVRON_SVG = '<svg viewBox="0 0 10 10" fill="none"><path d="M3 1l4 4-4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        // Settings.tabOrder key — same persisted-order mechanism the rail/console/file tab strips
+        // already use (see saveTabOrder/loadedSettings in panels.js, loaded earlier in this same
+        // document), just applied to this list's own `items` array (see applySavedItemOrder)
+        // instead of reordering already-rendered DOM, since render() rebuilds the list from
+        // scratch on every load()/search keystroke rather than keeping persistent row elements.
+        const orderKey = `plugin-manager-list-${config.nounPlural}`;
 
         let items = [];
         let expandedId = null;
         let listEl = null;
+        let filterText = "";
+
+        function applySavedItemOrder() {
+          const order = loadedSettings?.tabOrder?.[orderKey];
+          if (!order || !order.length) return;
+          const byId = new Map(items.map((i) => [i.id, i]));
+          const ordered = order.map((id) => byId.get(id)).filter(Boolean);
+          const orderedIds = new Set(ordered.map((i) => i.id));
+          items = [...ordered, ...items.filter((i) => !orderedIds.has(i.id))];
+        }
 
         async function load() {
           try {
@@ -130,8 +146,44 @@
             showToast({ variant: "error", message: String(err) });
             items = [];
           }
+          applySavedItemOrder();
           if (!items.some((i) => i.id === expandedId)) expandedId = null;
           render();
+        }
+
+        // ---------- Enable/disable + remove — shared by the row's own controls and the row's
+        // right-click context menu (showRowContextMenu below), so there's exactly one place each
+        // actually happens rather than three copies of the same invoke/load/error-toast dance.
+        async function setItemEnabled(item, enabled) {
+          try {
+            await invoke(config.enableCommand, { id: item.id, enabled });
+            await load();
+          } catch (err) {
+            showToast({ variant: "error", message: String(err) });
+          }
+        }
+
+        async function removeItem(item) {
+          const confirmed = await showPopup("manager-remove", { nounSingular: config.nounSingular, name: item.name });
+          if (!confirmed) return;
+          try {
+            await invoke(config.removeCommand, { id: item.id });
+            expandedId = null;
+            await load();
+          } catch (err) {
+            showToast({ variant: "error", message: String(err) });
+          }
+        }
+
+        // Right-click menu — same openMenuOverlay primitive (menus.js) the rail/file-tab-bar
+        // context menus already use, anchored at the raw pointer position rather than a trigger
+        // element's rect (see showFileTabContextMenu in tabs-inspector.js for the closest existing
+        // analog: a per-row menu with a toggle-style item plus a destructive one).
+        function showRowContextMenu(item, x, y) {
+          openMenuOverlay([{ label: item.disabled ? "Enable" : "Disable", value: "toggle" }, { label: "Remove", value: "remove" }], { x, y }).then((value) => {
+            if (value === "toggle") setItemEnabled(item, item.disabled);
+            else if (value === "remove") removeItem(item);
+          });
         }
 
         function render() {
@@ -143,21 +195,61 @@
             listEl.appendChild(empty);
             return;
           }
-          for (const item of items) listEl.appendChild(renderRow(item));
+
+          const query = filterText.trim().toLowerCase();
+          const shown = query ? items.filter((i) => i.name.toLowerCase().includes(query) || i.id.toLowerCase().includes(query)) : items;
+          if (shown.length === 0) {
+            const empty = document.createElement("div");
+            empty.className = "plugin-manager-empty";
+            empty.textContent = `No ${config.nounPlural} match "${filterText.trim()}".`;
+            listEl.appendChild(empty);
+            return;
+          }
+          for (const item of shown) listEl.appendChild(renderRow(item));
+          // Each row's own toggle carries a fresh data-tooltip element every render (typing in the
+          // search box re-renders the list on every keystroke) — initTooltips() is idempotent per
+          // element (dataset.tooltipInit guard), so re-running it here is cheap and keeps every
+          // current row's tooltip actually wired up, not just the first render's.
+          initTooltips();
+        }
+
+        // The row header's own enable/disable toggle — the app's one standard control for this
+        // (.checkbox-row/.checkbox-box, same as createManagerPage's detail-pane toggle in
+        // primitives.js) in place of what used to be a purely decorative, unclickable .status-dot.
+        // Its own click is stopped from bubbling so it doesn't also trigger the row header's
+        // expand/collapse.
+        function renderEnabledToggle(item) {
+          const label = document.createElement("label");
+          label.className = "checkbox-row plugin-manager-row-toggle";
+          label.dataset.tooltip = item.disabled ? "Disabled" : "Enabled";
+          label.addEventListener("click", (e) => e.stopPropagation());
+
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.checked = !item.disabled;
+          const box = document.createElement("span");
+          box.className = "checkbox-box";
+          box.innerHTML = CHECKMARK_SVG;
+          label.appendChild(checkbox);
+          label.appendChild(box);
+
+          checkbox.addEventListener("change", () => setItemEnabled(item, checkbox.checked));
+          return label;
         }
 
         function renderRow(item) {
           const row = document.createElement("div");
           row.className = "plugin-manager-row";
+          // initReorderable's default itemSelector/keyAttr ([data-tab-value] / .tabValue) — same
+          // identity attribute every other reorderable strip in this app already uses, so this
+          // list needs no custom itemSelector/keyAttr passed to initReorderable below.
+          row.dataset.tabValue = item.id;
 
           const header = document.createElement("button");
           header.type = "button";
           header.className = "plugin-manager-row-header";
 
-          const dot = document.createElement("span");
-          dot.className = "status-dot" + (item.disabled ? "" : " is-enabled");
-          dot.dataset.tooltip = item.disabled ? "Disabled" : "Enabled";
-          header.appendChild(dot);
+          header.appendChild(renderEnabledToggle(item));
 
           const name = document.createElement("span");
           name.className = "plugin-manager-row-name";
@@ -172,6 +264,11 @@
           header.addEventListener("click", () => {
             expandedId = expandedId === item.id ? null : item.id;
             render();
+          });
+          header.addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            showRowContextMenu(item, e.clientX, e.clientY);
           });
           row.appendChild(header);
 
@@ -198,44 +295,12 @@
           const actions = document.createElement("div");
           actions.className = "plugin-manager-row-actions";
 
-          const enabledLabel = document.createElement("label");
-          enabledLabel.className = "checkbox-row";
-          const checkbox = document.createElement("input");
-          checkbox.type = "checkbox";
-          checkbox.checked = !item.disabled;
-          const box = document.createElement("span");
-          box.className = "checkbox-box";
-          box.innerHTML = CHECKMARK_SVG;
-          const enabledText = document.createElement("span");
-          enabledText.textContent = "Enabled";
-          enabledLabel.appendChild(checkbox);
-          enabledLabel.appendChild(box);
-          enabledLabel.appendChild(enabledText);
-          checkbox.addEventListener("change", async () => {
-            try {
-              await invoke(config.enableCommand, { id: item.id, enabled: checkbox.checked });
-              await load();
-            } catch (err) {
-              showToast({ variant: "error", message: String(err) });
-            }
-          });
-          actions.appendChild(enabledLabel);
-
           const removeBtn = document.createElement("button");
           removeBtn.type = "button";
-          removeBtn.className = "btn btn-xs btn-danger";
-          removeBtn.textContent = "Remove";
-          removeBtn.addEventListener("click", async () => {
-            const confirmed = await showPopup("manager-remove", { nounSingular: config.nounSingular, name: item.name });
-            if (!confirmed) return;
-            try {
-              await invoke(config.removeCommand, { id: item.id });
-              expandedId = null;
-              await load();
-            } catch (err) {
-              showToast({ variant: "error", message: String(err) });
-            }
-          });
+          removeBtn.className = "btn btn-xs btn-danger btn-icon-only";
+          removeBtn.dataset.tooltip = `Remove this ${config.nounSingular.toLowerCase()}`;
+          removeBtn.innerHTML = DELETE_SVG;
+          removeBtn.addEventListener("click", () => removeItem(item));
           actions.appendChild(removeBtn);
 
           body.appendChild(actions);
@@ -245,14 +310,44 @@
         function mount(el) {
           const toolbar = document.createElement("div");
           toolbar.className = "plugin-manager-toolbar";
+
+          // One row: search (flex:1) + two icon-only buttons — a labeled "Add X…" button doesn't
+          // fit the sidebar's 240px width alongside a second button (confirmed live: it pushed
+          // Marketplace off the edge, clipping it), so both are icon-only with a tooltip carrying
+          // the label instead, same as the row header's own icon-only controls.
+          const controlsRow = document.createElement("div");
+          controlsRow.className = "plugin-manager-toolbar-controls";
+
+          const searchInput = document.createElement("input");
+          searchInput.type = "text";
+          searchInput.className = "input plugin-manager-search";
+          // Just "Search" — the fuller "Search plugins…"/"Search modules…" got clipped in the
+          // sidebar's 240px width now that the search box shares its row with two icon buttons.
+          searchInput.placeholder = "Search";
+          searchInput.addEventListener("input", () => {
+            filterText = searchInput.value;
+            render();
+          });
+          controlsRow.appendChild(searchInput);
+
           const addBtn = document.createElement("button");
           addBtn.type = "button";
-          addBtn.className = "btn btn-sm btn-outline";
-          addBtn.innerHTML = `<svg viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg> Add ${config.nounSingular}…`;
+          addBtn.className = "btn btn-sm btn-outline btn-icon-only";
+          addBtn.dataset.tooltip = `Add ${config.nounSingular}…`;
+          addBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>';
+
+          const marketplaceBtn = document.createElement("button");
+          marketplaceBtn.type = "button";
+          marketplaceBtn.className = "btn btn-sm btn-outline btn-icon-only";
+          marketplaceBtn.dataset.tooltip = `Browse the ${config.nounSingular} marketplace`;
+          marketplaceBtn.innerHTML =
+            '<svg viewBox="0 0 16 16" fill="none"><path d="M2.5 5.5 3.5 2h9l1 3.5M2.5 5.5v7a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-7M2.5 5.5h11M6 5.5v1.5a2 2 0 0 0 4 0V5.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" /></svg>';
+          marketplaceBtn.addEventListener("click", () => {
+            showPopup(config.popupId, { url: `${config.pageFile}?tab=marketplace` });
+          });
 
           const progressEl = document.createElement("div");
           progressEl.className = "progress";
-          progressEl.style.flex = "1";
           progressEl.style.display = "none";
           progressEl.innerHTML = '<div class="progress-fill"></div>';
 
@@ -284,13 +379,27 @@
               progressEl.style.display = "none";
             }
           });
-          toolbar.appendChild(addBtn);
+          controlsRow.appendChild(addBtn);
+          controlsRow.appendChild(marketplaceBtn);
+          toolbar.appendChild(controlsRow);
           toolbar.appendChild(progressEl);
           el.appendChild(toolbar);
 
           listEl = document.createElement("div");
           listEl.className = "plugin-manager-list";
+          listEl.setAttribute("data-reorderable", "");
           el.appendChild(listEl);
+
+          // mount() runs exactly once per app session (see showSlotTab's own "mounting it once,
+          // ever" comment) — listEl itself is never recreated after this, only its children
+          // (render() rebuilds those from `items` on every load()/search keystroke), so a single
+          // initReorderable call here covers every future render: it delegates from listEl itself
+          // rather than binding per-row, the same way every other reorderable strip in this app
+          // works (see initReorderable's own header comment in primitives.js).
+          initReorderable(listEl, {
+            axis: "y",
+            onReorder: (order) => saveTabOrder(orderKey, order),
+          });
 
           initTooltips();
         }
@@ -309,6 +418,8 @@
         installCommand: "install_plugin",
         nounSingular: "Plugin",
         nounPlural: "plugins",
+        popupId: "plugins",
+        pageFile: "plugins.html",
         extraFields: (item) => [{ value: item.description || "No description." }, { label: "Command", value: item.command }],
       });
       contribute("sidebar", {
@@ -329,6 +440,8 @@
         installCommand: "install_module",
         nounSingular: "Module",
         nounPlural: "modules",
+        popupId: "modules",
+        pageFile: "modules.html",
         extraFields: (item) => [
           { value: item.description || "No description." },
           { label: "Load order", value: String(item.loadOrder) },
@@ -348,35 +461,17 @@
 
       const FALLBACK_RAIL_ICON_SVG = '<svg viewBox="0 0 16 16" fill="none"><rect x="3" y="3" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.3" /></svg>';
 
-      // Strips anything that could execute if this SVG ends up in the HOST's own document (the
-      // rail lives in editor.html itself, not a sandboxed iframe — unlike a plugin's panel
-      // content, this has real Tauri access, so a plugin-supplied icon can't be trusted blindly).
-      // innerHTML already never runs a <script> tag it inserts, but inline event-handler
-      // attributes (onclick=, etc.) DO fire — those are the actual thing this strips.
-      function sanitizeSvg(root) {
-        root.querySelectorAll("script").forEach((el) => el.remove());
-        root.querySelectorAll("*").forEach((el) => {
-          for (const attr of Array.from(el.attributes)) {
-            const name = attr.name.toLowerCase();
-            if (name.startsWith("on") || (name === "href" && attr.value.trim().toLowerCase().startsWith("javascript:"))) {
-              el.removeAttribute(attr.name);
-            }
-          }
-        });
-      }
-
       // Fetched as raw text over IPC (read_plugin_asset) rather than used as an <img src="..."> —
       // inlining it as a real <svg> lets it inherit currentColor for free, the same as the
-      // fallback icon already does, which a rasterized <img> never could.
+      // fallback icon already does, which a rasterized <img> never could. Parsing + sanitizing
+      // (strip anything that could execute if this ends up in the HOST's own document) is
+      // primitives.js's shared parseSanitizedSvg — same treatment the Modules/Plugins manage
+      // pages' own item icon uses, since both need identical "a plugin/module-supplied SVG can't
+      // be trusted blindly" handling.
       async function loadRailIconSvg(pluginId, railIcon) {
         try {
           const text = await invoke("read_plugin_asset", { pluginId, relPath: railIcon });
-          const doc = new DOMParser().parseFromString(text, "image/svg+xml");
-          if (doc.querySelector("parsererror")) return null;
-          const svg = doc.querySelector("svg");
-          if (!svg) return null;
-          sanitizeSvg(svg);
-          return svg;
+          return parseSanitizedSvg(text);
         } catch (err) {
           return null;
         }

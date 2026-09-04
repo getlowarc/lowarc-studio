@@ -51,6 +51,13 @@ pub struct PluginDescriptor {
     pub name: Option<String>,
     pub version: Option<String>,
     pub description: Option<String>,
+    /// Purely descriptive, shown in the Plugins manage page's detail header.
+    pub website: Option<String>,
+    /// Path to an SVG/PNG within this plugin's own folder — a general "this is the plugin" icon,
+    /// distinct from a panel's own `rail_icon` (sidebar-slot-specific, plugins.rs's Contributes).
+    /// Read the same way (see loadRailIconSvg in plugin-hosting.js); absent falls back to a
+    /// generic placeholder on the frontend.
+    pub icon: Option<String>,
     /// True for a plugin whose backend can't be invoke-per-call — Terminal, so far, and the only
     /// thing this flag changes: the host spawns `command` once (see plugin_session.rs) instead of
     /// fresh per call, and keeps it running until explicitly stopped or the app exits. Everything

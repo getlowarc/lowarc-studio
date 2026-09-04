@@ -34,11 +34,18 @@ pub struct Manifest {
     /// isn't even satisfied yet — see resolve()'s own note on that gap).
     pub version: Option<String>,
     pub description: Option<String>,
+    /// Purely descriptive, shown in the Modules manage page's detail header — no marketplace
+    /// exists yet to link out to, but a locally-authored module can still point at its own repo.
+    pub website: Option<String>,
+    /// Path to an SVG/PNG within this module's own folder, read the same way a plugin's rail icon
+    /// is (see plugin_assets/loadRailIconSvg) — a missing/absent icon falls back to a generic
+    /// placeholder on the frontend rather than this field being required.
+    pub icon: Option<String>,
 }
 
 impl Default for Manifest {
     fn default() -> Self {
-        Self { id: String::new(), name: "Unnamed Module".into(), load_order: 100, requires: Vec::new(), version: None, description: None }
+        Self { id: String::new(), name: "Unnamed Module".into(), load_order: 100, requires: Vec::new(), version: None, description: None, website: None, icon: None }
     }
 }
 

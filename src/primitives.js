@@ -8,6 +8,11 @@
 // (menus.js), a manager panel's "Enabled" checkbox (plugin-hosting.js) — defined once here (loads
 // first, see editor.html's script order) rather than hand-copied at each of those.
 const CHECKMARK_SVG = '<svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>';
+// Same X glyph plugins/terminal/terminal.js, plugins/debugger/debugger.js, and
+// plugins/node-graph/inspector.js each already declare their own copy of (as DELETE_SVG) — those
+// are separate sandboxed plugin documents with no shared module system to pull this from, but a
+// host-side Remove control has no such excuse, so it lives here once.
+const DELETE_SVG = '<svg viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>';
 
 // Appends a .popup-actions row with a Cancel button plus one other action button — the shape most
 // simple popups need (a delete/discard confirmation, a create-with-validation form's Cancel+Create
@@ -1270,6 +1275,109 @@ function initTooltips(root = document) {
   });
 }
 
+// ---------- Sanitized inline SVG (shared: rail icons in plugin-hosting.js, item icons below) ----------
+// Strips anything that could execute if this SVG ends up in a trusted, non-sandboxed document (the
+// editor's own rail, or these un-sandboxed Modules/Plugins popup pages — unlike a real plugin's
+// `sandbox="allow-scripts"` panel iframe, neither can treat a plugin/module-supplied icon as safe
+// by default). innerHTML already never runs an embedded <script> tag, but inline event-handler
+// attributes (onclick=, etc.) DO fire — those are the actual thing this strips.
+function sanitizeSvg(root) {
+  root.querySelectorAll("script").forEach((el) => el.remove());
+  root.querySelectorAll("*").forEach((el) => {
+    for (const attr of Array.from(el.attributes)) {
+      const name = attr.name.toLowerCase();
+      if (name.startsWith("on") || (name === "href" && attr.value.trim().toLowerCase().startsWith("javascript:"))) {
+        el.removeAttribute(attr.name);
+      }
+    }
+  });
+}
+
+function parseSanitizedSvg(text) {
+  const doc = new DOMParser().parseFromString(text, "image/svg+xml");
+  if (doc.querySelector("parsererror")) return null;
+  const svg = doc.querySelector("svg");
+  if (!svg) return null;
+  sanitizeSvg(svg);
+  return svg;
+}
+
+// ---------- Markdown rendering (Overview/Changelog tabs) ----------
+// Vendored marked.js (src/vendor/marked/marked.umd.js, MIT — see MARKED_LICENSE) — real CommonMark
+// support (tables, nested emphasis, the works) for ~44KB, the same vendor-a-real-library-under
+// src/vendor call this repo already makes for three.js/xterm.js/Monaco. Only modules.html/
+// plugins.html load the vendor script; everywhere else primitives.js is loaded (editor.html,
+// settings.html, ...) this whole block is simply never exercised.
+function escapeHtml(text) {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// Security: modules.html/plugins.html load in an UN-sandboxed popup iframe with real Tauri access
+// via relayableInvoke (see this file's own note above that function) — a README/CHANGELOG is
+// local-but-foreign content that must never be able to inject live markup into that trusted
+// document. marked's OWN default output is not safe by itself — raw HTML in the source passes
+// straight through, and it doesn't reject a `javascript:` link/image href — verified live before
+// this shipped (`marked.parse("<script>alert(1)</script>")` and a `javascript:` link both come
+// back executable with no configuration). This overrides exactly the three renderer hooks that
+// matter: every raw-HTML token is stripped entirely (its surrounding plain text survives, only the
+// tag markup itself is dropped), and a link/image href is only ever emitted verbatim when it has
+// no scheme at all (an ordinary relative path) or an explicit http(s) scheme — anything else
+// (javascript:, data:, ...) falls back to plain escaped text/nothing instead of a live element.
+let markedConfigured = false;
+function configureMarkedOnce() {
+  if (markedConfigured || typeof marked === "undefined") return;
+  markedConfigured = true;
+
+  const safeHref = (href) => {
+    const trimmed = (href || "").trim();
+    const scheme = trimmed.match(/^([a-z][a-z0-9+.-]*):/i);
+    if (!scheme) return trimmed; // no scheme at all — a relative path, always safe
+    return /^https?$/i.test(scheme[1]) ? trimmed : null;
+  };
+
+  marked.use({
+    renderer: {
+      html: () => "",
+      link(token) {
+        const href = safeHref(token.href);
+        const text = escapeHtml(token.text);
+        return href ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${text}</a>` : text;
+      },
+      image(token) {
+        const href = safeHref(token.href);
+        return href ? `<img src="${escapeHtml(href)}" alt="${escapeHtml(token.text || "")}" />` : "";
+      },
+    },
+  });
+}
+
+function renderMarkdown(text) {
+  configureMarkedOnce();
+  // The vendor script not being loaded shouldn't happen for createManagerPage, its only real
+  // caller — degrade to plain escaped text rather than throw if it somehow isn't.
+  if (typeof marked === "undefined") return `<p>${escapeHtml(text)}</p>`;
+  return marked.parse(text);
+}
+
+// ---------- Item icon (Modules/Plugins detail header) ----------
+// A generic placeholder — same graceful-degradation shape as plugin-hosting.js's own
+// FALLBACK_RAIL_ICON_SVG — for an item with no declared `icon`, or whose icon fails to load/parse.
+const FALLBACK_ITEM_ICON_SVG = '<svg viewBox="0 0 16 16" fill="none"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5" stroke="currentColor" stroke-width="1.3" /></svg>';
+
+// Fetched as raw text over the generic read_install_text_file command (works for both a module and
+// a plugin's own folder, unlike read_plugin_asset which is plugin-id-scoped) rather than used as an
+// <img src="...">, so it can be inlined as a real <svg> and inherit currentColor the same as the
+// fallback already does.
+async function loadItemIconSvg(invoke, item) {
+  if (!item.icon) return null;
+  try {
+    const text = await invoke("read_install_text_file", { folder: item.folder, relPath: item.icon });
+    return text ? parseSanitizedSvg(text) : null;
+  } catch (err) {
+    return null;
+  }
+}
+
 // ---------- Manager page (Modules/Plugins' Installed tab) ----------
 // modules.html and plugins.html are two deliberately SEPARATE pages/popups — different concepts
 // (game-runtime deps vs. sandboxed editor plugins, see installs.rs), never merged into one — that
@@ -1282,8 +1390,9 @@ function initTooltips(root = document) {
 // has room for), same underlying idea, so deliberately not the same function.
 //
 // config: { nounSingular, nounPlural, listCommand, enableCommand, removeCommand, installCommand,
-// installDialogTitle, addButtonLabel, showStatusDot (bool — plugins shows an enabled/disabled dot
-// next to the detail title, modules doesn't), detailFields(item) -> [{label, value, mono?}] }. Self-
+// installDialogTitle, addButtonLabel, detailFields(item) -> [{label, value, mono?}] (the narrower
+// metadata column), contributionFields(item) -> [{label, value}] (the Contributions tab — what
+// VSCode calls "Feature Contributions": what this item actually plugs into the app with) }. Self-
 // initializing — call it once at page load; it wires everything (including the popup-header relay
 // and the shared remove-confirm popup) and loads the list itself, nothing else needs to run after.
 function createManagerPage(config) {
@@ -1365,6 +1474,100 @@ function createManagerPage(config) {
     return field;
   }
 
+  // ---------- Detail tabs (Overview / Changelog / Contributions) ----------
+  const DETAIL_TABS = [
+    { value: "overview", label: "Overview" },
+    { value: "changelog", label: "Changelog" },
+    { value: "contributions", label: "Contributions" },
+  ];
+
+  function renderOverviewPanel(panel, item, readmeText) {
+    panel.innerHTML = "";
+    if (readmeText) {
+      panel.innerHTML = renderMarkdown(readmeText);
+      return;
+    }
+    const note = document.createElement("div");
+    note.className = "field-hint detail-tab-note";
+    note.textContent = `No README.md — here's what this ${config.nounSingular.toLowerCase()} declares:`;
+    panel.appendChild(note);
+    for (const field of config.detailFields(item)) {
+      panel.appendChild(detailField(field));
+    }
+  }
+
+  function renderChangelogPanel(panel, changelogText) {
+    panel.innerHTML = "";
+    if (changelogText) {
+      panel.innerHTML = renderMarkdown(changelogText);
+      return;
+    }
+    const empty = document.createElement("div");
+    empty.className = "field-hint detail-tab-note";
+    empty.textContent = "No CHANGELOG.md.";
+    panel.appendChild(empty);
+  }
+
+  function renderContributionsPanel(panel, item) {
+    panel.innerHTML = "";
+    const fields = config.contributionFields(item);
+    if (fields.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "field-hint detail-tab-note";
+      empty.textContent = `This ${config.nounSingular.toLowerCase()} doesn't contribute anything else.`;
+      panel.appendChild(empty);
+      return;
+    }
+    for (const field of fields) {
+      panel.appendChild(detailField(field));
+    }
+  }
+
+  function renderDetailTabs(item) {
+    const wrap = document.createElement("div");
+    wrap.className = "detail-tabs-wrap";
+
+    const nav = document.createElement("div");
+    nav.className = "detail-tabs";
+    nav.setAttribute("data-tabs", "");
+    DETAIL_TABS.forEach((tab, i) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "detail-tab" + (i === 0 ? " is-active" : "");
+      btn.dataset.tabValue = tab.value;
+      btn.textContent = tab.label;
+      nav.appendChild(btn);
+    });
+    wrap.appendChild(nav);
+
+    const panels = {};
+    DETAIL_TABS.forEach((tab, i) => {
+      const panel = document.createElement("div");
+      panel.className = "detail-tab-panel" + (i === 0 ? " is-active" : "");
+      panel.id = `detail-tab-${tab.value}`;
+      panels[tab.value] = panel;
+      wrap.appendChild(panel);
+    });
+
+    nav.addEventListener("tab-change", (e) => {
+      Object.values(panels).forEach((p) => p.classList.toggle("is-active", p.id === `detail-tab-${e.detail.value}`));
+    });
+
+    panels.overview.textContent = "Loading…";
+    panels.changelog.textContent = "Loading…";
+    renderContributionsPanel(panels.contributions, item);
+
+    invoke("read_install_text_file", { folder: item.folder, relPath: "README.md" })
+      .then((text) => renderOverviewPanel(panels.overview, item, text))
+      .catch(() => renderOverviewPanel(panels.overview, item, null));
+    invoke("read_install_text_file", { folder: item.folder, relPath: "CHANGELOG.md" })
+      .then((text) => renderChangelogPanel(panels.changelog, text))
+      .catch(() => renderChangelogPanel(panels.changelog, null));
+
+    return wrap;
+  }
+
+  // ---------- Header row: icon | title/website/description/actions | file metadata ----------
   function renderDetail(item) {
     const pane = document.getElementById("detail-pane");
     pane.innerHTML = "";
@@ -1377,27 +1580,49 @@ function createManagerPage(config) {
       return;
     }
 
+    const headerRow = document.createElement("div");
+    headerRow.className = "detail-header-row";
+
+    const iconWrap = document.createElement("div");
+    iconWrap.className = "detail-icon";
+    iconWrap.innerHTML = FALLBACK_ITEM_ICON_SVG;
+    headerRow.appendChild(iconWrap);
+    loadItemIconSvg(invoke, item).then((svg) => {
+      if (!svg) return;
+      iconWrap.innerHTML = "";
+      iconWrap.appendChild(svg);
+    });
+
+    const mainCol = document.createElement("div");
+    mainCol.className = "detail-header-main";
+
     const title = document.createElement("div");
     title.className = "detail-title";
-    if (config.showStatusDot) {
-      const dot = document.createElement("span");
-      dot.className = "status-dot" + (item.disabled ? "" : " is-enabled");
-      dot.dataset.tooltip = item.disabled ? "Disabled" : "Enabled";
-      title.appendChild(dot);
-    }
     const titleText = document.createElement("span");
     titleText.textContent = item.name;
     title.appendChild(titleText);
-    pane.appendChild(title);
+    const idText = document.createElement("span");
+    idText.className = "detail-title-id";
+    idText.textContent = item.id + (item.version ? ` · v${item.version}` : "");
+    title.appendChild(idText);
+    mainCol.appendChild(title);
 
-    const sub = document.createElement("div");
-    sub.className = "detail-sub";
-    sub.textContent = item.id + (item.version ? ` · v${item.version}` : "");
-    pane.appendChild(sub);
-
-    for (const field of config.detailFields(item)) {
-      pane.appendChild(detailField(field));
+    if (item.website) {
+      const websiteRow = document.createElement("div");
+      websiteRow.className = "detail-meta-row";
+      const link = document.createElement("a");
+      link.href = item.website;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = item.website;
+      websiteRow.appendChild(link);
+      mainCol.appendChild(websiteRow);
     }
+
+    const description = document.createElement("div");
+    description.className = "detail-description";
+    description.textContent = item.description || "No description.";
+    mainCol.appendChild(description);
 
     const actions = document.createElement("div");
     actions.className = "detail-actions";
@@ -1427,8 +1652,9 @@ function createManagerPage(config) {
 
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
-    removeBtn.className = "btn btn-sm btn-danger";
-    removeBtn.textContent = "Remove";
+    removeBtn.className = "btn btn-sm btn-danger btn-icon-only";
+    removeBtn.dataset.tooltip = `Remove this ${config.nounSingular.toLowerCase()}`;
+    removeBtn.innerHTML = DELETE_SVG;
     removeBtn.addEventListener("click", async () => {
       const confirmed = await showPopup(popupId, { nounSingular: config.nounSingular, name: item.name });
       if (!confirmed) return;
@@ -1441,9 +1667,22 @@ function createManagerPage(config) {
       }
     });
     actions.appendChild(removeBtn);
+    mainCol.appendChild(actions);
 
-    pane.appendChild(actions);
-    if (config.showStatusDot) initTooltips(); // the detail title's own status-dot needs one too
+    headerRow.appendChild(mainCol);
+
+    const metaCol = document.createElement("div");
+    metaCol.className = "detail-meta-column";
+    for (const field of config.detailFields(item)) {
+      metaCol.appendChild(detailField(field));
+    }
+    headerRow.appendChild(metaCol);
+
+    pane.appendChild(headerRow);
+    pane.appendChild(renderDetailTabs(item));
+
+    initTabs(pane);
+    initTooltips();
   }
 
   document.getElementById("item-list").addEventListener("tab-change", (e) => {
@@ -1512,12 +1751,22 @@ function createManagerPage(config) {
 
   // ---------- Popup header (Installed/Marketplace tabs + Add …, rendered by the popup shell
   // itself — see setPopupHeaderControls()/onPopupHeaderAction() above) ----------
+  function showOuterTab(value) {
+    document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("is-active", p.id === `tab-panel-${value}`));
+  }
+
+  // Lets a caller deep-link straight to the Marketplace tab — e.g. the sidebar manager panel's own
+  // "Marketplace" button (see plugin-hosting.js) opens this popup with `?tab=marketplace` rather
+  // than always landing on Installed. Same pattern settings.html already uses for its own tabs.
+  const requestedTab = new URLSearchParams(location.search).get("tab") === "marketplace" ? "marketplace" : "installed";
+  if (requestedTab !== "installed") showOuterTab(requestedTab);
+
   setPopupHeaderControls({
     tabs: [
       { value: "installed", label: "Installed" },
       { value: "marketplace", label: "Marketplace" },
     ],
-    activeTab: "installed",
+    activeTab: requestedTab,
     buttons: [
       {
         id: "add-item",
@@ -1527,9 +1776,7 @@ function createManagerPage(config) {
     ],
   });
   onPopupHeaderAction({
-    onTabChange: (value) => {
-      document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("is-active", p.id === `tab-panel-${value}`));
-    },
+    onTabChange: showOuterTab,
     onButtonClick: (id) => {
       if (id === "add-item") addItem();
     },

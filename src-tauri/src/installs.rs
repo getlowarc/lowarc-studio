@@ -24,6 +24,8 @@ pub struct ModuleListItem {
     pub requires: Vec<String>,
     pub folder: String,
     pub disabled: bool,
+    pub website: Option<String>,
+    pub icon: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -39,6 +41,8 @@ pub struct PluginListItem {
     /// True for a "session": true plugin (Terminal) — tells editor.html to start its backend once
     /// and keep it running (see plugin_session.rs) instead of the default invoke-per-call model.
     pub session: bool,
+    pub website: Option<String>,
+    pub icon: Option<String>,
     /// What this plugin declares it provides — see plugin_host::protocol::Contributes. The
     /// editor shell builds rail icons/console tabs from this directly. Plugins are invoked per
     /// call, not kept running, so there's no separate "is it actually running" status any more —
@@ -70,6 +74,8 @@ pub fn list_modules(modules_dir: &Path, disabled: &HashSet<String>) -> Vec<Modul
                 load_order: manifest.load_order,
                 requires: manifest.requires.into_iter().map(|d| d.id).collect(),
                 folder: folder.display().to_string(),
+                website: manifest.website,
+                icon: manifest.icon,
             })
         })
         .collect();
@@ -102,6 +108,8 @@ pub fn list_plugins(plugins_dir: &Path, disabled: &HashSet<String>) -> Vec<Plugi
             command: desc.command,
             folder: folder.display().to_string(),
             session: desc.session,
+            website: desc.website,
+            icon: desc.icon,
             contributes: desc.contributes,
             settings: desc.settings,
             commands: desc.commands,
@@ -174,6 +182,32 @@ pub fn remove_plugin(plugins_dir: &Path, id: &str) -> Result<(), String> {
         return Err(format!("No installed plugin with id \"{id}\"."));
     }
     std::fs::remove_dir_all(&folder).map_err(|e| e.to_string())
+}
+
+/// Reads `rel_path` (e.g. "README.md", "CHANGELOG.md", or a declared `icon` path) relative to an
+/// already-installed module/plugin's own folder — the one generic file read the Modules/Plugins
+/// manage pages' Overview/Changelog tabs and icon both use, rather than three narrower commands.
+/// `folder` must canonicalize to somewhere inside `modules_dir` or `plugins_dir` (the only two
+/// places anything ever gets installed to), and the resolved file must stay inside `folder`
+/// itself — the same two-layer containment shape as plugin_assets::resolve_asset_path, just
+/// generalized to an arbitrary already-known install folder instead of a plugin id under one
+/// fixed root. Returns None for anything missing, unreadable, or failing either containment
+/// check — a module/plugin shipping no README/CHANGELOG/icon is the ordinary case, not an error.
+pub fn read_install_text_file(modules_dir: &Path, plugins_dir: &Path, folder: &str, rel_path: &str) -> Option<String> {
+    if rel_path.is_empty() {
+        return None;
+    }
+    let modules_root = modules_dir.canonicalize().ok()?;
+    let plugins_root = plugins_dir.canonicalize().ok()?;
+    let folder = Path::new(folder).canonicalize().ok()?;
+    if !folder.starts_with(&modules_root) && !folder.starts_with(&plugins_root) {
+        return None;
+    }
+    let resolved = folder.join(rel_path).canonicalize().ok()?;
+    if !resolved.starts_with(&folder) {
+        return None;
+    }
+    std::fs::read_to_string(resolved).ok()
 }
 
 pub(crate) fn copy_dir_recursive(from: &Path, to: &Path) -> std::io::Result<()> {
@@ -348,5 +382,64 @@ mod tests {
 
         remove_plugin(&plugins_dir, "removable-plugin").expect("remove should succeed");
         assert!(list_plugins(&plugins_dir, &HashSet::new()).is_empty());
+    }
+
+    #[test]
+    fn read_install_text_file_reads_a_real_file_inside_an_installed_folder() {
+        let root = temp_dir("read_install_text_ok");
+        let modules_dir = root.join("modules");
+        let plugins_dir = root.join("plugins");
+        std::fs::create_dir_all(&modules_dir).unwrap();
+        std::fs::create_dir_all(&plugins_dir).unwrap();
+        let source = write_source_module(&root, "source", "readme-mod");
+        std::fs::write(source.join("README.md"), "# Hello").unwrap();
+        install_module(&modules_dir, &source, &mut |_, _| {}).unwrap();
+        let folder = modules_dir.join("source");
+
+        let text = read_install_text_file(&modules_dir, &plugins_dir, &folder.to_string_lossy(), "README.md");
+        assert_eq!(text.as_deref(), Some("# Hello"));
+    }
+
+    #[test]
+    fn read_install_text_file_returns_none_for_a_missing_file() {
+        let root = temp_dir("read_install_text_missing");
+        let modules_dir = root.join("modules");
+        let plugins_dir = root.join("plugins");
+        std::fs::create_dir_all(&modules_dir).unwrap();
+        std::fs::create_dir_all(&plugins_dir).unwrap();
+        let source = write_source_module(&root, "source", "no-readme-mod");
+        install_module(&modules_dir, &source, &mut |_, _| {}).unwrap();
+        let folder = modules_dir.join("source");
+
+        assert!(read_install_text_file(&modules_dir, &plugins_dir, &folder.to_string_lossy(), "README.md").is_none());
+    }
+
+    #[test]
+    fn read_install_text_file_rejects_a_traversal_out_of_the_folder() {
+        let root = temp_dir("read_install_text_traversal");
+        let modules_dir = root.join("modules");
+        let plugins_dir = root.join("plugins");
+        std::fs::create_dir_all(&modules_dir).unwrap();
+        std::fs::create_dir_all(&plugins_dir).unwrap();
+        let source = write_source_module(&root, "source", "escape-mod");
+        install_module(&modules_dir, &source, &mut |_, _| {}).unwrap();
+        let folder = modules_dir.join("source");
+        std::fs::write(root.join("secret.txt"), "top secret").unwrap();
+
+        assert!(read_install_text_file(&modules_dir, &plugins_dir, &folder.to_string_lossy(), "../../secret.txt").is_none());
+    }
+
+    #[test]
+    fn read_install_text_file_rejects_a_folder_outside_modules_and_plugins() {
+        let root = temp_dir("read_install_text_outside");
+        let modules_dir = root.join("modules");
+        let plugins_dir = root.join("plugins");
+        std::fs::create_dir_all(&modules_dir).unwrap();
+        std::fs::create_dir_all(&plugins_dir).unwrap();
+        let elsewhere = root.join("elsewhere");
+        std::fs::create_dir_all(&elsewhere).unwrap();
+        std::fs::write(elsewhere.join("README.md"), "nope").unwrap();
+
+        assert!(read_install_text_file(&modules_dir, &plugins_dir, &elsewhere.to_string_lossy(), "README.md").is_none());
     }
 }

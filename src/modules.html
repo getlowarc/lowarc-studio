@@ -8,9 +8,10 @@
     <link rel="stylesheet" href="primitives-shared.css" />
     <link rel="stylesheet" href="primitives.css" />
     <style>
-      .page {
-        max-width: 900px;
-      }
+      /* .page already fills its container (width:100%, see style.css) — no max-width cap here any
+         more. The popup itself (.popup-large, primitives.css) is what actually bounds the width
+         (90vw, capped at 1400px); a narrower cap here just left dead space to the right of the
+         list+detail layout inside a wide popup, confirmed live. */
 
       .tab-panel {
         display: none;
@@ -22,7 +23,7 @@
         display: flex;
       }
 
-      /* .manage-list/.manage-detail/.detail-*/.status-dot now live in primitives.css — shared with
+      /* .manage-list/.manage-detail/.detail-* now live in primitives.css — shared with
          plugins.html and editor.html's own in-editor managers. */
     </style>
   </head>
@@ -52,6 +53,9 @@
          can clip it, same placement editor.html uses. -->
     <div class="popup-stack" id="popup-stack"></div>
 
+    <!-- Overview/Changelog Markdown rendering — see renderMarkdown/configureMarkedOnce in
+         primitives.js for the security-relevant renderer overrides applied on top of this. -->
+    <script src="vendor/marked/marked.umd.js"></script>
     <script src="primitives.js"></script>
     <script>
       // The list+detail logic (list/enable/remove/install, the remove-confirm popup, the
@@ -67,9 +71,14 @@
         installCommand: "install_module",
         installDialogTitle: "Choose a module folder to install",
         addButtonLabel: "Add Module…",
-        showStatusDot: false,
         detailFields: (item) => [
-          { label: "Description", value: item.description || "No description." },
+          { label: "Load order", value: String(item.loadOrder) },
+          { label: "Requires", value: item.requires.length ? item.requires.join(", ") : "Nothing." },
+        ],
+        // What VSCode's "Feature Contributions" tab conveys, for a module: what it plugs into the
+        // load/requires graph with — same data as detailFields above, surfaced here too rather
+        // than fetching anything new.
+        contributionFields: (item) => [
           { label: "Load order", value: String(item.loadOrder) },
           { label: "Requires", value: item.requires.length ? item.requires.join(", ") : "Nothing." },
         ],

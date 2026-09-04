@@ -738,32 +738,61 @@
   flex: 1;
 }
 
-.detail-title {
+/* ---------- Detail header: icon | title/website/description/actions | file metadata ---------- */
+.detail-header-row {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.detail-icon {
+  flex: none;
+  width: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: center;
+  color: var(--fg-dim);
+}
+
+.detail-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.detail-header-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.detail-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   font-size: 17px;
   font-weight: 600;
   margin: 0 0 4px;
 }
 
-.status-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--fg-dim);
-  flex: none;
-}
-
-.status-dot.is-enabled {
-  background: var(--success);
-}
-
-.detail-sub {
+.detail-title-id {
   font-size: 12px;
+  font-weight: 400;
   color: var(--fg-dim);
-  margin: 0 0 20px;
+}
+
+.detail-meta-row {
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.detail-meta-row a {
+  color: var(--cyan);
+}
+
+.detail-description {
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 16px;
 }
 
 .detail-field {
@@ -773,6 +802,7 @@
 .detail-field .value {
   font-size: 14px;
   margin-top: 2px;
+  overflow-wrap: anywhere;
 }
 
 .detail-field .value.mono {
@@ -783,9 +813,131 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
+}
+
+/* The narrower right-hand column holding config.detailFields() output — kept visually distinct
+   from the main title/description/actions column with its own left border, matching the
+   .manage-list/.manage-detail split's own "a border marks a column boundary" convention. */
+.detail-meta-column {
+  flex: 0 0 200px;
+  min-width: 0;
+  padding-left: 20px;
+  border-left: 1px solid var(--border);
+}
+
+/* ---------- Detail tabs: Overview / Changelog / Contributions ---------- */
+.detail-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.detail-tab {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--fg-dim);
+  padding: 6px 10px;
+  border-bottom: 2px solid transparent;
+}
+
+.detail-tab:hover {
+  color: var(--fg);
+}
+
+.detail-tab.is-active {
+  color: var(--fg);
+  border-bottom-color: var(--cyan);
+}
+
+.detail-tab-panel {
+  display: none;
+}
+
+.detail-tab-panel.is-active {
+  display: block;
+}
+
+.detail-tab-note {
+  margin-bottom: 16px;
+}
+
+/* Rendered README/CHANGELOG markdown (see renderMarkdown in primitives.js) — this is the only
+   place these tags appear in host-drawn content, so styling them by bare tag name (scoped to
+   .detail-tab-panel) is simpler than inventing a class per element. */
+.detail-tab-panel h1,
+.detail-tab-panel h2,
+.detail-tab-panel h3 {
+  margin: 20px 0 8px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.detail-tab-panel h1:first-child,
+.detail-tab-panel h2:first-child,
+.detail-tab-panel h3:first-child {
+  margin-top: 0;
+}
+
+.detail-tab-panel h1 {
+  font-size: 18px;
+}
+
+.detail-tab-panel h2 {
+  font-size: 16px;
+}
+
+.detail-tab-panel h3 {
+  font-size: 14px;
+}
+
+.detail-tab-panel p {
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0 0 12px;
+}
+
+.detail-tab-panel code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--bg-raised);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.detail-tab-panel pre {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  margin: 0 0 12px;
+}
+
+.detail-tab-panel pre code {
+  background: none;
+  padding: 0;
+}
+
+.detail-tab-panel ul,
+.detail-tab-panel ol {
+  margin: 0 0 12px;
+  padding-left: 22px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.detail-tab-panel blockquote {
+  margin: 0 0 12px;
+  padding: 4px 12px;
+  border-left: 3px solid var(--border);
+  color: var(--fg-dim);
+}
+
+.detail-tab-panel a {
+  color: var(--cyan);
 }
 
 /* ---------- Tooltip ---------- */

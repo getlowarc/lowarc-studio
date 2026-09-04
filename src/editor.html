@@ -751,8 +751,43 @@
          row expands in place instead of navigating to a separate detail view. */
       .plugin-manager-toolbar {
         flex: none;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
         padding: 8px;
         border-bottom: 1px solid var(--border);
+      }
+
+      /* Search (flex:1) plus two small icon-only buttons on one row — a labeled "Add X…" button
+         doesn't fit the sidebar's 240px width alongside a second button (confirmed live: it pushed
+         Marketplace off the edge, clipping it); icon-only + a tooltip fixes that and also settles
+         the original "isn't centered" complaint (a single unconstrained labeled button sitting at
+         the toolbar's own left edge with nothing balancing it). */
+      .plugin-manager-toolbar-controls {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .plugin-manager-search {
+        flex: 1;
+        min-width: 0;
+        font-size: 13px;
+        padding: 6px 8px;
+      }
+
+      /* The row header's enable/disable toggle — same .checkbox-row/.checkbox-box control as
+         everywhere else, just sized down (12px vs. the default 16px) to sit comfortably beside a
+         row's name/chevron instead of dominating the row the way a full-size one would. */
+      .plugin-manager-row-toggle {
+        flex: none;
+        margin: 0;
+        gap: 0;
+      }
+
+      .plugin-manager-row-toggle .checkbox-box {
+        width: 14px;
+        height: 14px;
       }
 
       .plugin-manager-list {
@@ -830,17 +865,13 @@
         margin-bottom: 10px;
       }
 
-      /* flex-wrap, not a fixed side-by-side layout — the checkbox label plus the Remove button
-         don't reliably both fit on one line at the sidebar's narrower widths (confirmed live: they
-         were forcing the whole panel wider than the sidebar, spawning a horizontal scrollbar).
-         Wrapping the button to its own line costs nothing when there IS room (it still sits on the
-         same line then) and just avoids the overflow entirely when there isn't. */
+      /* Just the Remove button now — the enable/disable toggle moved up into the row header itself
+         (see .plugin-manager-row-toggle) — right-aligned rather than the old space-between (which
+         existed to spread a checkbox label and this button apart; with one action left, flex-end
+         reads better than a lone button stranded at the left edge). */
       .plugin-manager-row-actions {
         display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: space-between;
-        gap: 6px 8px;
+        justify-content: flex-end;
       }
 
       /* Zeroes the placeholder-era padding/centering once the inspector actually hosts a plugin

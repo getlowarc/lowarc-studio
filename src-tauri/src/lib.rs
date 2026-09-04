@@ -527,6 +527,16 @@ fn list_installed_plugins() -> Vec<PluginListItem> {
     installs::list_plugins(&AppPaths::plugins(), &disabled)
 }
 
+/// Backs the Modules/Plugins manage pages' Overview/Changelog tabs and their optional `icon` —
+/// one generic "read a file out of an already-installed item's own folder" command instead of
+/// three narrower ones. `folder` is whatever `ModuleListItem.folder`/`PluginListItem.folder`
+/// already handed the frontend. Returns None (not an error) for anything missing/unreadable — see
+/// installs::read_install_text_file's own doc comment for the containment checks this relies on.
+#[tauri::command]
+fn read_install_text_file(folder: String, rel_path: String) -> Option<String> {
+    installs::read_install_text_file(&AppPaths::modules(), &AppPaths::plugins(), &folder, &rel_path)
+}
+
 /// Relays a call from a plugin's own webview content (see plugin_assets.rs's injected harness
 /// and editor.html's message-relay listener) into a fresh invocation of that plugin's backend,
 /// and surfaces its reply. This is the only path a plugin's UI has back to its own backend — it
@@ -696,6 +706,7 @@ pub fn run() {
       remove_module,
       set_module_enabled,
       list_installed_plugins,
+      read_install_text_file,
       install_plugin,
       remove_plugin,
       set_plugin_enabled,
