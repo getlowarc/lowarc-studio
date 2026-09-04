@@ -1,6 +1,10 @@
-The MIT License
+This plugin vendors [@xterm/xterm](https://xtermjs.org/) under the following license.
 
-Copyright © 2010-2026 three.js authors
+---
+
+Copyright (c) 2017-2019, The xterm.js authors (https://github.com/xtermjs/xterm.js)
+Copyright (c) 2014-2016, SourceLair Private Company (https://www.sourcelair.com)
+Copyright (c) 2012-2013, Christopher Jeffrey (https://github.com/chjj/)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

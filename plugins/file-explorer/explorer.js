@@ -27,6 +27,15 @@ let fileStatus = {}; // absolute path -> { dirty, missing, hasErrors } — see b
 // is already open takes effect on its next mount (reload), not live.
 let configuredShowHidden = false;
 let configuredFoldersFirst = true;
+let configuredDraftTool = true;
+
+// ---------- Draft Tool state ----------
+// A lightweight, disk-based backward snapshot for the CURRENT session only — bolted onto the
+// explorer rather than a separate plugin (see file_explorer_backend.rs's own header for how it
+// actually works). draftId is null when no Draft is open; diffCounts only ever has entries while
+// one is.
+let draftId = null;
+let diffCounts = {}; // absolute path -> {added, removed}, from the last diffStatus() call
 
 function sep() {
   return root && root.includes("\\") ? "\\" : "/";
@@ -167,6 +176,26 @@ function createRowMarker(isDir, isExpanded, label) {
   return marker;
 }
 
+function appendDiffCounts(row, path) {
+  const counts = diffCounts[path];
+  if (!counts || (!counts.added && !counts.removed)) return;
+  const wrap = document.createElement("span");
+  wrap.className = "row-diff";
+  if (counts.added) {
+    const added = document.createElement("span");
+    added.className = "row-diff-added";
+    added.textContent = lowarcFormatCompact(counts.added);
+    wrap.appendChild(added);
+  }
+  if (counts.removed) {
+    const removed = document.createElement("span");
+    removed.className = "row-diff-removed";
+    removed.textContent = lowarcFormatCompact(counts.removed);
+    wrap.appendChild(removed);
+  }
+  row.appendChild(wrap);
+}
+
 function createRow({ path, label, isDir, depth }) {
   const row = document.createElement("div");
   row.className = "row" + (path === selectedPath ? " selected" : "");
@@ -205,6 +234,10 @@ function createRow({ path, label, isDir, depth }) {
       row.appendChild(dot);
     }
   }
+
+  // Draft Tool decoration — only while a Draft is actually open, and only for a file that's
+  // genuinely changed since it opened (diffCounts is empty for anything untouched).
+  if (!isDir && draftId) appendDiffCounts(row, path);
 
   row.addEventListener("click", () => onRowClick(path, isDir));
   row.addEventListener("contextmenu", (e) => {
@@ -571,6 +604,108 @@ function refreshAll() {
   refreshTotals();
 }
 
+// ---------- Draft Tool ----------
+
+function showDraftForm() {
+  document.getElementById("draft-open-form").style.display = "";
+  document.getElementById("draft-summary").style.display = "none";
+  document.getElementById("draft-controls").style.display = "none";
+}
+
+function showOpenDraft(label, description) {
+  document.getElementById("draft-open-form").style.display = "none";
+  document.getElementById("draft-summary").style.display = "";
+  document.getElementById("draft-controls").style.display = "";
+  document.getElementById("draft-summary-label").textContent = label;
+  document.getElementById("draft-summary-description").textContent = description || "";
+}
+
+async function refreshDiffStatus() {
+  if (!draftId) return;
+  try {
+    diffCounts = await callBackend("diffStatus", { draftId });
+  } catch (err) {
+    diffCounts = {};
+  }
+  renderTree();
+}
+
+document.getElementById("open-draft-btn").addEventListener("click", async () => {
+  const label = document.getElementById("draft-label-input").value.trim() || "Untitled Draft";
+  const description = document.getElementById("draft-description-input").value.trim();
+  const id = crypto.randomUUID();
+  try {
+    await callBackend("openDraft", { draftId: id });
+  } catch (err) {
+    showError(String(err));
+    return;
+  }
+  draftId = id;
+  diffCounts = {};
+  showOpenDraft(label, description);
+  document.getElementById("draft-label-input").value = "";
+  document.getElementById("draft-description-input").value = "";
+  renderTree();
+});
+
+// A lightweight inline confirm, same reasoning as beginDelete's own banner — Revert discards real
+// edits, that's worth one extra click to avoid an accidental loss.
+document.getElementById("revert-btn").addEventListener("click", () => {
+  const btn = document.getElementById("revert-btn");
+  if (btn.dataset.confirming) {
+    doRevertDraft();
+    return;
+  }
+  btn.dataset.confirming = "true";
+  btn.textContent = "Confirm Revert";
+  setTimeout(() => {
+    delete btn.dataset.confirming;
+    btn.textContent = "Revert";
+  }, 3000);
+});
+
+async function doRevertDraft() {
+  const id = draftId;
+  // Grab the reverted paths BEFORE clearing diffCounts below — Revert writes straight to disk,
+  // bypassing whatever editor already has one of these files open, so each one needs an explicit
+  // push (window.lowarc.refreshFile) or it just keeps showing the now-stale edited content.
+  const revertedPaths = Object.keys(diffCounts);
+  try {
+    await callBackend("revertAll", { draftId: id });
+    revertedPaths.forEach((path) => window.lowarc.refreshFile(path));
+  } catch (err) {
+    showError(String(err));
+  }
+  draftId = null;
+  diffCounts = {};
+  invalidateAll();
+  showDraftForm();
+  renderTree();
+}
+
+document.getElementById("commit-btn").addEventListener("click", async () => {
+  const id = draftId;
+  try {
+    await callBackend("commit", { draftId: id });
+  } catch (err) {
+    showError(String(err));
+  }
+  draftId = null;
+  diffCounts = {};
+  showDraftForm();
+  renderTree();
+});
+
+// The host's generic "about to overwrite" broadcast (see write_text_file in lib.rs) — the actual
+// backward-snapshot moment. Only matters while a Draft is open; every other plugin just ignores
+// this same broadcast.
+window.lowarc.on("lowarc:beforeSave", ({ path, previousContent }) => {
+  if (!draftId) return;
+  callBackend("captureBaseline", { draftId, path, previousContent })
+    .then(refreshDiffStatus)
+    .catch((err) => showError(String(err)));
+});
+
 // ---------- Wiring ----------
 
 document.getElementById("new-file-btn").addEventListener("click", () => beginCreate(targetDirFor(null), false));
@@ -601,6 +736,8 @@ if (root) {
   window.lowarc.getSettings().then((settings) => {
     configuredShowHidden = (settings && settings.showHidden) === "true";
     configuredFoldersFirst = !(settings && settings.foldersFirst === "false");
+    configuredDraftTool = !(settings && settings.draftTool === "false");
+    document.getElementById("draft-tool").style.display = configuredDraftTool ? "" : "none";
     renderTree();
     refreshTotals();
   });

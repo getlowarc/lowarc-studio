@@ -2,7 +2,7 @@
   "command": "file_explorer_backend",
   "args": [],
   "name": "File Explorer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Browse, create, rename, move, and delete the project's files.",
   "contributes": {
     "panels": [
@@ -11,6 +11,7 @@
   },
   "settings": [
     { "key": "showHidden", "label": "Show hidden files", "type": "checkbox", "hint": "Files and folders whose name starts with a dot." },
-    { "key": "foldersFirst", "label": "Folders first", "type": "checkbox", "hint": "Off sorts everything together, alphabetically." }
+    { "key": "foldersFirst", "label": "Folders first", "type": "checkbox", "hint": "Off sorts everything together, alphabetically." },
+    { "key": "draftTool", "label": "Draft Tool", "type": "checkbox", "hint": "A lightweight, session-only backward snapshot — open a Draft, edit freely, then Revert or Commit." }
   ]
 }

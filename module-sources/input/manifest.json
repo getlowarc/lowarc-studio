@@ -1,0 +1,8 @@
+{
+  "id": "input",
+  "name": "Input",
+  "version": "0.1.0",
+  "description": "Keyboard, mouse, and gamepad input, cross-platform.",
+  "loadOrder": 1,
+  "requires": []
+}

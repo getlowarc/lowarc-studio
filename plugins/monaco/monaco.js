@@ -160,6 +160,26 @@ Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve
     model.onDidChangeContent(() => updateDirty(payload.path));
   });
 
+  // The host's own signal for "this path's disk content just changed out from under you" (see
+  // refreshOpenFile() in tabs-inspector.js — the Draft Tool's Revert writing straight to disk is
+  // what motivated this) — deliberately a SEPARATE event from lowarc:openFile, which is a no-op
+  // for an already-open path by design (see that handler's own comment). setValue(), not a fresh
+  // model: keeps this the SAME model instance (still attached to the editor if it's the active
+  // file, still the same object everything else here references) — just replaces its content and
+  // resets the dirty baseline to match, the same "this is now the clean, saved state" treatment a
+  // real save gets. Undo history resets along with it, on purpose: there's no meaningful "undo"
+  // back to an in-editor state that disk has since genuinely diverged from.
+  window.lowarc.on("lowarc:refreshFile", (payload) => {
+    if (!payload || typeof payload.path !== "string") return;
+    const doc = docs.get(payload.path);
+    if (!doc) return; // not open here
+    loading = true;
+    doc.model.setValue(payload.contents);
+    loading = false;
+    doc.savedVersionId = doc.model.getAlternativeVersionId();
+    updateDirty(payload.path);
+  });
+
   window.lowarc.on("lowarc:activateFile", (payload) => {
     const doc = payload && docs.get(payload.path);
     if (!doc) return;

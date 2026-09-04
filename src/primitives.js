@@ -1564,6 +1564,31 @@ function createManagerPage(config) {
       .then((text) => renderChangelogPanel(panels.changelog, text))
       .catch(() => renderChangelogPanel(panels.changelog, null));
 
+    // License is the one CONDITIONAL tab — unlike Overview/Changelog (which always show, with a
+    // fallback, even when their file is missing), a License tab only ever appears at all once its
+    // file is confirmed to exist. initTabs()'s own click delegation is bound to `nav` itself
+    // (see primitives.js's initTabs), so a tab button appended here after the fact is still fully
+    // clickable with no extra wiring; the tab-change listener above re-reads `panels` fresh on
+    // every event too, so adding to it late works the same way.
+    invoke("read_install_text_file", { folder: item.folder, relPath: "LICENSE.md" })
+      .then((text) => {
+        if (!text) return;
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "detail-tab";
+        btn.dataset.tabValue = "license";
+        btn.textContent = "License";
+        nav.appendChild(btn);
+
+        const panel = document.createElement("div");
+        panel.className = "detail-tab-panel";
+        panel.id = "detail-tab-license";
+        panel.innerHTML = renderMarkdown(text);
+        wrap.appendChild(panel);
+        panels.license = panel;
+      })
+      .catch(() => {});
+
     return wrap;
   }
 

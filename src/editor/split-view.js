@@ -135,6 +135,16 @@
             return;
           }
 
+          // window.lowarc.refreshFile() — same trust shape as openFile above (any mounted plugin,
+          // not scoped to the file's own viewer via windowToFilePaths, since the CALLER here is
+          // never the viewer itself — it's whatever changed the file out from under it).
+          if (data.action === "refreshFile") {
+            if (windowToPlugin.get(event.source) && typeof data.path === "string" && data.path) {
+              refreshOpenFile(data.path);
+            }
+            return;
+          }
+
           // window.lowarc.pickOpenFile()/createFile() — a plugin has no filesystem access of its
           // own to browse or write with, so these relay to the host's real native file dialogs
           // (openDialog/saveDialog, the same ones the File menu itself uses) rather than giving a
@@ -449,6 +459,24 @@
           if (file.pluginId === pluginId && file.iframe) {
             file.iframe.contentWindow.postMessage({ type: "emit", event: eventName, payload }, "*");
           }
+        }
+      });
+
+      // The generic "a save is about to overwrite this file" hook (see write_text_file in lib.rs)
+      // — broadcast to every mounted plugin iframe, same shape as broadcastFileStatus()
+      // (tabs-inspector.js), just Rust-originated instead of client-state-originated. Host code has
+      // no notion of which plugin (if any) cares — Offshoot is the only one listening today, but
+      // nothing here says so.
+      window.__TAURI__.event.listen("file-about-to-save", (event) => {
+        const payload = { type: "emit", event: "lowarc:beforeSave", payload: event.payload };
+        for (const entry of pluginPanels.values()) {
+          if (entry.iframe) entry.iframe.contentWindow.postMessage(payload, "*");
+        }
+        const notified = new Set();
+        for (const file of openFiles.values()) {
+          if (notified.has(file.iframe)) continue;
+          notified.add(file.iframe);
+          file.iframe.contentWindow.postMessage(payload, "*");
         }
       });
 

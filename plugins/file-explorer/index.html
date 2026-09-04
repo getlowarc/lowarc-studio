@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="__lowarc-theme.css" />
 <link rel="stylesheet" href="__lowarc-icons.css" />
 <script src="__lowarc-icons.js"></script>
+<script src="__lowarc-format.js"></script>
 <style>
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; }
@@ -127,6 +128,53 @@
     color: var(--fg);
     font: inherit;
   }
+
+  /* No "+"/"-" glyphs — color alone (green added, red removed) plus lowarcFormatCompact() keeps
+     even a big diff fitting the sidebar's width. Only shown while a Draft is open. */
+  .row-diff { flex: none; display: flex; gap: 6px; font-size: 11px; font-variant-numeric: tabular-nums; margin-left: auto; }
+  .row-diff-added { color: var(--success); }
+  .row-diff-removed { color: var(--danger); }
+
+  /* ---------- Draft Tool: bolted onto the explorer, not a separate panel — stays fixed to the
+     bottom same as .footer above it, a divider line between "browsing" and "reviewing". Hidden
+     entirely when the draftTool setting is off. ---------- */
+  .draft-tool {
+    flex: none;
+    border-top: 1px solid var(--border);
+  }
+  .draft-open-form, .draft-summary {
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .draft-summary-label {
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .draft-summary-description {
+    font-size: 12px;
+    color: var(--fg-dim);
+    white-space: pre-wrap;
+  }
+  .draft-summary-description:empty {
+    display: none;
+  }
+  .draft-controls {
+    display: flex;
+    gap: 6px;
+    padding: 0 12px 10px;
+  }
+  .draft-controls .btn {
+    flex: 1;
+    justify-content: center;
+  }
+  /* .input already sets width:100% (primitives-shared.css), but a <textarea>'s native resize
+     handle drags an explicit inline pixel width regardless of that — vertical-only keeps the
+     description box's width pinned to the sidebar, letting only its height grow. */
+  #draft-description-input {
+    resize: vertical;
+  }
 </style>
 </head>
 <body>
@@ -155,6 +203,29 @@
   <div class="banner" id="banner"></div>
   <div class="tree" id="tree"></div>
   <div class="footer" id="footer"></div>
+
+  <div class="draft-tool" id="draft-tool" style="display: none">
+    <div class="draft-open-form" id="draft-open-form">
+      <div class="field">
+        <div class="field-label">Label</div>
+        <input type="text" class="input" id="draft-label-input" />
+      </div>
+      <div class="field">
+        <div class="field-label">Description</div>
+        <textarea class="input" id="draft-description-input" rows="2" placeholder="Optional"></textarea>
+      </div>
+      <button type="button" class="btn btn-sm btn-outline" id="open-draft-btn">Open Draft</button>
+    </div>
+
+    <div class="draft-summary" id="draft-summary" style="display: none">
+      <div class="draft-summary-label" id="draft-summary-label"></div>
+      <div class="draft-summary-description" id="draft-summary-description"></div>
+    </div>
+    <div class="draft-controls" id="draft-controls" style="display: none">
+      <button type="button" class="btn btn-sm btn-danger" id="revert-btn">Revert</button>
+      <button type="button" class="btn btn-sm btn-outline" id="commit-btn">Commit</button>
+    </div>
+  </div>
 
   <script src="explorer.js"></script>
 </body>

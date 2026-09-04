@@ -9,9 +9,27 @@
 // Every call carries "root" (the project directory) alongside its own arguments and gets
 // canonicalize-checked against it before touching disk — same reasoning as plugin_assets.rs's
 // path-traversal check for served assets: never trust a path without confirming it's still inside
-// the boundary it's supposed to be confined to, regardless of who's asking.
+// the boundary it's supposed to be confined to, regardless of who's asking. The Draft Tool methods
+// below (openDraft/captureBaseline/diffStatus/revertAll/commit) are the one exception — their
+// paths come from the host's own already-validated lowarc:beforeSave broadcast, not user input
+// into this plugin, so they don't need a second root check of their own.
+//
+// ---------- Draft Tool: a lightweight, disk-based backward snapshot for the CURRENT session ----
+// Bolted onto the file explorer (not a separate plugin — Nolan: "it will just be bolted on to the
+// normal functionality") since browsing files and reviewing what changed in them are the same
+// surface. Never stops a save from happening — it just watches for one (via the host's generic
+// lowarc:beforeSave, see write_text_file in lib.rs) and, the first time a tracked path changes
+// after a Draft opens, keeps that path's previous content in this binary's own scratch storage.
+// Revert restores every captured path; Commit just forgets them (current disk content was already
+// correct). Storage is entirely this binary's own concern — the host doesn't know the path, just
+// wipes it once on every launch (see lib.rs's setup()) so "session-only" is a real guarantee
+// rather than "OS temp-dir cleanup eventually happens." One folder per open Draft:
+//   <temp_dir>/lowarc-offshoot/<draft_id>/manifest.json   — { "<real path>": {"index":0,"existed":true} }
+//   <temp_dir>/lowarc-offshoot/<draft_id>/snapshots/<index>.txt   — that path's original content
 
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 fn main() {
@@ -59,6 +77,16 @@ fn handle(method: &str, params: &Value) -> Value {
         })(),
         "deletePath" => str_param(params, "path").and_then(|path| delete_entry(root, path)),
         "countTree" => count_tree(root),
+        "openDraft" => str_param(params, "draftId").and_then(open_draft),
+        "captureBaseline" => (|| {
+            let draft_id = str_param(params, "draftId")?;
+            let path = str_param(params, "path")?;
+            let previous_content = params.get("previousContent").and_then(|v| v.as_str());
+            capture_baseline(draft_id, path, previous_content)
+        })(),
+        "diffStatus" => str_param(params, "draftId").and_then(diff_status),
+        "revertAll" => str_param(params, "draftId").and_then(revert_all),
+        "commit" => str_param(params, "draftId").and_then(commit),
         _ => Err(format!("unknown method \"{method}\"")),
     };
 
@@ -228,6 +256,131 @@ fn walk_count(dir: &Path, totals: &mut Totals) -> std::io::Result<()> {
     Ok(())
 }
 
+// ---------- Draft Tool ----------
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+struct DraftManifestEntry {
+    index: usize,
+    /// False for a path that didn't exist before this Draft's first-seen change to it — revert
+    /// deletes the file in that case, rather than overwriting it with empty content.
+    existed: bool,
+}
+
+type DraftManifest = HashMap<String, DraftManifestEntry>;
+
+/// Every Draft's own scratch storage — this binary's sole concern, the host only ever wipes the
+/// whole thing wholesale on launch (see lib.rs). Not configurable, not read from `params`: a fixed,
+/// well-known location under the OS temp dir.
+fn draft_scratch_root() -> PathBuf {
+    std::env::temp_dir().join("lowarc-offshoot")
+}
+
+fn draft_dir(draft_id: &str) -> PathBuf {
+    draft_scratch_root().join(draft_id)
+}
+
+fn draft_manifest_path(draft_id: &str) -> PathBuf {
+    draft_dir(draft_id).join("manifest.json")
+}
+
+fn draft_snapshot_path(draft_id: &str, index: usize) -> PathBuf {
+    draft_dir(draft_id).join("snapshots").join(format!("{index}.txt"))
+}
+
+fn read_draft_manifest(draft_id: &str) -> DraftManifest {
+    std::fs::read_to_string(draft_manifest_path(draft_id)).ok().and_then(|text| serde_json::from_str(&text).ok()).unwrap_or_default()
+}
+
+fn write_draft_manifest(draft_id: &str, manifest: &DraftManifest) -> Result<(), String> {
+    let text = serde_json::to_string(manifest).map_err(|e| e.to_string())?;
+    std::fs::write(draft_manifest_path(draft_id), text).map_err(|e| format!("could not save Draft state: {e}"))
+}
+
+/// Idempotent — opening the same draft_id twice (a double-click, a retry) just leaves any already-
+/// captured baselines in place rather than losing them.
+fn open_draft(draft_id: &str) -> Result<Value, String> {
+    std::fs::create_dir_all(draft_dir(draft_id).join("snapshots")).map_err(|e| format!("could not open Draft: {e}"))?;
+    if !draft_manifest_path(draft_id).is_file() {
+        write_draft_manifest(draft_id, &DraftManifest::new())?;
+    }
+    Ok(Value::Null)
+}
+
+/// First-write-wins per path — a second (or third, ...) save of the same file after its baseline
+/// is already captured is a no-op here, which is exactly the point: the ORIGINAL content is what
+/// Revert needs to restore, not whatever the file looked like a moment before the most recent save.
+fn capture_baseline(draft_id: &str, path: &str, previous_content: Option<&str>) -> Result<Value, String> {
+    let mut manifest = read_draft_manifest(draft_id);
+    if manifest.contains_key(path) {
+        return Ok(Value::Null);
+    }
+
+    let index = manifest.len();
+    let existed = previous_content.is_some();
+    std::fs::write(draft_snapshot_path(draft_id, index), previous_content.unwrap_or("")).map_err(|e| format!("could not capture {path}: {e}"))?;
+    manifest.insert(path.to_string(), DraftManifestEntry { index, existed });
+    write_draft_manifest(draft_id, &manifest)?;
+    Ok(Value::Null)
+}
+
+/// Re-reads every tracked path's CURRENT disk content fresh on every call (never cached), same
+/// "the backend is the source of truth, re-fetched on demand" convention list_dir/count_tree above
+/// already follow. A path that's been deleted since its baseline was captured reads as empty
+/// current content (a full removal shows as every original line removed), rather than erroring the
+/// whole status call over one missing file.
+fn diff_status(draft_id: &str) -> Result<Value, String> {
+    let manifest = read_draft_manifest(draft_id);
+    let mut status = serde_json::Map::new();
+    for (path, entry) in &manifest {
+        let baseline = if entry.existed { std::fs::read_to_string(draft_snapshot_path(draft_id, entry.index)).unwrap_or_default() } else { String::new() };
+        let current = std::fs::read_to_string(path).unwrap_or_default();
+        let (added, removed) = count_line_changes(&baseline, &current);
+        status.insert(path.clone(), json!({"added": added, "removed": removed}));
+    }
+    Ok(Value::Object(status))
+}
+
+fn count_line_changes(baseline: &str, current: &str) -> (usize, usize) {
+    let diff = similar::TextDiff::from_lines(baseline, current);
+    let mut added = 0usize;
+    let mut removed = 0usize;
+    for change in diff.iter_all_changes() {
+        match change.tag() {
+            similar::ChangeTag::Insert => added += 1,
+            similar::ChangeTag::Delete => removed += 1,
+            similar::ChangeTag::Equal => {}
+        }
+    }
+    (added, removed)
+}
+
+/// Restores every tracked path to its captured baseline (deleting a path that didn't exist before
+/// the Draft touched it, rather than leaving it behind), then discards the Draft's own storage.
+fn revert_all(draft_id: &str) -> Result<Value, String> {
+    let manifest = read_draft_manifest(draft_id);
+    for (path, entry) in &manifest {
+        if entry.existed {
+            let baseline = std::fs::read_to_string(draft_snapshot_path(draft_id, entry.index)).map_err(|e| format!("could not read the original content of {path}: {e}"))?;
+            std::fs::write(path, baseline).map_err(|e| format!("could not restore {path}: {e}"))?;
+        } else {
+            // Best-effort: if it's already gone (the user deleted it themselves), nothing to undo.
+            let _ = std::fs::remove_file(path);
+        }
+    }
+    discard_draft(draft_id)
+}
+
+/// Current disk content is already what it should be — Commit's only job is forgetting the
+/// baselines so they stop being tracked.
+fn commit(draft_id: &str) -> Result<Value, String> {
+    discard_draft(draft_id)
+}
+
+fn discard_draft(draft_id: &str) -> Result<Value, String> {
+    let _ = std::fs::remove_dir_all(draft_dir(draft_id));
+    Ok(Value::Null)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -378,5 +531,119 @@ mod tests {
         let reply = call(&root, "doSomethingUnsupported", json!({}));
         assert!(!ok(&reply));
         assert!(reply["error"].as_str().unwrap().contains("unknown method"));
+    }
+
+    // ---------- Draft Tool ----------
+    // Every test gets its own draft_id (not its own scratch root — that's a fixed, real OS temp
+    // path this binary always uses) so parallel `cargo test` runs never collide with each other.
+
+    fn unique_draft_id(name: &str) -> String {
+        format!("test_{name}_{}", std::process::id())
+    }
+
+    fn cleanup_draft(draft_id: &str) {
+        let _ = std::fs::remove_dir_all(draft_dir(draft_id));
+    }
+
+    #[test]
+    fn open_draft_is_idempotent_and_starts_with_an_empty_manifest() {
+        let draft_id = unique_draft_id("open");
+        cleanup_draft(&draft_id);
+
+        assert!(open_draft(&draft_id).is_ok());
+        assert!(read_draft_manifest(&draft_id).is_empty());
+        assert!(open_draft(&draft_id).is_ok(), "opening the same draft twice must not error");
+
+        cleanup_draft(&draft_id);
+    }
+
+    #[test]
+    fn capture_baseline_is_first_write_wins() {
+        let draft_id = unique_draft_id("first_write_wins");
+        cleanup_draft(&draft_id);
+        open_draft(&draft_id).unwrap();
+
+        capture_baseline(&draft_id, "C:/fake/a.txt", Some("original")).unwrap();
+        capture_baseline(&draft_id, "C:/fake/a.txt", Some("edited once")).unwrap();
+
+        let manifest = read_draft_manifest(&draft_id);
+        let entry = manifest.get("C:/fake/a.txt").unwrap();
+        assert!(entry.existed);
+        let stored = std::fs::read_to_string(draft_snapshot_path(&draft_id, entry.index)).unwrap();
+        assert_eq!(stored, "original");
+
+        cleanup_draft(&draft_id);
+    }
+
+    #[test]
+    fn capture_baseline_records_a_brand_new_file_as_not_existed() {
+        let draft_id = unique_draft_id("new_file");
+        cleanup_draft(&draft_id);
+        open_draft(&draft_id).unwrap();
+
+        capture_baseline(&draft_id, "C:/fake/new.txt", None).unwrap();
+        let manifest = read_draft_manifest(&draft_id);
+        assert!(!manifest.get("C:/fake/new.txt").unwrap().existed);
+
+        cleanup_draft(&draft_id);
+    }
+
+    #[test]
+    fn diff_status_counts_added_and_removed_lines() {
+        let draft_id = unique_draft_id("diff_status");
+        cleanup_draft(&draft_id);
+        open_draft(&draft_id).unwrap();
+
+        let root = temp_dir("diff_status_file");
+        let file = root.join("diff_status.txt");
+        std::fs::write(&file, "one\ntwo\nthree\n").unwrap();
+        capture_baseline(&draft_id, &file.to_string_lossy(), Some("one\ntwo\nthree\n")).unwrap();
+        std::fs::write(&file, "one\ntwo\nfour\nfive\n").unwrap();
+
+        let reply = diff_status(&draft_id).unwrap();
+        let counts = &reply[file.to_string_lossy().as_ref()];
+        assert_eq!(counts["removed"], 1, "\"three\" was removed");
+        assert_eq!(counts["added"], 2, "\"four\" and \"five\" were added");
+
+        cleanup_draft(&draft_id);
+    }
+
+    #[test]
+    fn revert_all_restores_original_content_and_deletes_a_newly_created_file() {
+        let draft_id = unique_draft_id("revert");
+        cleanup_draft(&draft_id);
+        open_draft(&draft_id).unwrap();
+
+        let root = temp_dir("revert_files");
+        let existing = root.join("revert_existing.txt");
+        std::fs::write(&existing, "original").unwrap();
+        capture_baseline(&draft_id, &existing.to_string_lossy(), Some("original")).unwrap();
+        std::fs::write(&existing, "edited").unwrap();
+
+        let created = root.join("revert_created.txt");
+        std::fs::write(&created, "brand new").unwrap();
+        capture_baseline(&draft_id, &created.to_string_lossy(), None).unwrap();
+
+        assert!(revert_all(&draft_id).is_ok());
+        assert_eq!(std::fs::read_to_string(&existing).unwrap(), "original");
+        assert!(!created.exists(), "a file that didn't exist before the Draft must be deleted, not left empty");
+        assert!(!draft_dir(&draft_id).exists(), "revert must discard the Draft's own storage when it's done");
+    }
+
+    #[test]
+    fn commit_leaves_current_content_untouched_and_clears_storage() {
+        let draft_id = unique_draft_id("commit");
+        cleanup_draft(&draft_id);
+        open_draft(&draft_id).unwrap();
+
+        let root = temp_dir("commit_file");
+        let file = root.join("commit.txt");
+        std::fs::write(&file, "original").unwrap();
+        capture_baseline(&draft_id, &file.to_string_lossy(), Some("original")).unwrap();
+        std::fs::write(&file, "edited, kept").unwrap();
+
+        assert!(commit(&draft_id).is_ok());
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "edited, kept");
+        assert!(!draft_dir(&draft_id).exists());
     }
 }

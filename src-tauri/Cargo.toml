@@ -42,6 +42,11 @@ gilrs = "0.11"
 # bin/audio_runtime.rs — real audio playback (Windows/macOS/Linux, built on cpal), with broad
 # format decoding (WAV/MP3/OGG/FLAC and more, via Symphonia) rather than hand-rolling a decoder.
 rodio = "0.22"
+# bin/file_explorer_backend.rs's Draft Tool half — line-level text diffing (added/removed counts,
+# and later a real unified diff) for the review functionality bolted onto the file explorer. A
+# correctness-sensitive algorithm (Myers diff) is worth a small, well-tested real dependency rather
+# than hand-rolling it.
+similar = "2"
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-window-state = "2"

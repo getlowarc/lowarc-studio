@@ -557,6 +557,31 @@
         activateFile(path);
       }
 
+      // window.lowarc.refreshFile()'s host half — some plugin (the Draft Tool's Revert, so far)
+      // just changed `path`'s content on disk directly, bypassing whatever editor has it open. A
+      // no-op if it isn't currently open anywhere (nothing to refresh). Unlike openFile(), this
+      // pushes a DIFFERENT event — lowarc:openFile is a deliberate no-op for an already-open path
+      // (see monaco.js's own comment on that), so an already-open file needs its own "yes, really,
+      // replace what you're showing" signal; lowarc:refreshFile is that signal.
+      async function refreshOpenFile(path) {
+        const file = openFiles.get(path);
+        if (!file) return;
+        try {
+          const contents = await invoke("read_text_file", { path });
+          file.dirty = false;
+          file.missing = false;
+          file.iframe.contentWindow.postMessage({ type: "emit", event: "lowarc:refreshFile", payload: { path, contents } }, "*");
+        } catch (err) {
+          // Revert can also delete a path outright (one that didn't exist before the Draft
+          // touched it) — same "missing" state a file deleted out from under an open tab any
+          // other way already gets, not a hard error.
+          file.missing = true;
+        }
+        renderTabBar(file.groupId);
+        broadcastFileStatus();
+        if (path === groupActiveFilePath[activeGroupId]) updateInspectorForActiveFile();
+      }
+
       document.getElementById("open-file-item").addEventListener("click", async () => {
         const picked = await openDialog({ title: "Open File", defaultPath: projectPath });
         if (picked) openFile(picked);

@@ -250,10 +250,31 @@ fn read_text_file(path: String) -> Result<String, String> {
 /// The other half of read_text_file — invoked host-side in response to a viewer plugin's
 /// `window.lowarc.saveFile(path, contents)`, same reasoning as read: a sandboxed viewer iframe
 /// has no filesystem access of its own.
+///
+/// Every save in the app flows through here — Monaco's today, anything else that edits files
+/// later too — which makes this the one generic place to give a plugin a chance to see a file's
+/// content the instant BEFORE it's overwritten, not after (a moment nothing else in the app
+/// otherwise exposes). Reads the current content first and emits "file-about-to-save" with it,
+/// then writes. Not addressed to any particular plugin — this file has no idea Offshoot exists,
+/// same reasoning read_text_file/write_text_file never knew about any one viewer plugin either;
+/// see split-view.js's listener for how it actually reaches a plugin's iframe. `previousContent`
+/// is None for a brand-new file (nothing existed to read yet) or one that failed to read as UTF-8
+/// text — either way, "no prior text content" is a fact worth telling a listener, not an error
+/// worth failing the save over.
+///
+/// The emitted "path" is deliberately the ORIGINAL, un-canonicalized argument, not `validated`
+/// below — on Windows, PathBuf::canonicalize() returns the `\\?\`-prefixed extended-length form,
+/// which is byte-for-byte different from the plain path every other part of the app (the file
+/// tree, openFile, Monaco's own `activePath`) already uses for this exact same file. Confirmed
+/// live: a listener trying to match this event's path against its own tree-row paths never found
+/// a match, because they weren't actually the same string. `validated` is still what actually
+/// gets read/written — this only changes what string a listener sees.
 #[tauri::command]
-fn write_text_file(path: String, contents: String) -> Result<(), String> {
-    let path = validate_file_path(&path)?;
-    std::fs::write(&path, contents).map_err(|e| format!("Could not save {}: {e}", path.display()))
+fn write_text_file(app: AppHandle, path: String, contents: String) -> Result<(), String> {
+    let validated = validate_file_path(&path)?;
+    let previous_content = std::fs::read_to_string(&validated).ok();
+    let _ = app.emit("file-about-to-save", serde_json::json!({"path": path, "previousContent": previous_content}));
+    std::fs::write(&validated, contents).map_err(|e| format!("Could not save {}: {e}", validated.display()))
 }
 
 /// read_text_file's counterpart for a viewer whose plugin.json marks its `viewers` entry
@@ -745,6 +766,17 @@ pub fn run() {
           log::warn!("couldn't unpack this install's bundled plugin/runtime resources: {err}");
         }
       }
+
+      // Offshoot's own scratch storage (see offshoot_backend.rs) is deliberately session-only —
+      // wiping it once here, on every launch, is what actually makes "gone once the app closes"
+      // true rather than aspirational (an unclean exit — a crash, a forced kill — would otherwise
+      // leave it sitting in the OS temp dir indefinitely). Non-fatal: a locked/missing folder here
+      // just means offshoot_backend starts a fresh draft from a not-quite-empty folder, no worse
+      // than any other stale-temp-file situation. This is the ONE place host code references
+      // Offshoot by name — deliberately just cleanup, not a real dependency; the actual capture/
+      // revert/commit logic lives entirely in offshoot_backend, self-contained same as every other
+      // plugin backend.
+      let _ = std::fs::remove_dir_all(std::env::temp_dir().join("lowarc-offshoot"));
 
       Ok(())
     })

@@ -14,8 +14,8 @@
 // server, so nothing extra is needed here for that.
 
 use crate::plugin_assets::{
-    resolve_asset_path, CSP, HARNESS_JS, SHARED_DROPDOWN_JS, SHARED_ICONS_CSS, SHARED_ICONS_JS, SHARED_ICONS_WOFF,
-    SHARED_PRIMITIVES_CSS, SHARED_STYLE_CSS,
+    resolve_asset_path, CSP, HARNESS_JS, SHARED_DROPDOWN_JS, SHARED_FORMAT_JS, SHARED_ICONS_CSS, SHARED_ICONS_JS,
+    SHARED_ICONS_WOFF, SHARED_PRIMITIVES_CSS, SHARED_STYLE_CSS,
 };
 use crate::{settings, theme};
 use std::sync::atomic::{AtomicU16, Ordering};
@@ -125,6 +125,10 @@ fn handle(request: tiny_http::Request) {
     }
     if rel_path == "__lowarc-dropdown.js" {
         respond_cacheable(request, 200, "text/javascript", SHARED_DROPDOWN_JS.as_bytes().to_vec(), true);
+        return;
+    }
+    if rel_path == "__lowarc-format.js" {
+        respond_cacheable(request, 200, "text/javascript", SHARED_FORMAT_JS.as_bytes().to_vec(), true);
         return;
     }
     // Computed fresh every request (settings::load() reads settings.json from disk each time, not

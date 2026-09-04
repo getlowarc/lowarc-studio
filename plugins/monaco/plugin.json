@@ -1,7 +1,7 @@
 {
   "name": "Monaco Editor",
-  "version": "0.1.0",
-  "description": "Code editor for opened files, powered by Monaco (vendored from the monaco-editor npm package, see MONACO_LICENSE).",
+  "version": "0.1.1",
+  "description": "Code editor for opened files, powered by Monaco (vendored from the monaco-editor npm package, see LICENSE.md).",
   "contributes": {
     "viewers": [
       {

@@ -143,6 +143,14 @@ pub const HARNESS_JS: &str = r#"(function () {
     openFile(path, opts) {
       window.parent.postMessage({ type: "host", action: "openFile", path, openInSplit: Boolean(opts && opts.openInSplit) }, "*");
     },
+    // Tells the host a path's on-disk content just changed out from under any editor that has it
+    // open — e.g. the Draft Tool's Revert writing straight to disk, bypassing the editor entirely.
+    // A no-op if that path isn't currently open anywhere. Not addressed to any one plugin, same
+    // reasoning as openFile above: the open-files list (and re-reading a path's real content) is
+    // core IDE state, not something a sidebar panel manages itself.
+    refreshFile(path) {
+      window.parent.postMessage({ type: "host", action: "refreshFile", path }, "*");
+    },
     // Generic "let the user pick a file for me to open" — a plugin has no filesystem access of
     // its own to browse with, so this asks the host to show its real native file picker instead
     // (options passed straight through to Tauri's dialog.open(), e.g. {filters: [{name, extensions}]}).
@@ -439,6 +447,11 @@ pub const SHARED_ICONS_WOFF: &[u8] = include_bytes!("../../src/vendor/seti-icons
 /// header for why this isn't just reusing the host's fuller-featured one. Served at
 /// __lowarc-dropdown.js; exposes one function, `createLowarcDropdown(options, value, onChange)`.
 pub const SHARED_DROPDOWN_JS: &str = include_str!("../../src/dropdown-shared.js");
+
+/// Compact number formatting ("1.4K", "10K", "1M") built on Intl.NumberFormat — see
+/// format-shared.js's own header. Served at __lowarc-format.js; exposes one function,
+/// `lowarcFormatCompact(n)`.
+pub const SHARED_FORMAT_JS: &str = include_str!("../../src/format-shared.js");
 
 /// Resolves `<plugin_id>/<rel_path>` to a real file, refusing anything that canonicalizes outside
 /// that plugin's own folder — shared between plugin_asset_server.rs and `read_plugin_asset`
