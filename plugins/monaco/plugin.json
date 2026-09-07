@@ -19,7 +19,6 @@
           ".yml", ".yaml", ".xml", ".sql",
           ".lua", ".swift", ".kt", ".dart",
           ".ps1", ".bat", ".ini",
-          ".uc",
           ".txt"
         ]
       }

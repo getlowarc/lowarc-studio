@@ -627,6 +627,7 @@ async function refreshDiffStatus() {
   } catch (err) {
     diffCounts = {};
   }
+  window.lowarc.setDiffStatus(diffCounts);
   renderTree();
 }
 
@@ -635,13 +636,14 @@ document.getElementById("open-draft-btn").addEventListener("click", async () => 
   const description = document.getElementById("draft-description-input").value.trim();
   const id = crypto.randomUUID();
   try {
-    await callBackend("openDraft", { draftId: id });
+    await callBackend("openDraft", { draftId: id, label, description });
   } catch (err) {
     showError(String(err));
     return;
   }
   draftId = id;
   diffCounts = {};
+  window.lowarc.setDiffStatus(diffCounts);
   showOpenDraft(label, description);
   document.getElementById("draft-label-input").value = "";
   document.getElementById("draft-description-input").value = "";
@@ -678,6 +680,7 @@ async function doRevertDraft() {
   }
   draftId = null;
   diffCounts = {};
+  window.lowarc.setDiffStatus(diffCounts);
   invalidateAll();
   showDraftForm();
   renderTree();
@@ -692,6 +695,7 @@ document.getElementById("commit-btn").addEventListener("click", async () => {
   }
   draftId = null;
   diffCounts = {};
+  window.lowarc.setDiffStatus(diffCounts);
   showDraftForm();
   renderTree();
 });
@@ -729,6 +733,39 @@ window.lowarc.on("lowarc:fileStatus", (status) => {
   renderTree();
 });
 
+// This iframe's own JS state (draftId, diffCounts) is gone the instant a page refresh happens —
+// but the backend process and its disk storage aren't, so this is the one thing standing between
+// "just reload the window" and silently losing track of an open Draft. Safe to call unconditionally
+// on every load (a fresh mount included): with nothing open, the backend just replies null and this
+// is a no-op. Restores regardless of the draftTool setting — if it's off, #draft-tool stays hidden
+// either way, but the underlying tracking (and status bar diff) shouldn't depend on that toggle.
+async function restoreActiveDraftIfAny() {
+  let active;
+  try {
+    active = await callBackend("getActiveDraft", {});
+  } catch (err) {
+    return;
+  }
+  if (!active) return;
+  draftId = active.draftId;
+  showOpenDraft(active.label, active.description);
+  await refreshDiffStatus();
+}
+
+// Live counterpart to the getSettings() read below — see set_plugin_setting/plugin-setting-changed
+// in lib.rs and its relay to lowarc:settingsChanged in split-view.js. showHidden/foldersFirst just
+// need a re-render; draftTool also needs the section's own visibility toggled (it's independent of
+// the underlying tracking, same as the initial read below).
+window.lowarc.on("lowarc:settingsChanged", ({ key, value }) => {
+  if (key === "showHidden") configuredShowHidden = value === "true";
+  else if (key === "foldersFirst") configuredFoldersFirst = value !== "false";
+  else if (key === "draftTool") {
+    configuredDraftTool = value !== "false";
+    document.getElementById("draft-tool").style.display = configuredDraftTool ? "" : "none";
+  } else return;
+  renderTree();
+});
+
 if (root) {
   const header = document.getElementById("header");
   header.textContent = baseName(root) || root;
@@ -741,6 +778,7 @@ if (root) {
     renderTree();
     refreshTotals();
   });
+  restoreActiveDraftIfAny();
 } else {
   showError("No project path was provided to this panel.");
 }

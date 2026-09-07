@@ -209,3 +209,25 @@ window.lowarc.getSettings().then((settings) => {
   if (Number.isInteger(scrollback) && scrollback >= 0) configuredScrollback = scrollback;
   createInstance(null);
 });
+
+// Live counterpart to the getSettings() read above — see set_plugin_setting/plugin-setting-changed
+// in lib.rs and its relay to lowarc:settingsChanged in split-view.js. shell stays "next instance
+// only" (see configuredShell's own comment above — that's existing terminal semantics, not a
+// limitation of this mechanism); fontSize/scrollback are genuinely live xterm.js options
+// (Terminal.options), so every already-open session picks them up immediately.
+window.lowarc.on("lowarc:settingsChanged", ({ key, value }) => {
+  if (key === "fontSize") {
+    const fontSize = Number(value);
+    if (!Number.isInteger(fontSize) || fontSize <= 0) return;
+    configuredFontSize = fontSize;
+    for (const { term, fitAddon } of sessions.values()) {
+      term.options.fontSize = fontSize;
+      fitAddon.fit();
+    }
+  } else if (key === "scrollback") {
+    const scrollback = Number(value);
+    if (!Number.isInteger(scrollback) || scrollback < 0) return;
+    configuredScrollback = scrollback;
+    for (const { term } of sessions.values()) term.options.scrollback = scrollback;
+  }
+});

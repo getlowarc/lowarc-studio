@@ -396,8 +396,12 @@
           // initReorderable call here covers every future render: it delegates from listEl itself
           // rather than binding per-row, the same way every other reorderable strip in this app
           // works (see initReorderable's own header comment in primitives.js).
+          // Header-only drag handle: an expanded row's body is real content (description, version,
+          // action buttons) that the user reads and clicks, so it shouldn't double as a grab area.
+          // See initReorderable's handleSelector in primitives.js.
           initReorderable(listEl, {
             axis: "y",
+            handleSelector: ".plugin-manager-row-header",
             onReorder: (order) => saveTabOrder(orderKey, order),
           });
 

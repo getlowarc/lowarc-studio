@@ -208,7 +208,13 @@ function initTabs(root = document) {
 // alone (only the indicator moves during the drag) — onMoveAcross is expected to update whatever
 // real state governs group membership and re-render both sides from scratch, which would discard
 // any manual DOM surgery done here anyway; onReorder does NOT fire for a cross-container drop.
-function initReorderable(container, { itemSelector = "[data-tab-value]", keyAttr = "tabValue", axis = "x", onReorder, crossContainer, crossZone, onMoveAcross } = {}) {
+// handleSelector optionally narrows WHERE within an item a drag can start from. Omitted (the
+// default), the whole item is the handle — right for a tab, which is nothing but its own label.
+// An item with a real content area inside it needs the narrower version: the plugin/module
+// managers' rows expand to show a description, version and action buttons, and dragging the list
+// around by that text is both surprising and in the way of selecting it. Those pass their header,
+// so an expanded row still reorders by its title bar and its body behaves like ordinary content.
+function initReorderable(container, { itemSelector = "[data-tab-value]", keyAttr = "tabValue", axis = "x", handleSelector, onReorder, crossContainer, crossZone, onMoveAcross } = {}) {
   if (!container || !container.hasAttribute("data-reorderable")) return;
   if (container.dataset.reorderInit) return;
   container.dataset.reorderInit = "true";
@@ -253,6 +259,12 @@ function initReorderable(container, { itemSelector = "[data-tab-value]", keyAttr
   container.addEventListener("pointerdown", (e) => {
     const item = e.target.closest(itemSelector);
     if (!item || !container.contains(item)) return;
+    // Checked against THIS item's own handle, not just any match on the page — a nested reorderable
+    // would otherwise let a child's handle start a drag of its ancestor.
+    if (handleSelector) {
+      const handle = e.target.closest(handleSelector);
+      if (!handle || !item.contains(handle)) return;
+    }
 
     const startPos = axis === "x" ? e.clientX : e.clientY;
     let dragging = false;
@@ -1819,7 +1831,11 @@ function createManagerPage(config) {
 const MAXIMIZE_ICON = '<svg viewBox="0 0 16 16" fill="none"><rect x="3.5" y="3.5" width="9" height="9" rx="0.5" stroke="currentColor" stroke-width="1.3" /></svg>';
 const RESTORE_ICON = '<svg viewBox="0 0 16 16" fill="none"><rect x="5.5" y="2.5" width="8" height="8" rx="0.5" stroke="currentColor" stroke-width="1.3" /><path d="M3 5.5v7a1 1 0 001 1h7" stroke="currentColor" stroke-width="1.3" /></svg>';
 
-async function initWindowControls() {
+// beforeClose (optional): an async () => boolean, awaited before the window actually closes —
+// false cancels it. Only the editor passes one (unsaved files / an open Draft with real changes);
+// every other page (settings, startup, the Modules/Plugins popups) has nothing of the sort to
+// lose, so they call this exactly as before, no behavior change.
+async function initWindowControls(beforeClose) {
   const tauriWindow = window.__TAURI__ && window.__TAURI__.window;
   if (!tauriWindow) return;
 
@@ -1838,9 +1854,25 @@ async function initWindowControls() {
     maxBtn.setAttribute("aria-label", label);
   }
 
+  // appWindow.close() (what our own titlebar button below calls) does NOT reliably fire
+  // onCloseRequested in Tauri v2 — confirmed (tauri-apps/tauri#5288), and this app runs with
+  // decorations:false, so that JS call IS the only "close" path our own X button has; gating it
+  // right here, before ever calling .close(), is what actually protects it. onCloseRequested
+  // below is still worth wiring too — it DOES correctly fire for Alt+F4/a taskbar "close window",
+  // the paths that don't go through our own button at all.
+  async function requestClose() {
+    if (beforeClose && !(await beforeClose())) return;
+    appWindow.close();
+  }
+
   minBtn.addEventListener("click", () => appWindow.minimize());
   maxBtn.addEventListener("click", () => appWindow.toggleMaximize());
-  closeBtn.addEventListener("click", () => appWindow.close());
+  closeBtn.addEventListener("click", requestClose);
+  if (beforeClose) {
+    appWindow.onCloseRequested(async (event) => {
+      if (!(await beforeClose())) event.preventDefault();
+    });
+  }
 
   await syncMaximizeButton();
   appWindow.onResized(() => syncMaximizeButton());

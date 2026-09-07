@@ -9,7 +9,10 @@
 // No OS signal handling (Ctrl+C, window-close) yet — a module's own requestStop is the only way a
 // run currently ends early. Worth adding before this is more than a first pass.
 
-use lowarc_studio_lib::runtime::{self, runtime_loader::LogFn};
+use lowarc_studio_lib::runtime::{
+    self,
+    runtime_loader::{DebugHooks, LogFn},
+};
 use parking_lot::Mutex;
 use std::io::Write;
 use std::sync::atomic::AtomicBool;
@@ -42,7 +45,9 @@ fn main() {
 
     let stop_flag = Arc::new(AtomicBool::new(false));
 
-    if let Err(errors) = runtime::run_from_launch_dir(&dir, stop_flag, log) {
+    // No debugger in an export — see run_from_launch_dir's own comment on why this is a parameter
+    // now rather than something it decides for itself.
+    if let Err(errors) = runtime::run_from_launch_dir(&dir, stop_flag, log, DebugHooks::disabled()) {
         for e in &errors {
             eprintln!("{e}");
         }

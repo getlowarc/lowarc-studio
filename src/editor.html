@@ -923,16 +923,33 @@
         display: flex;
         align-items: center;
         gap: 16px;
-        padding: 3px 12px;
+        padding: 4px 12px;
         border-top: 1px solid var(--border);
         background: var(--bg-raised);
-        font-size: 11px;
+        font-size: 12px;
         color: var(--fg-dim);
         flex: none;
       }
 
       .status-bar .status-spacer {
         flex: 1;
+      }
+
+      /* The Draft Tool's per-file diff, for whichever file is currently active — pushed by the
+         File Explorer plugin (window.lowarc.setDiffStatus, see plugin_assets.rs) whenever its own
+         diffCounts changes, and re-shown whenever the active file changes (see showActiveFile in
+         tabs-inspector.js). Hidden entirely when the active file has no tracked diff, same
+         no-glyphs-just-color convention the file tree's own row-diff decoration uses. */
+      .status-draft-diff {
+        display: none;
+        gap: 6px;
+        font-variant-numeric: tabular-nums;
+      }
+      .status-draft-diff-added {
+        color: var(--success);
+      }
+      .status-draft-diff-removed {
+        color: var(--danger);
       }
     </style>
   </head>
@@ -1200,6 +1217,7 @@
       <div class="status-bar">
         <span id="status-project">No project</span>
         <div class="status-spacer"></div>
+        <span class="status-draft-diff" id="status-draft-diff"></span>
         <span>LowArc Studio</span>
       </div>
     </div>
@@ -1216,6 +1234,7 @@
          class like the three popups this replaced. -->
     <div class="popup-stack" id="popup-stack"></div>
 
+    <script src="format-shared.js"></script>
     <script src="primitives.js"></script>
     <script src="editor/menus.js"></script>
     <script src="editor/header.js"></script>

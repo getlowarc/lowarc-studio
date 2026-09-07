@@ -85,7 +85,13 @@ impl LaunchConfig {
 /// everything it names) lives in — for a real export, the exported runtime's own directory; a
 /// plain PathBuf rather than "wherever the current exe is" so this stays testable without an
 /// actual built binary.
-pub fn run_from_launch_dir(dir: &Path, stop_flag: Arc<AtomicBool>, log: LogFn) -> Result<(), Vec<String>> {
+///
+/// `debug` is a parameter rather than hardcoded because this now has two callers wanting opposite
+/// things from it: bin/lowarc_runtime.rs (a real export) passes DebugHooks::disabled(), while
+/// bin/dev_run_host.rs (the IDE's own dev-run, in its own process) passes real hooks wired to the
+/// stdio control protocol Studio drives it with. Generalizing the one parameter is what keeps those
+/// two binaries sharing this exact resolve-and-run machinery instead of duplicating it.
+pub fn run_from_launch_dir(dir: &Path, stop_flag: Arc<AtomicBool>, log: LogFn, debug: DebugHooks) -> Result<(), Vec<String>> {
     let launch = LaunchConfig::read(dir).map_err(|e| vec![e])?;
 
     let entry_file = dir.join(&launch.source);
@@ -114,7 +120,7 @@ pub fn run_from_launch_dir(dir: &Path, stop_flag: Arc<AtomicBool>, log: LogFn) -
         settings: launch.settings,
         stop_flag,
         log,
-        debug: DebugHooks::disabled(),
+        debug,
     };
     loader.run(modules, &ctx).map_err(|e| vec![e])
 }

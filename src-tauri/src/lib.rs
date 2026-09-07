@@ -14,23 +14,48 @@ mod theme;
 use app_paths::AppPaths;
 use installs::{ModuleListItem, PluginListItem};
 use projects::RecentProject;
-use runtime::runtime_loader::{LogFn, LogLevel};
+use runtime::runtime_loader::LogLevel;
 use settings::Settings;
 use theme::ThemePreset;
 use std::collections::HashSet;
+use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use parking_lot::Mutex;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::process::{Child, ChildStdin};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State};
 
-/// The debug-control handles for the one active dev-run, if any. A second start_dev_run while one
-/// is already running is refused rather than silently replacing it — mirrors "throw a visible
-/// error, let the user decide" rather than guessing what they meant.
+/// The one active dev-run, if any. A second start_dev_run while one is already running is refused
+/// rather than silently replacing it — mirrors "throw a visible error, let the user decide" rather
+/// than guessing what they meant.
+///
+/// A run executes in its own process now (bin/dev_run_host.rs), not on a thread inside this one, so
+/// what's held here is that child and the pipe used to drive it — not the stop/pause/step atomics
+/// this used to carry. Those live in the child; every control command is a JSON line written to
+/// `stdin` below. See dev_run_host.rs's own header for why the run moved out at all (short version:
+/// user code must never be able to crash Studio).
 struct ActiveRun {
-    stop_flag: Arc<AtomicBool>,
-    pause_flag: Arc<AtomicBool>,
-    step_request: Arc<AtomicU32>,
+    child: Child,
+    stdin: ChildStdin,
+    /// The scratch folder holding this run's generated launch.json, removed when the run ends.
+    scratch: PathBuf,
+    /// Mirrors the child's own pause_flag, purely so step_dev_run can keep refusing a step on a
+    /// freely-running loop the way it did when it owned that flag directly. Two things move it: the
+    /// pause/resume commands sent from here, and a frame trace arriving with a `triggered`
+    /// breakpoint — the child pausing ITSELF, which is otherwise invisible to this process.
+    paused: bool,
+}
+
+impl ActiveRun {
+    /// Fire-and-forget, like every command in this protocol — there's no reply to correlate, and a
+    /// write failing means the child is already gone, which the stdout reader thread reports on its
+    /// own. Callers surface a plain error rather than trying to distinguish the two.
+    fn send(&mut self, command: serde_json::Value) -> Result<(), String> {
+        writeln!(self.stdin, "{command}")
+            .and_then(|_| self.stdin.flush())
+            .map_err(|_| "The dev-run process is no longer responding.".to_string())
+    }
 }
 
 #[derive(Default)]
@@ -78,53 +103,195 @@ fn start_dev_run(
     entry_file: String,
     project_dir: String,
 ) -> Result<(), String> {
-    let stop_flag = Arc::new(AtomicBool::new(false));
-    let pause_flag = Arc::new(AtomicBool::new(false));
-    let step_request = Arc::new(AtomicU32::new(0));
-
-    {
-        let mut guard = state.0.lock();
-        if guard.is_some() {
-            return Err("A run is already active — stop it before starting another.".into());
-        }
-        *guard = Some(ActiveRun { stop_flag: stop_flag.clone(), pause_flag: pause_flag.clone(), step_request: step_request.clone() });
-    }
+    // Read before RunState is locked below, never while holding it. set_breakpoints takes these two
+    // locks in the opposite order, so nesting them here would be a genuine ABBA deadlock between a
+    // run starting and a breakpoint being edited at the same moment.
+    let breakpoints = breakpoint_state.0.lock().clone();
 
     // entry_file is stored (and passed in here) relative to the project root — see
     // ProjectPreset::entry's doc comment — so it has to be joined before it's an actually
     // readable path, rather than assumed to already be one.
     let project = PathBuf::from(project_dir);
     let entry = project.join(&entry_file);
-    let modules = AppPaths::modules();
 
-    let log_handle = app.clone();
-    let log: LogFn = Arc::new(move |level, message| {
-        let _ = log_handle.emit("dev-run-log", serde_json::json!({"level": log_level_str(level), "message": message}));
-    });
+    // Held across the whole start, so "is one already running?" and "this one is now running" are
+    // one atomic step — two Start clicks racing must not both get to spawn a process, and this
+    // lock is the only thing that decides it. Dropped before the reader threads start, since they
+    // take it themselves.
+    let mut guard = state.0.lock();
+    if guard.is_some() {
+        return Err("A run is already active — stop it before starting another.".into());
+    }
 
-    let frame_handle = app.clone();
-    let on_frame: Arc<dyn Fn(runtime::runtime_loader::FrameTrace) + Send + Sync> = Arc::new(move |trace| {
-        let _ = frame_handle.emit("dev-run-frame", trace);
-    });
+    // Resolved HERE, not in the child, for one reason: a resolution failure (a missing module, two
+    // modules claiming one id) has to come back as this command's own Err so the UI can show it
+    // where it always has. Spawning a process just to have it exit reporting that would be a worse
+    // error path for the same information.
+    let preset = runtime::project::ProjectPreset::load(&project)?;
+    let modules = runtime::project::resolve(&preset, &AppPaths::modules()).map_err(|errors| errors.join("\n"))?;
 
-    let target_fps = settings::load().dev_run_target_fps;
-    let debug = runtime::runtime_loader::DebugHooks { pause_flag, step_request, breakpoints: breakpoint_state.0.clone(), on_frame };
+    let scratch = write_dev_run_launch(&entry, &modules)?;
+    let host = dev_run_host_path()?;
 
-    let done_handle = app.clone();
-    std::thread::spawn(move || {
-        // Per-module settings (the 4th arg) aren't sourced from anywhere real yet — that's config
-        // handed to game modules at start, a separate concept from Studio's own settings.json.
-        let result = runtime::start_run(&entry, &project, &modules, target_fps, serde_json::json!({}), stop_flag, log, debug);
+    // spawn_piped's own working directory is the scratch dir purely so a module that resolves
+    // something relative to cwd doesn't reach into Studio's — every path in launch.json is
+    // absolute, so nothing here depends on it.
+    let mut child = runtime::child_process::spawn_piped(host, &[scratch.to_string_lossy().into_owned()], &scratch)
+        .map_err(|e| {
+            let _ = std::fs::remove_dir_all(&scratch);
+            format!("Could not start the dev-run process: {e}")
+        })?;
 
-        *done_handle.state::<RunState>().0.lock() = None;
-        let payload = match &result {
-            Ok(()) => serde_json::json!({"ok": true}),
-            Err(errors) => serde_json::json!({"ok": false, "errors": errors}),
-        };
-        let _ = done_handle.emit("dev-run-ended", payload);
-    });
+    let stdin = child.stdin.take().expect("piped stdin");
+    let stdout = child.stdout.take().expect("piped stdout");
+    let stderr = child.stderr.take().expect("piped stderr");
 
+    let mut active = ActiveRun { child, stdin, scratch, paused: false };
+
+    // Breakpoints are configured independently of any one run (see BreakpointState's own comment),
+    // so the child starts life knowing nothing about them — it has to be told, both now and on
+    // every later edit (see set_breakpoints). While the run lived in this process, a shared Arc
+    // made both of those free.
+    let _ = active.send(serde_json::json!({"cmd": "setBreakpoints", "breakpoints": breakpoints}));
+
+    *guard = Some(active);
+    drop(guard);
+
+    spawn_dev_run_readers(app, stdout, stderr);
     Ok(())
+}
+
+/// Writes the one file bin/dev_run_host.rs needs, into a fresh scratch folder, and returns that
+/// folder. Nothing is staged or copied: `modules` are the live folders project::resolve just
+/// returned and `source` is the real entry file, both ABSOLUTE — run_from_launch_dir joins each
+/// against the launch dir, and joining an absolute path yields it unchanged, so the export-shaped
+/// LaunchConfig doubles as a dev-run one with no changes to how it's read.
+fn write_dev_run_launch(entry: &std::path::Path, modules: &[runtime::manifest::ModuleInfo]) -> Result<PathBuf, String> {
+    // Nanos, not just the pid: one Studio session starts many runs, so a pid alone isn't unique
+    // across them the way it is for the per-process temp dirs elsewhere in this crate.
+    let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+    let scratch = std::env::temp_dir().join(format!("lowarc_studio_devrun_{}_{nanos}", std::process::id()));
+    std::fs::create_dir_all(&scratch).map_err(|e| format!("Could not create the dev-run scratch folder: {e}"))?;
+
+    let launch = runtime::LaunchConfig {
+        target_fps: settings::load().dev_run_target_fps,
+        source: entry.to_string_lossy().into_owned(),
+        modules: modules.iter().map(|m| m.folder.to_string_lossy().into_owned()).collect(),
+        diagnostics_log: false,
+        // Per-module settings aren't sourced from anywhere real yet — that's config handed to game
+        // modules at start, a separate concept from Studio's own settings.json.
+        settings: serde_json::json!({}),
+    };
+    let text = serde_json::to_string_pretty(&launch).map_err(|e| e.to_string())?;
+    std::fs::write(scratch.join("launch.json"), text).map_err(|e| format!("Could not write the dev-run launch.json: {e}"))?;
+    Ok(scratch)
+}
+
+#[cfg(test)]
+mod dev_run_launch_tests {
+    use super::*;
+
+    /// The whole no-staging design rests on one assumption: what this side WRITES is exactly what
+    /// the run side READS, absolute paths and all. LaunchConfig::read is literally the function
+    /// bin/dev_run_host.rs reaches through run_from_launch_dir, so round-tripping through it is the
+    /// real check — a serde rename drifting on either half would otherwise only ever show up as a
+    /// dev-run mysteriously failing to start.
+    #[test]
+    fn the_generated_launch_json_is_read_back_by_the_same_reader_the_run_uses() {
+        let module_folder = std::env::temp_dir().join(format!("lowarc_studio_devrun_launch_test_{}", std::process::id()));
+        std::fs::create_dir_all(&module_folder).unwrap();
+        let entry = module_folder.join("main.txt");
+
+        let modules = vec![runtime::manifest::ModuleInfo {
+            folder: module_folder.clone(),
+            manifest: runtime::manifest::Manifest::default(),
+        }];
+
+        let scratch = write_dev_run_launch(&entry, &modules).expect("writing the launch file should succeed");
+        let launch = runtime::LaunchConfig::read(&scratch).expect("the run side must be able to read what this wrote");
+
+        assert_eq!(launch.source, entry.to_string_lossy(), "the entry path should survive verbatim");
+        assert_eq!(launch.modules, vec![module_folder.to_string_lossy().into_owned()], "module folders should survive verbatim");
+
+        // The property that makes staging unnecessary: joining the launch dir onto these absolute
+        // entries has to yield the originals back, untouched.
+        assert_eq!(scratch.join(&launch.source), entry, "an absolute source must ignore the launch dir");
+        assert_eq!(scratch.join(&launch.modules[0]), module_folder, "an absolute module path must ignore the launch dir");
+
+        let _ = std::fs::remove_dir_all(&scratch);
+        let _ = std::fs::remove_dir_all(&module_folder);
+    }
+}
+
+/// Same resolution order (and for the same three contexts) as
+/// native_module::native_module_host_path — next to the running exe first, since both a source
+/// checkout and an export always have it there, falling back to the installed copy's own helpers
+/// folder.
+fn dev_run_host_path() -> Result<PathBuf, String> {
+    let name = if cfg!(windows) { "dev_run_host.exe" } else { "dev_run_host" };
+    let exe = std::env::current_exe().map_err(|e| format!("could not resolve the current executable: {e}"))?;
+    let dir = exe.parent().ok_or("the current executable has no parent directory")?;
+    let next_to_exe = dir.join(name);
+    if next_to_exe.is_file() {
+        return Ok(next_to_exe);
+    }
+    Ok(AppPaths::runtime_helpers().join(name))
+}
+
+/// Relays the child's output onto the same three Tauri events the frontend has always listened to —
+/// what changed is only where the data comes from (parsed off a pipe rather than produced by
+/// in-process closures), never the event shapes themselves.
+fn spawn_dev_run_readers(app: AppHandle, stdout: std::process::ChildStdout, stderr: std::process::ChildStderr) {
+    let err_handle = app.clone();
+    std::thread::spawn(move || {
+        for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+            if line.trim().is_empty() {
+                continue;
+            }
+            let truncated: String = line.chars().take(runtime::child_process::STDERR_LOG_TRUNCATE_CHARS).collect();
+            let _ = err_handle.emit("dev-run-log", serde_json::json!({"level": "error", "message": truncated}));
+        }
+    });
+
+    std::thread::spawn(move || {
+        let mut ended: Option<serde_json::Value> = None;
+        for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+            let Ok(value) = serde_json::from_str::<serde_json::Value>(&line) else { continue };
+            if let Some(log) = value.get("log") {
+                let level = log.get("severity").and_then(|s| s.as_str()).unwrap_or("info");
+                let message = log.get("message").and_then(|m| m.as_str()).unwrap_or("");
+                let _ = app.emit("dev-run-log", serde_json::json!({"level": level, "message": message}));
+            } else if let Some(frame) = value.get("frame") {
+                // A trace carrying a triggered breakpoint means the child just paused itself — see
+                // ActiveRun::paused for why this process has to notice that.
+                if !frame.get("triggered").unwrap_or(&serde_json::Value::Null).is_null() {
+                    if let Some(active) = app.state::<RunState>().0.lock().as_mut() {
+                        active.paused = true;
+                    }
+                }
+                let _ = app.emit("dev-run-frame", frame.clone());
+            } else if let Some(payload) = value.get("ended") {
+                ended = Some(payload.clone());
+            }
+        }
+
+        // Reached when the pipe closes, which happens whether the child ended cleanly or died
+        // outright (crash, external kill, a failure to even start). Either way the run is over, so
+        // RunState has to clear and dev-run-ended has to fire — a child that never got to say
+        // "ended" still can't be allowed to leave the UI believing a run is live forever. Same
+        // reasoning as ProcessModule's own dead flag, one level up.
+        let end_payload = ended.unwrap_or_else(|| {
+            serde_json::json!({"ok": false, "errors": ["The dev-run process ended unexpectedly."]})
+        });
+        if let Some(mut active) = app.state::<RunState>().0.lock().take() {
+            // Reaped, not just dropped — dropping a Child detaches it, leaving a zombie behind on
+            // Unix for the life of this long-running process, once per run. Its pipes are already
+            // closed by the time this runs, so there's nothing left to wait on but the exit status.
+            let _ = active.child.wait();
+            let _ = std::fs::remove_dir_all(&active.scratch);
+        }
+        let _ = app.emit("dev-run-ended", end_payload);
+    });
 }
 
 /// Pausing also zeroes any in-flight step request — otherwise a step queued right before a manual
@@ -132,10 +299,10 @@ fn start_dev_run(
 /// impossible to race) would let one more tick slip through right after this call returns.
 #[tauri::command]
 fn pause_dev_run(state: State<'_, RunState>) -> Result<(), String> {
-    match state.0.lock().as_ref() {
+    match state.0.lock().as_mut() {
         Some(active) => {
-            active.step_request.store(0, Ordering::SeqCst);
-            active.pause_flag.store(true, Ordering::SeqCst);
+            active.send(serde_json::json!({"cmd": "pause"}))?;
+            active.paused = true;
             Ok(())
         }
         None => Err("No run is active.".into()),
@@ -144,10 +311,10 @@ fn pause_dev_run(state: State<'_, RunState>) -> Result<(), String> {
 
 #[tauri::command]
 fn resume_dev_run(state: State<'_, RunState>) -> Result<(), String> {
-    match state.0.lock().as_ref() {
+    match state.0.lock().as_mut() {
         Some(active) => {
-            active.step_request.store(0, Ordering::SeqCst);
-            active.pause_flag.store(false, Ordering::SeqCst);
+            active.send(serde_json::json!({"cmd": "resume"}))?;
+            active.paused = false;
             Ok(())
         }
         None => Err("No run is active.".into()),
@@ -159,13 +326,12 @@ fn resume_dev_run(state: State<'_, RunState>) -> Result<(), String> {
 /// silently pausing-then-stepping on the caller's behalf.
 #[tauri::command]
 fn step_dev_run(state: State<'_, RunState>, count: Option<u32>) -> Result<(), String> {
-    match state.0.lock().as_ref() {
+    match state.0.lock().as_mut() {
         Some(active) => {
-            if !active.pause_flag.load(Ordering::SeqCst) {
+            if !active.paused {
                 return Err("Pause the run before stepping.".into());
             }
-            active.step_request.fetch_add(count.unwrap_or(1).max(1), Ordering::SeqCst);
-            Ok(())
+            active.send(serde_json::json!({"cmd": "step", "count": count.unwrap_or(1).max(1)}))
         }
         None => Err("No run is active.".into()),
     }
@@ -174,9 +340,20 @@ fn step_dev_run(state: State<'_, RunState>, count: Option<u32>) -> Result<(), St
 /// Works with or without an active run — see BreakpointState's own doc comment for why. Replaces
 /// the whole set rather than adding/removing one at a time, same "frontend always resends
 /// everything" convention plugin settings/commands already use.
+///
+/// A live run now needs telling separately: it's another process holding its own copy, so an edit
+/// made mid-run no longer reaches it for free through a shared Arc the way it did when the run
+/// lived in this one.
 #[tauri::command]
-fn set_breakpoints(state: State<'_, BreakpointState>, breakpoints: Vec<runtime::runtime_loader::Breakpoint>) {
-    *state.0.lock() = breakpoints;
+fn set_breakpoints(
+    state: State<'_, BreakpointState>,
+    run_state: State<'_, RunState>,
+    breakpoints: Vec<runtime::runtime_loader::Breakpoint>,
+) {
+    *state.0.lock() = breakpoints.clone();
+    if let Some(active) = run_state.0.lock().as_mut() {
+        let _ = active.send(serde_json::json!({"cmd": "setBreakpoints", "breakpoints": breakpoints}));
+    }
 }
 
 #[tauri::command]
@@ -363,12 +540,12 @@ mod entry_tests {
         let project_dir = temp_dir("entry_ok");
         std::fs::write(project_dir.join("project.json"), "{\"requires\":[]}\n").unwrap();
         std::fs::create_dir_all(project_dir.join("src")).unwrap();
-        let entry_path = project_dir.join("src").join("main.uc");
+        let entry_path = project_dir.join("src").join("main.txt");
         std::fs::write(&entry_path, "// entry").unwrap();
 
         let relative = set_project_entry(project_dir.to_string_lossy().into_owned(), entry_path.to_string_lossy().into_owned())
             .expect("an entry file inside the project should be accepted");
-        assert_eq!(relative, PathBuf::from("src").join("main.uc").to_string_lossy());
+        assert_eq!(relative, PathBuf::from("src").join("main.txt").to_string_lossy());
 
         let preset = runtime::project::ProjectPreset::load(&project_dir).unwrap();
         assert_eq!(preset.entry, relative, "the saved project.json should carry the same relative path back out");
@@ -379,7 +556,7 @@ mod entry_tests {
         let project_dir = temp_dir("entry_outside_project");
         std::fs::write(project_dir.join("project.json"), "{\"requires\":[]}\n").unwrap();
         let outside_dir = temp_dir("entry_outside_target");
-        let outside_file = outside_dir.join("elsewhere.uc");
+        let outside_file = outside_dir.join("elsewhere.txt");
         std::fs::write(&outside_file, "// not in the project").unwrap();
 
         let err = set_project_entry(project_dir.to_string_lossy().into_owned(), outside_file.to_string_lossy().into_owned())
@@ -390,13 +567,13 @@ mod entry_tests {
     #[test]
     fn entry_file_exists_reflects_disk_state() {
         let project_dir = temp_dir("entry_exists");
-        let entry_path = project_dir.join("main.uc");
+        let entry_path = project_dir.join("main.txt");
         std::fs::write(&entry_path, "// entry").unwrap();
 
-        assert!(entry_file_exists(project_dir.to_string_lossy().into_owned(), "main.uc".to_string()));
+        assert!(entry_file_exists(project_dir.to_string_lossy().into_owned(), "main.txt".to_string()));
 
         std::fs::remove_file(&entry_path).unwrap();
-        assert!(!entry_file_exists(project_dir.to_string_lossy().into_owned(), "main.uc".to_string()), "a deleted entry should report as missing, not stale-true");
+        assert!(!entry_file_exists(project_dir.to_string_lossy().into_owned(), "main.txt".to_string()), "a deleted entry should report as missing, not stale-true");
     }
 }
 
@@ -450,13 +627,14 @@ fn delete_theme_preset(name: String) -> Result<(), String> {
     theme::delete_preset(&name)
 }
 
+/// Asks the run to end itself, rather than killing the process outright — the child's own loop
+/// still has to unwind (every module gets its "stop" phase, its process is waited on) exactly as it
+/// did when the run lived in this process. RunState clears when the child's pipes actually close,
+/// not here; see spawn_dev_run_readers.
 #[tauri::command]
 fn stop_dev_run(state: State<'_, RunState>) -> Result<(), String> {
-    match state.0.lock().as_ref() {
-        Some(active) => {
-            active.stop_flag.store(true, Ordering::SeqCst);
-            Ok(())
-        }
+    match state.0.lock().as_mut() {
+        Some(active) => active.send(serde_json::json!({"cmd": "stop"})),
         None => Err("No run is active.".into()),
     }
 }
@@ -668,11 +846,16 @@ fn get_plugin_settings(id: String) -> std::collections::HashMap<String, String> 
 /// Sets one (id, key) -> value in Settings.plugin_settings, leaving every other plugin's — and
 /// this plugin's own other fields' — values untouched. Called from the Settings UI, not from a
 /// plugin itself (a plugin only ever reads its own settings, never writes them for itself).
+/// Emits "plugin-setting-changed" so an already-mounted instance of that plugin can pick the new
+/// value up live instead of needing a refresh — see split-view.js's relay of it to
+/// lowarc:settingsChanged, same shape as file-about-to-save/plugin-emit above.
 #[tauri::command]
-fn set_plugin_setting(id: String, key: String, value: String) -> Result<(), String> {
+fn set_plugin_setting(app: AppHandle, id: String, key: String, value: String) -> Result<(), String> {
     let mut settings = settings::load();
-    settings.plugin_settings.entry(id).or_default().insert(key, value);
-    settings::save(&settings)
+    settings.plugin_settings.entry(id.clone()).or_default().insert(key.clone(), value.clone());
+    settings::save(&settings)?;
+    let _ = app.emit("plugin-setting-changed", serde_json::json!({"id": id, "key": key, "value": value}));
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

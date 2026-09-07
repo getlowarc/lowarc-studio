@@ -47,6 +47,18 @@ rodio = "0.22"
 # correctness-sensitive algorithm (Myers diff) is worth a small, well-tested real dependency rather
 # than hand-rolling it.
 similar = "2"
+# bin/vector_canvas_runtime.rs only — the windowed 2D drawing surface. femtovg is a GPU vector
+# renderer (OpenGL ES 3.0+) whose API is modelled on the HTML5 Canvas API, which is the same drawing
+# model p5.js wraps; adopting it is why that module is a command dispatcher rather than a
+# hand-written renderer, and why antialiasing, glyph shaping and image decoding come for free. Its
+# default features carry text layout and image loading; "glutin" adds the safe
+# OpenGl::new_from_glutin_display constructor. winit owns the window and its event queue, glutin the
+# GL context, glutin-winit the bridge between them (its version is pinned by femtovg's own glutin
+# feature, so these four move together).
+femtovg = { version = "0.27", features = ["glutin"] }
+winit = "0.30"
+glutin = "0.32"
+glutin-winit = "0.5"
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-window-state = "2"

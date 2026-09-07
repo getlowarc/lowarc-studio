@@ -225,7 +225,7 @@
       });
 
       initTooltips();
-      initWindowControls();
+      initWindowControls(() => confirmAppClose());
       initTabs();
 
       // Drag-to-reorder — see initReorderable() in primitives.js. Only these four strips opt in

@@ -392,6 +392,54 @@
         },
       });
 
+      // Gates the whole APP window closing (see confirmAppClose() in tabs-inspector.js and
+      // initWindowControls's beforeClose param in primitives.js) — same shape as
+      // confirm-close-dirty above, just for "the window itself is about to close" rather than one
+      // tab. target is { message, canSave }: canSave is false when the only unsaved work is an
+      // open Draft (nothing here for a Save button to write — Commit/Revert are its resolutions,
+      // not this popup's). Resolves "save" | "discard" | false, one 3-button row hand-built here
+      // instead of via appendConfirmActions (which only ever does Cancel + one other button).
+      contribute("popups", {
+        id: "confirm-close-app",
+        sourceType: "host",
+        title: "Unsaved changes",
+        size: 380,
+        mount(container, ctx) {
+          const body = document.createElement("div");
+          body.className = "popup-body";
+          body.textContent = ctx.target.message;
+          container.appendChild(body);
+
+          const actions = document.createElement("div");
+          actions.className = "popup-actions";
+
+          const cancelBtn = document.createElement("button");
+          cancelBtn.type = "button";
+          cancelBtn.className = "btn btn-md btn-ghost";
+          cancelBtn.textContent = "Cancel";
+          cancelBtn.addEventListener("click", () => ctx.close(false));
+          actions.appendChild(cancelBtn);
+
+          const discardBtn = document.createElement("button");
+          discardBtn.type = "button";
+          discardBtn.className = "btn btn-md btn-danger";
+          discardBtn.textContent = "Close Anyway";
+          discardBtn.addEventListener("click", () => ctx.close("discard"));
+          actions.appendChild(discardBtn);
+
+          if (ctx.target.canSave) {
+            const saveBtn = document.createElement("button");
+            saveBtn.type = "button";
+            saveBtn.className = "btn btn-md btn-confirm";
+            saveBtn.textContent = "Save & Close";
+            saveBtn.addEventListener("click", () => ctx.close("save"));
+            actions.appendChild(saveBtn);
+          }
+
+          container.appendChild(actions);
+        },
+      });
+
       // Settings/Modules/Plugins stay their own separate documents (real Tauri API access,
       // multiple entry points already before this) — see contributeIframePopup() in primitives.js.
       // The url passed to each showPopup() call below is what actually varies per trigger (e.g.

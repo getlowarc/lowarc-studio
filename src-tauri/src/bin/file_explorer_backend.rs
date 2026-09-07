@@ -77,7 +77,13 @@ fn handle(method: &str, params: &Value) -> Value {
         })(),
         "deletePath" => str_param(params, "path").and_then(|path| delete_entry(root, path)),
         "countTree" => count_tree(root),
-        "openDraft" => str_param(params, "draftId").and_then(open_draft),
+        "openDraft" => (|| {
+            let draft_id = str_param(params, "draftId")?;
+            let label = params.get("label").and_then(|v| v.as_str()).unwrap_or("Untitled Draft");
+            let description = params.get("description").and_then(|v| v.as_str()).unwrap_or("");
+            open_draft(draft_id, label, description)
+        })(),
+        "getActiveDraft" => get_active_draft(),
         "captureBaseline" => (|| {
             let draft_id = str_param(params, "draftId")?;
             let path = str_param(params, "path")?;
@@ -296,14 +302,50 @@ fn write_draft_manifest(draft_id: &str, manifest: &DraftManifest) -> Result<(), 
     std::fs::write(draft_manifest_path(draft_id), text).map_err(|e| format!("could not save Draft state: {e}"))
 }
 
+/// Which Draft (if any) is currently open — a single well-known file, not per-draft, since this
+/// UI only ever has one open at a time. Exists entirely so a page refresh (which wipes every bit
+/// of the plugin iframe's own JS state, but neither this backend process nor its disk storage) has
+/// something to ask "was a Draft actually open?" on reload — see getActiveDraft below. Restarting
+/// the whole app still forgets it, same as everything else under scratch_root(): lib.rs's setup()
+/// wipes that entire folder wholesale on every launch.
+#[derive(Debug, Serialize, Deserialize)]
+struct ActiveDraft {
+    #[serde(rename = "draftId")]
+    draft_id: String,
+    label: String,
+    description: String,
+}
+
+fn active_draft_path() -> PathBuf {
+    draft_scratch_root().join("active.json")
+}
+
 /// Idempotent — opening the same draft_id twice (a double-click, a retry) just leaves any already-
-/// captured baselines in place rather than losing them.
-fn open_draft(draft_id: &str) -> Result<Value, String> {
+/// captured baselines in place rather than losing them (though it DOES refresh the remembered
+/// label/description, in case those were edited on a retry).
+fn open_draft(draft_id: &str, label: &str, description: &str) -> Result<Value, String> {
     std::fs::create_dir_all(draft_dir(draft_id).join("snapshots")).map_err(|e| format!("could not open Draft: {e}"))?;
     if !draft_manifest_path(draft_id).is_file() {
         write_draft_manifest(draft_id, &DraftManifest::new())?;
     }
+    let active = ActiveDraft { draft_id: draft_id.to_string(), label: label.to_string(), description: description.to_string() };
+    // Best-effort — a failure to write the "resume after refresh" pointer shouldn't fail opening
+    // the Draft itself, it just means a refresh won't be able to rediscover it.
+    let _ = serde_json::to_string(&active).map(|text| std::fs::write(active_draft_path(), text));
     Ok(Value::Null)
+}
+
+/// The frontend's own "did I lose track of an open Draft?" check, called once on page load —
+/// covers exactly the gap a webview refresh leaves (see ActiveDraft's own doc comment). None (not
+/// an error) whenever nothing's tracked, which is the ordinary case outside a mid-Draft refresh.
+fn get_active_draft() -> Result<Value, String> {
+    let Ok(text) = std::fs::read_to_string(active_draft_path()) else {
+        return Ok(Value::Null);
+    };
+    match serde_json::from_str::<ActiveDraft>(&text) {
+        Ok(active) => Ok(json!({"draftId": active.draft_id, "label": active.label, "description": active.description})),
+        Err(_) => Ok(Value::Null),
+    }
 }
 
 /// First-write-wins per path — a second (or third, ...) save of the same file after its baseline
@@ -378,12 +420,30 @@ fn commit(draft_id: &str) -> Result<Value, String> {
 
 fn discard_draft(draft_id: &str) -> Result<Value, String> {
     let _ = std::fs::remove_dir_all(draft_dir(draft_id));
+    // Only clear the "resume after refresh" pointer if it was actually pointing at THIS draft —
+    // defensive more than load-bearing (only one Draft is ever open at a time in this UI today),
+    // but a stale unrelated pointer shouldn't be silently erased just because some other draft_id
+    // got cleaned up.
+    if let Ok(text) = std::fs::read_to_string(active_draft_path()) {
+        if serde_json::from_str::<ActiveDraft>(&text).ok().map(|a| a.draft_id).as_deref() == Some(draft_id) {
+            let _ = std::fs::remove_file(active_draft_path());
+        }
+    }
     Ok(Value::Null)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // open_draft/commit/revert_all all touch the ONE shared active_draft_path() now (not
+    // anything keyed by draft_id) — cargo test runs tests in parallel by default, so without this
+    // every test calling any of the three could stomp on another's active-pointer expectations
+    // (confirmed live: get_active_draft's own tests failed intermittently before this existed).
+    // parking_lot, not std::sync — a std Mutex poisons permanently on a panicking test, which
+    // would otherwise cascade an unrelated assertion failure into every other test sharing this
+    // lock; parking_lot has no poisoning, so one failure stays exactly that.
+    static ACTIVE_DRAFT_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
 
     fn temp_dir(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("lowarc_file_explorer_test_{name}_{}", std::process::id()));
@@ -547,21 +607,23 @@ mod tests {
 
     #[test]
     fn open_draft_is_idempotent_and_starts_with_an_empty_manifest() {
+        let _guard = ACTIVE_DRAFT_LOCK.lock();
         let draft_id = unique_draft_id("open");
         cleanup_draft(&draft_id);
 
-        assert!(open_draft(&draft_id).is_ok());
+        assert!(open_draft(&draft_id, "Test Draft", "").is_ok());
         assert!(read_draft_manifest(&draft_id).is_empty());
-        assert!(open_draft(&draft_id).is_ok(), "opening the same draft twice must not error");
+        assert!(open_draft(&draft_id, "Test Draft", "").is_ok(), "opening the same draft twice must not error");
 
         cleanup_draft(&draft_id);
     }
 
     #[test]
     fn capture_baseline_is_first_write_wins() {
+        let _guard = ACTIVE_DRAFT_LOCK.lock();
         let draft_id = unique_draft_id("first_write_wins");
         cleanup_draft(&draft_id);
-        open_draft(&draft_id).unwrap();
+        open_draft(&draft_id, "Test Draft", "").unwrap();
 
         capture_baseline(&draft_id, "C:/fake/a.txt", Some("original")).unwrap();
         capture_baseline(&draft_id, "C:/fake/a.txt", Some("edited once")).unwrap();
@@ -577,9 +639,10 @@ mod tests {
 
     #[test]
     fn capture_baseline_records_a_brand_new_file_as_not_existed() {
+        let _guard = ACTIVE_DRAFT_LOCK.lock();
         let draft_id = unique_draft_id("new_file");
         cleanup_draft(&draft_id);
-        open_draft(&draft_id).unwrap();
+        open_draft(&draft_id, "Test Draft", "").unwrap();
 
         capture_baseline(&draft_id, "C:/fake/new.txt", None).unwrap();
         let manifest = read_draft_manifest(&draft_id);
@@ -590,9 +653,10 @@ mod tests {
 
     #[test]
     fn diff_status_counts_added_and_removed_lines() {
+        let _guard = ACTIVE_DRAFT_LOCK.lock();
         let draft_id = unique_draft_id("diff_status");
         cleanup_draft(&draft_id);
-        open_draft(&draft_id).unwrap();
+        open_draft(&draft_id, "Test Draft", "").unwrap();
 
         let root = temp_dir("diff_status_file");
         let file = root.join("diff_status.txt");
@@ -610,9 +674,10 @@ mod tests {
 
     #[test]
     fn revert_all_restores_original_content_and_deletes_a_newly_created_file() {
+        let _guard = ACTIVE_DRAFT_LOCK.lock();
         let draft_id = unique_draft_id("revert");
         cleanup_draft(&draft_id);
-        open_draft(&draft_id).unwrap();
+        open_draft(&draft_id, "Test Draft", "").unwrap();
 
         let root = temp_dir("revert_files");
         let existing = root.join("revert_existing.txt");
@@ -632,9 +697,10 @@ mod tests {
 
     #[test]
     fn commit_leaves_current_content_untouched_and_clears_storage() {
+        let _guard = ACTIVE_DRAFT_LOCK.lock();
         let draft_id = unique_draft_id("commit");
         cleanup_draft(&draft_id);
-        open_draft(&draft_id).unwrap();
+        open_draft(&draft_id, "Test Draft", "").unwrap();
 
         let root = temp_dir("commit_file");
         let file = root.join("commit.txt");
@@ -645,5 +711,38 @@ mod tests {
         assert!(commit(&draft_id).is_ok());
         assert_eq!(std::fs::read_to_string(&file).unwrap(), "edited, kept");
         assert!(!draft_dir(&draft_id).exists());
+    }
+
+    #[test]
+    fn get_active_draft_reflects_the_currently_open_draft() {
+        let _guard = ACTIVE_DRAFT_LOCK.lock();
+        let draft_id = unique_draft_id("active_reflects");
+        cleanup_draft(&draft_id);
+
+        open_draft(&draft_id, "My Feature", "Trying something out").unwrap();
+        let active = get_active_draft().unwrap();
+        assert_eq!(active["draftId"], draft_id);
+        assert_eq!(active["label"], "My Feature");
+        assert_eq!(active["description"], "Trying something out");
+
+        commit(&draft_id).unwrap();
+    }
+
+    #[test]
+    fn get_active_draft_is_cleared_by_commit_and_by_revert() {
+        let _guard = ACTIVE_DRAFT_LOCK.lock();
+        let committed_id = unique_draft_id("active_cleared_commit");
+        cleanup_draft(&committed_id);
+        open_draft(&committed_id, "Commit Me", "").unwrap();
+        assert_eq!(get_active_draft().unwrap()["draftId"], committed_id);
+        commit(&committed_id).unwrap();
+        assert!(get_active_draft().unwrap().is_null(), "commit must clear the active-draft pointer");
+
+        let reverted_id = unique_draft_id("active_cleared_revert");
+        cleanup_draft(&reverted_id);
+        open_draft(&reverted_id, "Revert Me", "").unwrap();
+        assert_eq!(get_active_draft().unwrap()["draftId"], reverted_id);
+        revert_all(&reverted_id).unwrap();
+        assert!(get_active_draft().unwrap().is_null(), "revert must clear the active-draft pointer");
     }
 }

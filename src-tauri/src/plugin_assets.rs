@@ -151,6 +151,14 @@ pub const HARNESS_JS: &str = r#"(function () {
     refreshFile(path) {
       window.parent.postMessage({ type: "host", action: "refreshFile", path }, "*");
     },
+    // Pushes a { "<path>": {added, removed} } map into the status bar's per-active-file diff
+    // display — the File Explorer's Draft Tool is the only caller today, whenever its own
+    // diffCounts changes (a capture, a revert, a commit). Fire-and-forget, same reasoning as
+    // markDirty: nothing for the caller to wait on, and the host re-renders reactively off
+    // whichever file is actually active right now, not off this call's own timing.
+    setDiffStatus(diffCounts) {
+      window.parent.postMessage({ type: "host", action: "setDiffStatus", diffCounts: diffCounts || {} }, "*");
+    },
     // Generic "let the user pick a file for me to open" — a plugin has no filesystem access of
     // its own to browse with, so this asks the host to show its real native file picker instead
     // (options passed straight through to Tauri's dialog.open(), e.g. {filters: [{name, extensions}]}).

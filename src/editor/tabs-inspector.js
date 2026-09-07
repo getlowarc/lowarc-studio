@@ -15,6 +15,13 @@
       // current content (see requestPluginContent below) rather than re-reading the file from disk,
       // so unsaved edits survive the move.
       const openFiles = new Map();
+      // absolute path -> {added, removed} — pushed by the File Explorer's Draft Tool
+      // (window.lowarc.setDiffStatus) whenever ITS OWN diffCounts changes; the status bar's own
+      // per-active-file display (see updateStatusBarDiff below) is just a reactive read of
+      // whatever's in here for groupActiveFilePath[activeGroupId], nothing host-computed. Empty
+      // whenever no Draft is open (Commit/Revert both clear it the same way opening a Draft starts
+      // it empty).
+      let draftDiffCounts = {};
       // iframe.contentWindow -> Set<path> this iframe is currently responsible for. A plugin's own
       // markDirty/markErrors/requestClose/saveFile calls all carry an explicit path now (see
       // plugin_assets.rs) — this Set is what validates that path actually belongs to the iframe
@@ -366,6 +373,103 @@
         iframe.remove();
       }
 
+      // Re-shown on every active-file switch (see showActiveFile below) and every setDiffStatus
+      // push (split-view.js's own "host" action handler) — deliberately not tracking "is a Draft
+      // even open" separately, since an untracked/unchanged active file and "no Draft open" both
+      // just mean "nothing to show" either way, the same no-op either path already is.
+      function updateStatusBarDiff() {
+        const el = document.getElementById("status-draft-diff");
+        const path = groupActiveFilePath[activeGroupId];
+        const counts = path && draftDiffCounts[path];
+        if (!counts || (!counts.added && !counts.removed)) {
+          el.style.display = "none";
+          el.innerHTML = "";
+          return;
+        }
+        el.innerHTML = "";
+        if (counts.added) {
+          const added = document.createElement("span");
+          added.className = "status-draft-diff-added";
+          added.textContent = `+${lowarcFormatCompact(counts.added)}`;
+          el.appendChild(added);
+        }
+        if (counts.removed) {
+          const removed = document.createElement("span");
+          removed.className = "status-draft-diff-removed";
+          removed.textContent = `-${lowarcFormatCompact(counts.removed)}`;
+          el.appendChild(removed);
+        }
+        el.style.display = "flex";
+      }
+
+      function setDraftDiffStatus(diffCounts) {
+        draftDiffCounts = diffCounts;
+        updateStatusBarDiff();
+      }
+
+      // Writes every dirty file back to its own path — same read-current-content-then-write flow
+      // Save As already uses (requestPluginContent + write_text_file), just without the "pick a
+      // new destination" step, since every open file already has a real one. No "new project"/
+      // unsaved-buffer case exists to send through Save As instead: files only ever get into
+      // openFiles via openFile(path) on a real path already on disk (see createFile/openFile),
+      // there's no "Untitled" buffer in this app's model. Returns the paths that failed to save
+      // (empty array = everything saved).
+      async function saveAllDirtyFiles() {
+        const failed = [];
+        for (const [path, file] of Array.from(openFiles.entries())) {
+          if (!file.dirty) continue;
+          const content = file.iframe ? await requestPluginContent(file.iframe, path) : null;
+          if (content === null) {
+            failed.push(file.title);
+            continue;
+          }
+          try {
+            await invoke("write_text_file", { path, contents: content });
+            file.dirty = false;
+            file.missing = false;
+          } catch (err) {
+            failed.push(file.title);
+          }
+        }
+        for (const groupId of [0, 1]) renderTabBar(groupId);
+        broadcastFileStatus();
+        updateInspectorForActiveFile();
+        return failed;
+      }
+
+      // Called before the app window actually closes (see initWindowControls's beforeClose param
+      // in primitives.js) — unsaved open files and an open Draft with real tracked changes both
+      // represent real work that'd otherwise be silently lost, so this is the one gate standing
+      // between "click the X" (or Alt+F4) and losing either. Resolves true to let the close
+      // proceed, false to cancel it. draftDiffCounts having any entries at all is exactly "a Draft
+      // is open with something actually captured" — an open-but-untouched Draft has nothing to
+      // lose by closing, same reasoning it shows no diff anywhere else either. A Draft itself has
+      // no "save" — Commit/Revert are its only resolutions, and both live in the sidebar, not here.
+      async function confirmAppClose() {
+        const dirtyFiles = Array.from(openFiles.values()).filter((f) => f.dirty);
+        const draftHasChanges = Object.keys(draftDiffCounts).length > 0;
+        if (dirtyFiles.length === 0 && !draftHasChanges) return true;
+
+        const parts = [];
+        if (dirtyFiles.length === 1) parts.push(`"${dirtyFiles[0].title}" has unsaved changes`);
+        else if (dirtyFiles.length > 1) parts.push(`${dirtyFiles.length} files have unsaved changes`);
+        if (draftHasChanges) parts.push("an open Draft has tracked changes that haven't been committed or reverted");
+
+        const choice = await showPopup("confirm-close-app", {
+          message: `${parts.join(" and ")}.`,
+          canSave: dirtyFiles.length > 0,
+        });
+        if (choice === "save") {
+          const failed = await saveAllDirtyFiles();
+          if (failed.length > 0) {
+            showToast({ variant: "error", message: `Couldn't save ${failed.join(", ")}.` });
+            return false;
+          }
+          return true;
+        }
+        return choice === "discard";
+      }
+
       function showActiveFile(groupId) {
         const { viewport, empty } = groupEls(groupId);
         viewport.querySelectorAll(".plugin-panel-frame").forEach((f) => f.classList.remove("is-active"));
@@ -380,8 +484,12 @@
         // Only actually matters for the group the user is currently focused on —
         // updateInspectorForActiveFile re-derives from activeGroupId itself, so calling it here
         // even when `groupId` is the OTHER (unfocused) group's own file switch is harmless, just
-        // a no-op recompute of the same answer as before.
-        if (groupId === activeGroupId) updateInspectorForActiveFile();
+        // a no-op recompute of the same answer as before — same reasoning updateStatusBarDiff's
+        // own call here follows.
+        if (groupId === activeGroupId) {
+          updateInspectorForActiveFile();
+          updateStatusBarDiff();
+        }
       }
 
       // Only for switching TO an already-rendered tab (a re-open, or right after openFile() has

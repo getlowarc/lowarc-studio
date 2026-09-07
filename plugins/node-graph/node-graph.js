@@ -31,13 +31,24 @@ let activePath = null;
 // makes the correction happen immediately instead of appearing to piggyback on whatever the user
 // does next.
 let showBadges = true;
-window.lowarc.getSettings().then((settings) => {
-  showBadges = !(settings && settings.showBadges === "false");
+function refreshOpenDocsForBadgeSetting() {
   for (const doc of docs.values()) {
     if (!doc.graph) continue;
     renderConnections(doc);
     refreshAllBadges(doc);
   }
+}
+window.lowarc.getSettings().then((settings) => {
+  showBadges = !(settings && settings.showBadges === "false");
+  refreshOpenDocsForBadgeSetting();
+});
+
+// Live counterpart to the getSettings() read above — see set_plugin_setting/plugin-setting-changed
+// in lib.rs and its relay to lowarc:settingsChanged in split-view.js.
+window.lowarc.on("lowarc:settingsChanged", ({ key, value }) => {
+  if (key !== "showBadges") return;
+  showBadges = value !== "false";
+  refreshOpenDocsForBadgeSetting();
 });
 
 function activeDoc() {

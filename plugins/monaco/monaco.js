@@ -22,10 +22,9 @@ self.MonacoEnvironment = {
   },
 };
 
-// Broad but not exhaustive — anything Monaco can highlight is fair game to add here later. ".uc"
-// (LowArc's own language) is registered with no tokenizer yet, further down, purely so it's
-// labelled correctly instead of silently falling back to plaintext; a real Monarch grammar for it
-// is a separate, later task.
+// Broad but not exhaustive — anything Monaco can highlight is fair game to add here later. Only
+// languages Monaco actually ships belong here; registering an id Monaco has no tokenizer for buys
+// nothing over the plaintext fallback it would get anyway.
 const LANGUAGE_BY_EXT = {
   ".js": "javascript", ".jsx": "javascript", ".mjs": "javascript", ".cjs": "javascript",
   ".ts": "typescript", ".tsx": "typescript",
@@ -53,7 +52,6 @@ const LANGUAGE_BY_EXT = {
   ".ps1": "powershell",
   ".bat": "bat",
   ".ini": "ini",
-  ".uc": "uc",
   ".txt": "plaintext",
 };
 
@@ -83,7 +81,6 @@ function numSetting(settings, key, fallback) {
 
 Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve)), window.lowarc.getSettings()]).then(([, settings]) => {
   settings = settings || {};
-  monaco.languages.register({ id: "uc" });
   monaco.editor.setTheme("vs-dark");
 
   const editor = monaco.editor.create(document.getElementById("container"), {
@@ -103,6 +100,34 @@ Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve
     // even after the keybindings below were overridden, since a context-menu click calls the
     // action directly rather than going through keybinding dispatch.
     contextmenu: false,
+  });
+
+  // Live counterpart to the getSettings() read above — see set_plugin_setting/
+  // plugin-setting-changed in lib.rs and its relay to lowarc:settingsChanged in split-view.js.
+  // Every option this plugin reads from settings is a plain editor.updateOptions() field, so there's
+  // no per-doc/per-model state to touch — one shared call applies to whichever file is showing.
+  window.lowarc.on("lowarc:settingsChanged", ({ key, value }) => {
+    const one = { [key]: value };
+    switch (key) {
+      case "minimap":
+        editor.updateOptions({ minimap: { enabled: boolSetting(one, key, true) } });
+        break;
+      case "lineNumbers":
+        editor.updateOptions({ lineNumbers: boolSetting(one, key, true) ? "on" : "off" });
+        break;
+      case "wordWrap":
+        editor.updateOptions({ wordWrap: boolSetting(one, key, false) ? "on" : "off" });
+        break;
+      case "fontSize":
+        editor.updateOptions({ fontSize: numSetting(one, key, 14) });
+        break;
+      case "tabSize":
+        editor.updateOptions({ tabSize: numSetting(one, key, 4) });
+        break;
+      case "insertSpaces":
+        editor.updateOptions({ insertSpaces: boolSetting(one, key, true) });
+        break;
+    }
   });
 
   // This instance can now outlive any one file — it's mounted once per (editor group, Monaco) pair

@@ -176,7 +176,7 @@ pub struct ViewerContribution {
     /// Path within the plugin's own folder, e.g. "index.html" — served over loopback HTTP, see
     /// plugin_asset_server.rs.
     pub entry: String,
-    /// Lowercase, dot-included ("`.uc`", "`.png`") — matched case-insensitively against the open
+    /// Lowercase, dot-included ("`.png`", "`.md`") — matched case-insensitively against the open
     /// file's own extension.
     pub extensions: Vec<String>,
     /// False (the default — every existing viewer, Monaco included, wants this) reads the file as

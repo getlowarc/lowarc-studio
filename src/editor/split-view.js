@@ -145,6 +145,14 @@
             return;
           }
 
+          // window.lowarc.setDiffStatus() — same trust shape as refreshFile above.
+          if (data.action === "setDiffStatus") {
+            if (windowToPlugin.get(event.source)) {
+              setDraftDiffStatus(data.diffCounts && typeof data.diffCounts === "object" ? data.diffCounts : {});
+            }
+            return;
+          }
+
           // window.lowarc.pickOpenFile()/createFile() — a plugin has no filesystem access of its
           // own to browse or write with, so these relay to the host's real native file dialogs
           // (openDialog/saveDialog, the same ones the File menu itself uses) rather than giving a
@@ -458,6 +466,28 @@
         for (const file of openFiles.values()) {
           if (file.pluginId === pluginId && file.iframe) {
             file.iframe.contentWindow.postMessage({ type: "emit", event: eventName, payload }, "*");
+          }
+        }
+      });
+
+      // A setting was changed in settings.html (a separate window/document, so it can't ride
+      // plugin-emit — that one only fires as a side effect of invoke_plugin, and no plugin call
+      // happens here) — see set_plugin_setting in lib.rs. Relayed the same way plugin-emit relays
+      // a plugin's own emit: filtered to that plugin's own mounted panels/files only, so a plugin
+      // doesn't need to know its own id to tell whether an incoming settingsChanged is for it.
+      window.__TAURI__.event.listen("plugin-setting-changed", (event) => {
+        const { id: pluginId, key, value } = event.payload;
+        const payload = { type: "emit", event: "lowarc:settingsChanged", payload: { key, value } };
+        for (const entry of pluginPanels.values()) {
+          if (entry.pluginId === pluginId && entry.iframe) {
+            entry.iframe.contentWindow.postMessage(payload, "*");
+          }
+        }
+        const notified = new Set();
+        for (const file of openFiles.values()) {
+          if (file.pluginId === pluginId && file.iframe && !notified.has(file.iframe)) {
+            notified.add(file.iframe);
+            file.iframe.contentWindow.postMessage(payload, "*");
           }
         }
       });

@@ -9,8 +9,8 @@
 #     (that's where AppPaths expects a plugin's own backend to live) — copied here the exact same
 #     way app_paths.rs's ensure_builtin_plugin_binaries() already copies them for a dev run, just
 #     done once at build time instead of on every dev launch.
-#   - native_module_host.exe and lowarc_runtime.exe aren't part of any plugin, so they go into
-#     runtime-helpers/ instead — a small resource folder bundle.resources also ships, that
+#   - native_module_host.exe, lowarc_runtime.exe and dev_run_host.exe aren't part of any plugin, so
+#     they go into runtime-helpers/ instead — a small resource folder bundle.resources also ships, that
 #     AppPaths::ensure_installed_copy_resources() unpacks into an installed copy's own per-user
 #     data folder on first run (see that function's own comment for the full story of why an
 #     installed copy needs a first-run unpack step at all, unlike a source checkout).
@@ -43,3 +43,4 @@ Copy-BackendBinary "file_explorer_backend" (Join-Path $PSScriptRoot "..\plugins\
 Copy-BackendBinary "terminal_backend" (Join-Path $PSScriptRoot "..\plugins\terminal")
 Copy-BackendBinary "native_module_host" (Join-Path $PSScriptRoot "runtime-helpers")
 Copy-BackendBinary "lowarc_runtime" (Join-Path $PSScriptRoot "runtime-helpers")
+Copy-BackendBinary "dev_run_host" (Join-Path $PSScriptRoot "runtime-helpers")
