@@ -23,13 +23,25 @@ copy.
 ## First-party naming
 
 Module names are literal, because modules are tools: `vector-canvas` says which kind of surface it
-is, leaving room for a pixel or 3D one beside it. (Plugins are products and can be named
-artistically; modules can't afford to be.) `audio` and `input` predate this rule and are both
-broader than what they actually do — renaming them is pending.
+is, leaving room for a pixel or 3D one beside it; `audio-playback` leaves room for capture;
+`device-input` says it polls hardware globally, which is what distinguishes it from the
+window-scoped input `vector-canvas` publishes. (Plugins are products and can be named
+artistically; modules can't afford to be.)
 
 | Module | Source |
 | --- | --- |
-| `audio` | `src-tauri/src/bin/audio_runtime.rs` |
-| `input` | `src-tauri/src/bin/input_runtime.rs` |
+| `audio-playback` | `src-tauri/src/bin/audio_playback_runtime.rs` |
+| `device-input` | `src-tauri/src/bin/device_input_runtime.rs` |
 | `node-graph-runtime` | `src-tauri/src/bin/node_graph_runtime.rs` |
 | `vector-canvas` | `src-tauri/src/bin/vector_canvas_runtime.rs` |
+
+## Convention roles are not modules
+
+Some ids name a *role* a project fills, not a module that ships here. `director` is one: both
+`audio-playback` and `vector-canvas` optionally require it and read what it publishes, without
+caring what actually provides it. `node-graph-runtime`'s optional `input` dependency is another —
+it wants `shared.input.advanceTo`, a node id, from whatever a project installs under that name.
+
+That second one used to collide with the shipped input module, which claimed the same id while
+publishing `keyboard`/`mouse`/`gamepads` and no `advanceTo` at all. Renaming it to `device-input`
+separated them. When adding a module, check its id doesn't shadow a role.

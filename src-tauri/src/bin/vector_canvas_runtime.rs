@@ -1,9 +1,9 @@
 // A process module providing a real 2D drawing surface — the thing that makes a LowArc run stop
 // being headless. Opens a window, owns an OpenGL context, and draws whatever a project's own
-// game-logic module tells it to, read every frame from the same GENERIC convention dependency named
-// "director" that audio_runtime.rs already uses. This module doesn't know or care what fills that
-// role — a node graph, a hand-written module, a Node.js script — only that something published a
-// list of draw commands under that id.
+// game-logic module tells it to, read every frame from the same GENERIC convention dependency
+// named "director" that audio_playback_runtime.rs already uses. It doesn't know or care what fills
+// that role — a node graph, a hand-written module, a Node.js script — only that something published
+// a list of draw commands under that id.
 //
 // Named "vector-canvas", not "canvas", deliberately. It is a VECTOR renderer (antialiased paths and
 // strokes, via femtovg), not a sprite blitter, and it is one possible surface rather than the only
@@ -24,9 +24,9 @@
 //
 // Outbound (published every frame): window size, plus mouse/keyboard/focus state. Input is here
 // because this module owns the window, so it's the only thing that can report a pointer position in
-// CANVAS coordinates (the camera transform inverted). That deliberately overlaps the "input" module,
-// which polls the OS globally in screen space — that one remains the right source for gamepads and
-// for input that isn't about this window.
+// CANVAS coordinates (the camera transform inverted). That deliberately overlaps the
+// "device-input" module, which polls the OS globally in screen space — that one remains the right
+// source for gamepads and for input that isn't about this window.
 //
 // Closing the window sends {"requestStop":true}, ending the run the same way any module asking to
 // stop already does (see process_module.rs's spawn_stdout_reader).
@@ -216,7 +216,7 @@ impl App {
 }
 
 /// Assets are named relative to the PROJECT root (captured from the compile phase's own sourcePath),
-/// the same convention audio_runtime.rs resolves its sound files by — so a director can say
+/// the same convention audio_playback_runtime.rs resolves its sound files by — so a director can say
 /// "art/player.png" without knowing where the project lives. An already-absolute path is left alone.
 /// A free function rather than a method so callers can hold a disjoint borrow of the canvas at the
 /// same time; see draw_command's destructuring.
@@ -672,7 +672,7 @@ fn run_windowed(mut event_loop: EventLoop<()>, rx: Receiver<Value>) {
 
 /// No display at all — a headless CI runner, a locked-down environment. The module still speaks the
 /// protocol, still replies, and just never draws anything; the run continues rather than dying on a
-/// machine that was never going to show a window. Same promise audio_runtime.rs makes for a missing
+/// machine that was never going to show a window. Same promise audio_playback_runtime.rs makes for a missing
 /// audio device, and the reason that one exists is that it has genuinely broken CI here before.
 fn run_headless(rx: Receiver<Value>, reason: &str) {
     log("warn", &format!("vector-canvas has no display available ({reason}) — running without a window"));

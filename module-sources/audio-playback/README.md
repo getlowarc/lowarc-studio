@@ -1,6 +1,6 @@
-# Audio
+# Audio Playback
 
-Real audio playback for a LowArc project, built on [rodio](https://docs.rs/rodio) (itself on
+Plays sound files for a LowArc project, built on [rodio](https://docs.rs/rodio) (itself on
 `cpal`), with broad format decoding (WAV, MP3, OGG, FLAC, and more, via Symphonia) rather than
 hand-rolling a decoder. Cross-platform: Windows, macOS, Linux.
 

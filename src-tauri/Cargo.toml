@@ -32,14 +32,14 @@ base64 = "0.22"
 # depends on it — RunState, SessionRegistry, ProcessModule's stdin/child, …) for the rest of the
 # app's life. Used everywhere this crate shares mutable state across threads.
 parking_lot = "0.12"
-# bin/input_runtime.rs only — real OS keyboard/mouse polling (Windows/macOS/Linux-X11) and gamepad
+# bin/device_input_runtime.rs only — real OS keyboard/mouse polling (Windows/macOS/Linux-X11) and gamepad
 # polling (Windows/macOS/Linux/BSD/Wasm), respectively. Plain top-level deps rather than something
 # scoped to just that one binary, matching how every other bin-specific dependency in this package
 # already works (e.g. portable-pty is only really used by terminal_backend.rs) — a true per-binary
 # dependency split would need a real Cargo workspace, not attempted here.
 device_query = "4"
 gilrs = "0.11"
-# bin/audio_runtime.rs — real audio playback (Windows/macOS/Linux, built on cpal), with broad
+# bin/audio_playback_runtime.rs — real audio playback (Windows/macOS/Linux, built on cpal), with broad
 # format decoding (WAV/MP3/OGG/FLAC and more, via Symphonia) rather than hand-rolling a decoder.
 rodio = "0.22"
 # bin/file_explorer_backend.rs's Draft Tool half — line-level text diffing (added/removed counts,

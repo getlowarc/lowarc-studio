@@ -1,4 +1,4 @@
-// Proves bin/audio_runtime.rs actually plays real audio through the real runtime and correctly
+// Proves bin/audio_playback_runtime.rs actually plays real audio through the real runtime and correctly
 // detects natural completion — not just that it type-checks. Manually piping the wire protocol
 // into the built exe (see this module's own dev notes) already confirmed a real WAV genuinely
 // plays; this test additionally proves the justFinished transition, using the same pause+step
@@ -55,17 +55,17 @@ fn write_test_tone(path: &std::path::Path) {
 }
 
 fn write_audio_module(modules_dir: &std::path::Path) {
-    let dir = modules_dir.join("audio");
+    let dir = modules_dir.join("audio-playback");
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("manifest.json"), r#"{"id":"audio","name":"Audio","loadOrder":1,"requires":[{"id":"director","version":"*","optional":true}]}"#).unwrap();
-    std::fs::write(dir.join("process.json"), r#"{"command":"audio_runtime","args":[],"wantsFrames":true}"#).unwrap();
-    let built_exe = std::path::PathBuf::from(env!("CARGO_BIN_EXE_audio_runtime"));
-    let file_name = if cfg!(windows) { "audio_runtime.exe" } else { "audio_runtime" };
+    std::fs::write(dir.join("manifest.json"), r#"{"id":"audio-playback","name":"Audio Playback","loadOrder":1,"requires":[{"id":"director","version":"*","optional":true}]}"#).unwrap();
+    std::fs::write(dir.join("process.json"), r#"{"command":"audio_playback_runtime","args":[],"wantsFrames":true}"#).unwrap();
+    let built_exe = std::path::PathBuf::from(env!("CARGO_BIN_EXE_audio_playback_runtime"));
+    let file_name = if cfg!(windows) { "audio_playback_runtime.exe" } else { "audio_playback_runtime" };
     std::fs::copy(&built_exe, dir.join(file_name)).unwrap();
 }
 
 // Publishes a fixed "play this one file" request every frame — a director's normal, idempotent
-// shape (see audio_runtime.rs's own header comment on why re-publishing the same list every frame
+// shape (see audio_playback_runtime.rs's own header comment on why re-publishing the same list every frame
 // is expected, not something that should restart anything).
 fn write_director_module(modules_dir: &std::path::Path, tone_path: &std::path::Path) {
     let dir = modules_dir.join("director");
@@ -147,7 +147,7 @@ fn noop_logger() -> LogFn {
 
 /// A locked-down or headless environment (a CI runner, confirmed live — not hypothetical) can
 /// have no real audio output at all, and opening the default device can hang rather than fail
-/// quickly in that case (see audio_runtime.rs's own header comment on why it races this against a
+/// quickly in that case (see audio_playback_runtime.rs's own header comment on why it races this against a
 /// timeout on a background thread). These tests need a genuinely working device to prove anything
 /// real, so they skip — not fail — when one isn't available within a few seconds, same
 /// environment-tolerance shape as the `if !cfg!(windows)` guards already used throughout this
@@ -173,7 +173,7 @@ fn the_audio_module_plays_a_real_file_and_reports_when_it_finishes() {
     write_director_module(&modules_dir, &tone_path);
 
     let project_dir = temp_dir("project");
-    std::fs::write(project_dir.join("project.json"), r#"{"requires":[{"id":"audio","version":"*"},{"id":"director","version":"*"}]}"#).unwrap();
+    std::fs::write(project_dir.join("project.json"), r#"{"requires":[{"id":"audio-playback","version":"*"},{"id":"director","version":"*"}]}"#).unwrap();
     let entry = project_dir.join("main.txt");
     std::fs::write(&entry, "unused by this module").unwrap();
 
@@ -210,11 +210,11 @@ fn the_audio_module_plays_a_real_file_and_reports_when_it_finishes() {
         std::thread::sleep(Duration::from_millis(20));
     }
     let first = last_trace.lock().clone().unwrap();
-    let published = first.modules.iter().find(|m| m.id == "audio").and_then(|m| m.reply.get("publish")).cloned().expect("audio module should have published something");
+    let published = first.modules.iter().find(|m| m.id == "audio-playback").and_then(|m| m.reply.get("publish")).cloned().expect("audio module should have published something");
     assert_eq!(published["playing"], serde_json::json!(["tone"]), "should be playing right after the first frame, got {published:?}");
 
     // The 0.1s tone genuinely finishes playing (for real, via rodio's own background thread) well
-    // within this — the engine itself stays paused/idle the whole time, sending audio_runtime no
+    // within this — the engine itself stays paused/idle the whole time, sending audio_playback_runtime no
     // further "frame" messages until the step below.
     std::thread::sleep(Duration::from_millis(500));
 
@@ -229,7 +229,7 @@ fn the_audio_module_plays_a_real_file_and_reports_when_it_finishes() {
         std::thread::sleep(Duration::from_millis(20));
     };
 
-    let published = second.modules.iter().find(|m| m.id == "audio").and_then(|m| m.reply.get("publish")).cloned().expect("audio module should have published something");
+    let published = second.modules.iter().find(|m| m.id == "audio-playback").and_then(|m| m.reply.get("publish")).cloned().expect("audio module should have published something");
     assert_eq!(published["playing"], serde_json::json!([]), "should no longer be playing after the tone finished, got {published:?}");
     assert_eq!(published["justFinished"], serde_json::json!(["tone"]), "should report the handle that just finished, got {published:?}");
 
@@ -255,7 +255,7 @@ fn pausing_holds_position_and_resuming_continues_it() {
     write_pausing_director_module(&modules_dir, &tone_path, paused_frames);
 
     let project_dir = temp_dir("pause_project");
-    std::fs::write(project_dir.join("project.json"), r#"{"requires":[{"id":"audio","version":"*"},{"id":"director","version":"*"}]}"#).unwrap();
+    std::fs::write(project_dir.join("project.json"), r#"{"requires":[{"id":"audio-playback","version":"*"},{"id":"director","version":"*"}]}"#).unwrap();
     let entry = project_dir.join("main.txt");
     std::fs::write(&entry, "unused by this module").unwrap();
 
@@ -291,14 +291,14 @@ fn pausing_holds_position_and_resuming_continues_it() {
         std::thread::sleep(Duration::from_millis(20));
     }
     let paused_trace = last_trace.lock().clone().unwrap();
-    let published = paused_trace.modules.iter().find(|m| m.id == "audio").and_then(|m| m.reply.get("publish")).cloned().unwrap();
+    let published = paused_trace.modules.iter().find(|m| m.id == "audio-playback").and_then(|m| m.reply.get("publish")).cloned().unwrap();
     assert_eq!(published["playing"], serde_json::json!(["tone"]), "should still be playing (paused, not finished) despite real time exceeding the tone's own length, got {published:?}");
 
     // One manual step: director's own frame_count becomes paused_frames + 1, crossing its "-le
     // paused_frames" threshold — this is the exact tick where it starts publishing paused:false,
-    // and audio_runtime resumes the still-fresh (0 elapsed) sound in the same tick.
+    // and audio_playback_runtime resumes the still-fresh (0 elapsed) sound in the same tick.
     let resumed_trace = step_once(&step_request, &last_trace, paused_trace.frame_index);
-    let published = resumed_trace.modules.iter().find(|m| m.id == "audio").and_then(|m| m.reply.get("publish")).cloned().unwrap();
+    let published = resumed_trace.modules.iter().find(|m| m.id == "audio-playback").and_then(|m| m.reply.get("publish")).cloned().unwrap();
     assert_eq!(published["playing"], serde_json::json!(["tone"]), "should have resumed (still playing, not yet finished) right after unpausing, got {published:?}");
 
     // The engine stays paused (no more automatic ticks) while this real sleep happens — same
@@ -306,7 +306,7 @@ fn pausing_holds_position_and_resuming_continues_it() {
     // other test above — long enough for the now-resumed 0.1s tone to genuinely reach its end.
     std::thread::sleep(Duration::from_millis(500));
     let finished_trace = step_once(&step_request, &last_trace, resumed_trace.frame_index);
-    let published = finished_trace.modules.iter().find(|m| m.id == "audio").and_then(|m| m.reply.get("publish")).cloned().unwrap();
+    let published = finished_trace.modules.iter().find(|m| m.id == "audio-playback").and_then(|m| m.reply.get("publish")).cloned().unwrap();
     assert_eq!(published["playing"], serde_json::json!([]), "should no longer be playing once the resumed tone actually finished, got {published:?}");
     assert_eq!(published["justFinished"], serde_json::json!(["tone"]), "should report the handle that just finished, got {published:?}");
 

@@ -1,4 +1,4 @@
-// Proves bin/input_runtime.rs actually runs as a real process module through the real runtime and
+// Proves bin/device_input_runtime.rs actually runs as a real process module through the real runtime and
 // publishes real hardware state — not just that it type-checks in isolation. Asserts on SHAPE
 // (the right fields, the right JSON types) rather than exact values, since actual keyboard/mouse/
 // gamepad state isn't something a test can control or predict; a manual smoke test (piping the
@@ -21,12 +21,12 @@ fn temp_dir(name: &str) -> std::path::PathBuf {
 }
 
 fn write_input_module(modules_dir: &std::path::Path) {
-    let dir = modules_dir.join("input");
+    let dir = modules_dir.join("device-input");
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("manifest.json"), r#"{"id":"input","name":"Input","loadOrder":1,"requires":[]}"#).unwrap();
-    std::fs::write(dir.join("process.json"), r#"{"command":"input_runtime","args":[],"wantsFrames":true}"#).unwrap();
-    let built_exe = std::path::PathBuf::from(env!("CARGO_BIN_EXE_input_runtime"));
-    let file_name = if cfg!(windows) { "input_runtime.exe" } else { "input_runtime" };
+    std::fs::write(dir.join("manifest.json"), r#"{"id":"device-input","name":"Device Input","loadOrder":1,"requires":[]}"#).unwrap();
+    std::fs::write(dir.join("process.json"), r#"{"command":"device_input_runtime","args":[],"wantsFrames":true}"#).unwrap();
+    let built_exe = std::path::PathBuf::from(env!("CARGO_BIN_EXE_device_input_runtime"));
+    let file_name = if cfg!(windows) { "device_input_runtime.exe" } else { "device_input_runtime" };
     std::fs::copy(&built_exe, dir.join(file_name)).unwrap();
 }
 
@@ -40,7 +40,7 @@ fn the_input_module_publishes_real_keyboard_mouse_and_gamepad_shape() {
     write_input_module(&modules_dir);
 
     let project_dir = temp_dir("project");
-    std::fs::write(project_dir.join("project.json"), r#"{"requires":[{"id":"input","version":"*"}]}"#).unwrap();
+    std::fs::write(project_dir.join("project.json"), r#"{"requires":[{"id":"device-input","version":"*"}]}"#).unwrap();
     let entry = project_dir.join("main.txt");
     std::fs::write(&entry, "unused by this module").unwrap();
 
@@ -78,7 +78,7 @@ fn the_input_module_publishes_real_keyboard_mouse_and_gamepad_shape() {
     let result = handle.join().unwrap();
     assert!(result.is_ok(), "expected the run to complete cleanly, got {result:?}");
 
-    let published = trace.modules.iter().find(|m| m.id == "input").and_then(|m| m.reply.get("publish")).cloned().expect("input module should have published something");
+    let published = trace.modules.iter().find(|m| m.id == "device-input").and_then(|m| m.reply.get("publish")).cloned().expect("input module should have published something");
 
     assert!(published["keyboard"]["keysDown"].is_array(), "keyboard.keysDown should be an array, got {published:?}");
     assert!(published["mouse"]["x"].is_i64() || published["mouse"]["x"].is_u64(), "mouse.x should be a real integer, got {published:?}");

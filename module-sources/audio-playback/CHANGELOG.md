@@ -1,7 +1,15 @@
 # Changelog
 
-All notable changes to the Audio module are documented here. Format loosely follows
+All notable changes to the Audio Playback module are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
+
+## 0.2.0 — 2026-09-07
+
+### Changed
+
+- Renamed from `audio` to `audio-playback`. First-party module names are literal: this one plays
+  sound files and does not capture or synthesize, and the old name claimed the whole category.
+  A project requiring `audio` must update its `project.json`.
 
 ## 0.1.1 — 2026-09-03
 

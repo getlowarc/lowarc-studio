@@ -1,0 +1,8 @@
+{
+  "id": "device-input",
+  "name": "Device Input",
+  "version": "0.2.0",
+  "description": "Polls keyboard, mouse and gamepads at the OS level, in screen coordinates, regardless of window focus.",
+  "loadOrder": 1,
+  "requires": []
+}

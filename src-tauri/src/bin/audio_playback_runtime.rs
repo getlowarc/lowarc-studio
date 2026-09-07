@@ -27,7 +27,7 @@
 // Cross-platform via rodio (Windows/macOS/Linux, itself built on cpal). A platform or environment
 // with no real audio output device at all (a locked-down or headless CI runner, say) doesn't fail
 // the whole module — playing/justFinished just stays empty every frame, the same "missing
-// hardware degrades gracefully" shape input_runtime.rs already uses for an unavailable gamepad
+// hardware degrades gracefully" shape device_input_runtime.rs already uses for an unavailable gamepad
 // backend.
 //
 // Speaks the standard process-module wire protocol (compile/start/frame/stop — see
@@ -108,7 +108,7 @@ fn start_sound(mixer: &Mixer, project_root: &Option<PathBuf>, req: &PlayRequest)
 fn main() {
     // A platform/environment with no real audio output at all shouldn't fail the whole module —
     // see this file's own header comment. Every "frame" reply below just reports nothing playing
-    // in that case, same shape input_runtime.rs uses for an unavailable gamepad backend.
+    // in that case, same shape device_input_runtime.rs uses for an unavailable gamepad backend.
     //
     // The tricky part: on some environments with no real device (a locked-down or headless CI
     // runner, confirmed live — this is not a hypothetical) opening the default sink doesn't fail

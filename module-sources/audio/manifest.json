@@ -1,8 +1,0 @@
-{
-  "id": "audio",
-  "name": "Audio",
-  "version": "0.1.1",
-  "description": "Real audio playback, cross-platform, with pause/resume and looping.",
-  "loadOrder": 1,
-  "requires": [{ "id": "director", "version": "*", "optional": true }]
-}
