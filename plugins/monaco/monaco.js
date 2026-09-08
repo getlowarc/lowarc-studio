@@ -79,9 +79,61 @@ function numSetting(settings, key, fallback) {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
+// Monaco does NOT read the app's CSS variables — it owns its own theme registry, so the panel
+// around the editor restyles with the rest of the IDE while the editor surface itself stays on
+// whatever theme it was last told about. Hardcoding "vs-dark" therefore left a dark editor sitting
+// in a light IDE.
+//
+// The two built-in themes carry all the syntax colouring, so this inherits from whichever matches
+// the app's ground and overrides only the handful of chrome colours that should agree exactly with
+// the IDE — otherwise the editor is a slightly different shade of background than the panel it sits
+// in, which reads as a rendering bug rather than a theme.
+function luminanceOfHex(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec((hex || "").trim());
+  if (!m) return 0;
+  const n = parseInt(m[1], 16);
+  return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+}
+
+function applyEditorTheme() {
+  const css = getComputedStyle(document.documentElement);
+  const token = (name, fallback) => {
+    const value = (css.getPropertyValue(name) || "").trim();
+    // Monaco rejects anything that isn't #rrggbb/#rrggbbaa and throws out the whole theme with it.
+    return /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(value) ? value : fallback;
+  };
+
+  const bg = token("--bg", "#1e1e1e");
+  const base = luminanceOfHex(bg) > 0.5 ? "vs" : "vs-dark";
+  try {
+    monaco.editor.defineTheme("lowarc", {
+      base,
+      inherit: true,
+      rules: [],
+      colors: {
+        "editor.background": bg,
+        "editor.foreground": token("--fg", "#d4d4d4"),
+        "editorGutter.background": bg,
+        "editorLineNumber.foreground": token("--fg-dim", "#8a8a8a"),
+        "editorCursor.foreground": token("--cyan", "#00ffff"),
+      },
+    });
+    monaco.editor.setTheme("lowarc");
+  } catch (err) {
+    // A malformed custom theme must not leave the editor unstyled — fall back to the built-in that
+    // matches the app's ground, which is still better than staying on the wrong one.
+    monaco.editor.setTheme(base);
+  }
+}
+
 Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve)), window.lowarc.getSettings()]).then(([, settings]) => {
   settings = settings || {};
-  monaco.editor.setTheme("vs-dark");
+  applyEditorTheme();
+
+  // The host pushes new values into this iframe when the IDE's theme changes (see the harness in
+  // plugin_assets.rs); by the time this fires they are already on documentElement, so re-reading is
+  // all that's needed. Without it the editor keeps its startup theme until the panel is reopened.
+  window.lowarc.on("lowarc:theme", () => applyEditorTheme());
 
   const editor = monaco.editor.create(document.getElementById("container"), {
     value: "",

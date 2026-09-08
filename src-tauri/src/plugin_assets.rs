@@ -59,6 +59,12 @@ pub const HARNESS_JS: &str = r#"(function () {
           document.documentElement.style.setProperty(name, value);
         }
       }
+      // Applied above AND announced here, because a plugin whose colors don't all come from CSS has
+      // real work to do — Monaco owns its own theme system and would otherwise keep rendering the
+      // editor surface in whatever theme it was told about at startup, however the page around it
+      // restyles. Listeners run after the properties are set, so on("lowarc:theme") can just read
+      // the ones it needs off documentElement.
+      (listeners.get("lowarc:theme") || []).forEach((handler) => handler(vars));
     } else if (data.type === "emit") {
       (listeners.get(data.event) || []).forEach((handler) => handler(data.payload));
     }
