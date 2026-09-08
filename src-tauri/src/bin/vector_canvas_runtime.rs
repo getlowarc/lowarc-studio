@@ -119,7 +119,7 @@ impl Default for Camera {
 impl Camera {
     /// The inverse of what apply() does to the canvas — used to report the pointer in the same
     /// space the caller is drawing in, which is the whole reason this module publishes input.
-    fn to_canvas(&self, wx: f32, wy: f32, width: f32, height: f32) -> (f32, f32) {
+    fn to_canvas(self, wx: f32, wy: f32, width: f32, height: f32) -> (f32, f32) {
         if !self.active || self.zoom == 0.0 {
             return (wx, wy);
         }
