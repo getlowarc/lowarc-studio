@@ -1,8 +1,6 @@
       // ---------- Split editor ----------
-      function applySplitRatio() {
-        const group0 = document.getElementById("editor-group-0");
-        group0.style.flex = splitOpen ? `0 0 ${splitRatio * 100}%` : "";
-      }
+      // applySplitRatio() is deliberately not here but in panels.js, beside the splitOpen/splitRatio
+      // state it reads — see its own comment there for why its position is load-order-sensitive.
 
       async function setSplitOpen(open) {
         if (splitOpen === open) return;

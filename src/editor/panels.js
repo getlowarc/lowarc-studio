@@ -206,6 +206,17 @@
       let splitOpen = false;
       let splitRatio = 0.5;
 
+      // Lives here, next to the two variables it reads, rather than in split-view.js with the rest
+      // of the split machinery — because loadPanelLayout() below calls it after an await, and
+      // split-view.js is the LAST script editor.html loads. That only ever worked because a real
+      // Tauri invoke() takes longer than the four remaining script tags take to execute; anything
+      // that made get_settings resolve promptly (a cache, a synchronous path) would have turned it
+      // into a ReferenceError at startup. split-view.js loads later and can still call it.
+      function applySplitRatio() {
+        const group0 = document.getElementById("editor-group-0");
+        group0.style.flex = splitOpen ? `0 0 ${splitRatio * 100}%` : "";
+      }
+
       function applyPanel(key) {
         const p = PANELS[key];
         shell.style.setProperty(p.cssVar, `${p.open ? p.size : 0}px`);
