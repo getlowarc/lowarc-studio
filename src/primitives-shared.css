@@ -144,10 +144,14 @@
 .btn-main:hover:not(:disabled) {
   filter: brightness(var(--btn-hover-brightness));
 }
+/* Ink, not --fg: pressing swaps the fill to cyan-dark, and --fg is the color for text on the PAGE,
+   which on a light theme is near-black — near-black on dark teal. Ink is defined as "what sits on a
+   cyan fill" and is correct against both cyan and cyan-dark in either theme, so the label also stops
+   changing color mid-press. */
 .btn-main:active:not(:disabled) {
   background: var(--cyan-dark);
   border-color: var(--cyan-dark);
-  color: var(--fg);
+  color: var(--cyan-ink);
   filter: none;
 }
 
