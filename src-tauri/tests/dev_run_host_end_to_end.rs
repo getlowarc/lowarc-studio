@@ -17,6 +17,11 @@ fn temp_dir(name: &str) -> PathBuf {
     dir
 }
 
+// Every fixture below sets a generous timeoutMs. The 10s default is tuned for a real module, not
+// for starting a PowerShell interpreter: this file runs three of them in parallel, and where that
+// costs 0.36s on a developer machine it has taken 12s+ on a CI runner. A module timeout exists to
+// catch one that has WEDGED, and 30s still does that while tolerating a slow, contended start.
+
 /// Built by the same `cargo test` invocation that builds this test (both are targets of this one
 /// package), so it always lands beside the test executable's own directory's parent — the standard
 /// layout for a bin target's output.
@@ -34,7 +39,7 @@ fn write_ticking_module(dir: &Path) {
     std::fs::write(dir.join("manifest.json"), r#"{"id":"ticker","name":"Ticker","loadOrder":1,"requires":[]}"#).unwrap();
     std::fs::write(
         dir.join("process.json"),
-        r#"{"command":"powershell","args":["-NoProfile","-ExecutionPolicy","Bypass","-File","module.ps1"],"wantsFrames":true}"#,
+        r#"{"command":"powershell","args":["-NoProfile","-ExecutionPolicy","Bypass","-File","module.ps1"],"wantsFrames":true,"timeoutMs":30000}"#,
     )
     .unwrap();
     std::fs::write(
@@ -62,7 +67,7 @@ fn write_degraded_module(dir: &Path) {
     std::fs::write(dir.join("manifest.json"), r#"{"id":"ticker","name":"Ticker","loadOrder":1,"requires":[]}"#).unwrap();
     std::fs::write(
         dir.join("process.json"),
-        r#"{"command":"powershell","args":["-NoProfile","-ExecutionPolicy","Bypass","-File","module.ps1"],"wantsFrames":true}"#,
+        r#"{"command":"powershell","args":["-NoProfile","-ExecutionPolicy","Bypass","-File","module.ps1"],"wantsFrames":true,"timeoutMs":30000}"#,
     )
     .unwrap();
     std::fs::write(
@@ -180,8 +185,14 @@ fn a_frame_count_breakpoint_set_over_the_wire_actually_pauses_and_reports_a_trac
     stdin.flush().unwrap();
 
     let mut trace: Option<Value> = None;
+    // Same reasoning as the degraded test's own `seen`: a missing frame trace is otherwise reported
+    // with no hint as to whether the module started at all.
+    let mut seen: Vec<String> = Vec::new();
     for line in stdout.lines().map_while(Result::ok) {
         let Ok(value) = serde_json::from_str::<Value>(&line) else { continue };
+        if seen.len() < 40 {
+            seen.push(line.chars().take(160).collect());
+        }
         if let Some(frame) = value.get("frame") {
             trace = Some(frame.clone());
             writeln!(stdin, "{}", serde_json::json!({"cmd": "stop"})).unwrap();
@@ -193,7 +204,9 @@ fn a_frame_count_breakpoint_set_over_the_wire_actually_pauses_and_reports_a_trac
 
     let _ = child.wait();
 
-    let trace = trace.expect("a frameCount breakpoint should have produced a frame trace");
+    let trace = trace.unwrap_or_else(|| {
+        panic!("a frameCount breakpoint should have produced a frame trace. Lines seen were: {seen:#?}")
+    });
     assert_eq!(trace.get("frameIndex").and_then(Value::as_u64), Some(2), "the trace should be for the frame the breakpoint named: {trace}");
     assert!(!trace.get("triggered").unwrap_or(&Value::Null).is_null(), "a breakpoint-caused pause must say what triggered it: {trace}");
 }
@@ -226,10 +239,17 @@ fn a_module_that_starts_degraded_says_so_and_keeps_running() {
     let mut degraded_line: Option<String> = None;
     let mut ticked_after = false;
     let mut sent_stop = false;
+    // Kept so a failure can say what DID arrive. Without it the panic is just "expected line
+    // missing", which on a machine you cannot reproduce on costs a whole CI round trip to learn
+    // nothing — the same gap that made the canvas's own failure opaque.
+    let mut seen: Vec<String> = Vec::new();
 
     for line in stdout.lines().map_while(Result::ok) {
         let Ok(value) = serde_json::from_str::<Value>(&line) else { continue };
         let Some(message) = value.pointer("/log/message").and_then(Value::as_str) else { continue };
+        if seen.len() < 40 {
+            seen.push(message.to_string());
+        }
 
         if message.contains("started degraded") {
             degraded_line = Some(message.to_string());
@@ -248,10 +268,11 @@ fn a_module_that_starts_degraded_says_so_and_keeps_running() {
 
     let _ = child.wait();
 
-    let degraded = degraded_line.expect("a degraded start must be reported, not swallowed");
+    let degraded = degraded_line
+        .unwrap_or_else(|| panic!("a degraded start must be reported, not swallowed. Log lines seen were: {seen:#?}"));
     assert!(
         degraded.contains("no widget frobnicator present"),
         "the report should carry the module's own reason, not a generic one: {degraded}"
     );
-    assert!(ticked_after, "a degraded module must keep running — degrading is not failing");
+    assert!(ticked_after, "a degraded module must keep running — degrading is not failing. Saw: {seen:#?}");
 }
