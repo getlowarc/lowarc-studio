@@ -1,7 +1,7 @@
 {
   "id": "vector-canvas",
   "name": "Vector Canvas",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A windowed 2D vector drawing surface — antialiased shapes, images and text, drawn from declarative commands.",
   "loadOrder": 1,
   "requires": [{ "id": "director", "version": "*", "optional": true }]

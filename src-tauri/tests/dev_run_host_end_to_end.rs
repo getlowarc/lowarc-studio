@@ -54,6 +54,39 @@ while ($line = [Console]::In.ReadLine()) {
     .unwrap();
 }
 
+/// Same as write_ticking_module, but its "start" reply carries the degraded marker. Still ticks
+/// afterwards, which is the half of the contract that would be easy to break: degrading must not
+/// be treated as failing.
+fn write_degraded_module(dir: &Path) {
+    std::fs::create_dir_all(dir).unwrap();
+    std::fs::write(dir.join("manifest.json"), r#"{"id":"ticker","name":"Ticker","loadOrder":1,"requires":[]}"#).unwrap();
+    std::fs::write(
+        dir.join("process.json"),
+        r#"{"command":"powershell","args":["-NoProfile","-ExecutionPolicy","Bypass","-File","module.ps1"],"wantsFrames":true}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join("module.ps1"),
+        r#"
+while ($line = [Console]::In.ReadLine()) {
+    if ([string]::IsNullOrWhiteSpace($line)) { continue }
+    $msg = $line | ConvertFrom-Json
+    if ($msg.phase -eq "frame") {
+        [Console]::Out.WriteLine((@{ log = @{ severity = "info"; message = "tick" } } | ConvertTo-Json -Compress))
+    }
+    if ($msg.phase -eq "start") {
+        [Console]::Out.WriteLine((@{ ok = $true; degraded = "no widget frobnicator present" } | ConvertTo-Json -Compress))
+    } else {
+        [Console]::Out.WriteLine((@{ ok = $true } | ConvertTo-Json -Compress))
+    }
+    [Console]::Out.Flush()
+    if ($msg.phase -eq "stop") { break }
+}
+"#,
+    )
+    .unwrap();
+}
+
 /// Absolute paths in `modules`/`source`, exactly as lib.rs's write_dev_run_launch builds them —
 /// run_from_launch_dir joins each against the launch dir, and joining an absolute path yields it
 /// unchanged, which is what lets dev-run reuse the export-shaped LaunchConfig with no staging.
@@ -163,4 +196,62 @@ fn a_frame_count_breakpoint_set_over_the_wire_actually_pauses_and_reports_a_trac
     let trace = trace.expect("a frameCount breakpoint should have produced a frame trace");
     assert_eq!(trace.get("frameIndex").and_then(Value::as_u64), Some(2), "the trace should be for the frame the breakpoint named: {trace}");
     assert!(!trace.get("triggered").unwrap_or(&Value::Null).is_null(), "a breakpoint-caused pause must say what triggered it: {trace}");
+}
+
+#[test]
+fn a_module_that_starts_degraded_says_so_and_keeps_running() {
+    // The gap this closes: a module missing something it needed (an audio device, a display) used
+    // to run to completion doing nothing, indistinguishable from one that had nothing to do. Both
+    // halves matter — the reason has to surface, AND the module has to carry on, since degrading is
+    // the intended behaviour rather than a failure.
+    let root = temp_dir("degraded");
+    let module_dir = root.join("ticker");
+    write_degraded_module(&module_dir);
+    let entry = root.join("main.txt");
+    std::fs::write(&entry, "// entry").unwrap();
+    write_launch(&root, &module_dir, &entry);
+
+    let mut child = std::process::Command::new(dev_run_host_bin())
+        .arg(&root)
+        .current_dir(&root)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("dev_run_host should start");
+
+    let mut stdin = child.stdin.take().expect("piped stdin");
+    let stdout = BufReader::new(child.stdout.take().expect("piped stdout"));
+
+    let mut degraded_line: Option<String> = None;
+    let mut ticked_after = false;
+    let mut sent_stop = false;
+
+    for line in stdout.lines().map_while(Result::ok) {
+        let Ok(value) = serde_json::from_str::<Value>(&line) else { continue };
+        let Some(message) = value.pointer("/log/message").and_then(Value::as_str) else { continue };
+
+        if message.contains("started degraded") {
+            degraded_line = Some(message.to_string());
+        } else if message.contains("tick") {
+            // A frame after the degraded start is the proof it wasn't dropped from the run.
+            if degraded_line.is_some() {
+                ticked_after = true;
+            }
+            if !sent_stop {
+                sent_stop = true;
+                writeln!(stdin, "{}", serde_json::json!({"cmd": "stop"})).unwrap();
+                stdin.flush().unwrap();
+            }
+        }
+    }
+
+    let _ = child.wait();
+
+    let degraded = degraded_line.expect("a degraded start must be reported, not swallowed");
+    assert!(
+        degraded.contains("no widget frobnicator present"),
+        "the report should carry the module's own reason, not a generic one: {degraded}"
+    );
+    assert!(ticked_after, "a degraded module must keep running — degrading is not failing");
 }

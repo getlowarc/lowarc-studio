@@ -35,6 +35,25 @@ artistically; modules can't afford to be.)
 | `node-graph-runtime` | `src-tauri/src/bin/node_graph_runtime.rs` |
 | `vector-canvas` | `src-tauri/src/bin/vector_canvas_runtime.rs` |
 
+## Reporting a degraded start
+
+A module's `start` reply may carry a `degraded` reason beside its `ok`:
+
+```json
+{ "ok": true, "degraded": "no audio output device is available — nothing will play" }
+```
+
+That means "I started, and I will keep answering, but something I needed isn't here." The engine
+logs it at Warn — so it reaches the dev-run console and an export's diagnostics log alike — and
+otherwise leaves the module running, because degrading is the intended behaviour, not a failure.
+
+Use it whenever a module can't do its actual job but chooses to carry on anyway. `audio-playback`
+sends it when there's no output device, `vector-canvas` when no window could be created. Without it
+both simply did nothing for a whole run, indistinguishable from a project that never asked them to
+do anything — which is exactly how a display-less CI runner hid a real bug for a while.
+
+Purely additive: a module that never sends it is unaffected.
+
 ## Convention roles are not modules
 
 Some ids name a *role* a project fills, not a module that ships here. `director` is one: both

@@ -2,6 +2,10 @@
 // lowarc/Contracts/ProcessModuleLoader.cs (one JSON object per line over stdin/stdout;
 // compile/start/frame/stop phases; {"log":...}/{"requestStop":true} notifications), so an
 // existing process-kind module works unmodified whether it's run by an export or by this IDE.
+//
+// One addition to that protocol: a "start" reply may carry `"degraded": "<reason>"` next to its ok.
+// See ProcessModule::start for why. Purely additive — a module that never sends it is unaffected,
+// which is the same compatibility rule the update manifest follows (see docs/updating.md).
 // The only real differences from Bootstrap's copy: logging goes through a caller-supplied
 // callback instead of a Diag file, and {"requestStop":true} sets the run's shared stop flag
 // instead of a process-wide global — this crate can run more than one session in its lifetime.
@@ -159,14 +163,25 @@ impl ProcessModule {
         true
     }
 
+    /// A "start" reply may carry `"degraded": "<reason>"` alongside its ok — "I started, and I will
+    /// keep answering, but something I needed isn't here." That is a genuinely different state from
+    /// both success and failure, and it had no way to be expressed: a module with no audio device or
+    /// no display would run to completion doing nothing, indistinguishable from one that simply had
+    /// nothing to do. Reported at Warn so it reaches the dev-run console and an export's diagnostics
+    /// log alike, without failing the module — degrading is the intended behavior, being silent
+    /// about it was not.
     pub fn start(&self, settings: &Value) -> bool {
         let reply = self.request(json!({"phase": "start", "settings": settings, "items": self.compile_items}));
         if !Self::ok(&reply) {
             (self.log)(LogLevel::Error, &format!(
                 "[{}] OnStart threw: {}", self.name, reply.get("error").and_then(|e| e.as_str()).unwrap_or("")
             ));
+            return false;
         }
-        Self::ok(&reply)
+        if let Some(reason) = reply.get("degraded").and_then(|d| d.as_str()).filter(|r| !r.trim().is_empty()) {
+            (self.log)(LogLevel::Warn, &format!("[{}] started degraded — {reason}", self.name));
+        }
+        true
     }
 
     /// Returns the raw request/reply pair and how long the round-trip took — `spawn_and_run` needs

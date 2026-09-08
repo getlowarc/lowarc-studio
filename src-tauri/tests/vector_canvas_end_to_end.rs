@@ -81,11 +81,15 @@ impl Module {
         }
     }
 
-    fn compile_and_start(&mut self, settings: Value) {
+    /// Returns the start reply, since whether it carries a `degraded` marker is itself part of the
+    /// contract — see the degraded-marker assertion in the first test.
+    fn compile_and_start(&mut self, settings: Value) -> Value {
         self.send(serde_json::json!({"phase": "compile", "sourceCode": "", "sourcePath": "project/main.txt"}));
         assert_eq!(self.reply().get("ok").and_then(Value::as_bool), Some(true), "compile should succeed");
         self.send(serde_json::json!({"phase": "start", "settings": settings, "items": []}));
-        assert_eq!(self.reply().get("ok").and_then(Value::as_bool), Some(true), "start should succeed");
+        let reply = self.reply();
+        assert_eq!(reply.get("ok").and_then(Value::as_bool), Some(true), "start should succeed even with no display: {reply}");
+        reply
     }
 
     /// One frame carrying `draw` as the director's published command list, returning the reply.
@@ -104,7 +108,7 @@ impl Module {
 #[test]
 fn it_answers_every_phase_and_publishes_a_surface_a_director_can_read() {
     let mut module = Module::start();
-    module.compile_and_start(serde_json::json!({"title": "test", "width": 320, "height": 240, "vsync": false}));
+    let start = module.compile_and_start(serde_json::json!({"title": "test", "width": 320, "height": 240, "vsync": false}));
 
     let reply = module.frame(serde_json::json!([
         {"op": "clear", "color": "#101820"},
@@ -125,6 +129,20 @@ fn it_answers_every_phase_and_publishes_a_surface_a_director_can_read() {
         Some(false),
         "nothing has asked to close: {published}"
     );
+
+    // The degraded marker has to agree with reality, and this holds on BOTH kinds of machine
+    // without the test needing to know which it is on — a developer box reports a real window and
+    // no marker, a display-less CI runner reports neither and must say so. Pinning the pair is what
+    // makes "it degrades" a checked claim rather than an intention; the module previously died here
+    // instead, and passing tests said nothing about it.
+    let width = published.get("width").and_then(Value::as_u64).unwrap_or(0);
+    let degraded = start.get("degraded").and_then(Value::as_str);
+    if width > 0 {
+        assert!(degraded.is_none(), "a real window was created, so nothing should be reported as degraded: {start}");
+    } else {
+        let reason = degraded.expect("no window means the start reply must say why, rather than leaving it silent");
+        assert!(!reason.trim().is_empty(), "the degraded reason must actually say something: {start}");
+    }
 
     let mouse = published.get("mouse").expect("mouse state must be published");
     for key in ["x", "y", "windowX", "windowY", "scroll"] {

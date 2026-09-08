@@ -1,7 +1,7 @@
 {
   "id": "audio-playback",
   "name": "Audio Playback",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Plays sound files, cross-platform, with pause/resume, looping and live volume.",
   "loadOrder": 1,
   "requires": [{ "id": "director", "version": "*", "optional": true }]

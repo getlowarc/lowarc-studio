@@ -223,10 +223,12 @@ impl App {
                 self.gfx = Some(gfx);
                 self.init_failed = false;
             }
-            Ok(Err(e)) => log("warn", &format!("vector-canvas has no window ({e}) — running without one")),
-            // The panic's own message has already gone to stderr, which the host relays; this only
-            // has to say the run is continuing regardless.
-            Err(_) => log("warn", "vector-canvas could not create a window on this machine — running without one"),
+            // These report the CAUSE only. That the module is running without a window is announced
+            // once, by the degraded marker on its start reply — saying it here too would be the same
+            // news twice, from a less useful place.
+            Ok(Err(e)) => log("warn", &format!("vector-canvas: window creation failed — {e}")),
+            // The panic's own message has already gone to stderr, which the host relays.
+            Err(_) => log("warn", "vector-canvas: window creation panicked"),
         }
     }
 
@@ -594,6 +596,28 @@ enum Outcome {
     Stop,
 }
 
+/// The settings half of the "start" phase, without replying. Split out because the reply has to say
+/// whether this module is running degraded, and only the caller knows: run_windowed has to pump the
+/// event loop once to find out whether a window actually materialised, while run_headless already
+/// knows it never will.
+fn apply_start_settings(app: &mut App, msg: &Value) {
+    app.settings = Some(msg.get("settings").cloned().and_then(|s| serde_json::from_value(s).ok()).unwrap_or_default());
+}
+
+fn is_start(msg: &Value) -> bool {
+    msg.get("phase").and_then(|p| p.as_str()) == Some("start")
+}
+
+/// A "start" reply, carrying the degraded marker when there's no window — see ProcessModule::start
+/// in process_module.rs for what the engine does with it.
+fn reply_started(degraded: Option<&str>) {
+    let mut extra = Map::new();
+    if let Some(reason) = degraded {
+        extra.insert("degraded".into(), json!(reason));
+    }
+    reply_ok(extra);
+}
+
 fn handle_message(app: &mut App, msg: &Value) -> Outcome {
     match msg.get("phase").and_then(|p| p.as_str()).unwrap_or("") {
         "compile" => {
@@ -604,15 +628,10 @@ fn handle_message(app: &mut App, msg: &Value) -> Outcome {
                 .and_then(|p| p.parent().map(|p| p.to_path_buf()));
             reply_ok(Map::new());
         }
-        "start" => {
-            app.settings = Some(
-                msg.get("settings")
-                    .cloned()
-                    .and_then(|s| serde_json::from_value(s).ok())
-                    .unwrap_or_default(),
-            );
-            reply_ok(Map::new());
-        }
+        // Deliberately not handled here — the reply has to report whether a window was actually
+        // obtained, and that isn't known until the event loop has been pumped once. Both run loops
+        // handle it themselves; see apply_start_settings.
+        "start" => reply_err("internal: start is handled by the run loop, not here"),
         "frame" => {
             let commands: Vec<Value> = msg
                 .pointer("/shared/director/draw")
@@ -676,6 +695,18 @@ fn run_windowed(mut event_loop: EventLoop<()>, rx: Receiver<Value>) {
         // Bounded wait rather than a spin: wakes immediately when the host sends something, and
         // still comes back often enough that the window stays responsive when it doesn't.
         match rx.recv_timeout(Duration::from_millis(4)) {
+            Ok(msg) if is_start(&msg) => {
+                // Settings first (the window's title and size come from them), then one pump to
+                // actually build it, and only then the reply — which is the whole reason start is
+                // handled here rather than in handle_message. Answering before the pump would mean
+                // always claiming success, including on the machine where it just failed.
+                apply_start_settings(&mut app, &msg);
+                let _ = event_loop.pump_app_events(Some(Duration::ZERO), &mut app);
+                reply_started(match app.gfx {
+                    Some(_) => None,
+                    None => Some("no window could be created on this machine — nothing will be drawn"),
+                });
+            }
             Ok(msg) => {
                 if let Outcome::Stop = handle_message(&mut app, &msg) {
                     break;
@@ -692,9 +723,15 @@ fn run_windowed(mut event_loop: EventLoop<()>, rx: Receiver<Value>) {
 /// machine that was never going to show a window. Same promise audio_playback_runtime.rs makes for a missing
 /// audio device, and the reason that one exists is that it has genuinely broken CI here before.
 fn run_headless(rx: Receiver<Value>, reason: &str) {
-    log("warn", &format!("vector-canvas has no display available ({reason}) — running without a window"));
     let mut app = App::new();
     while let Ok(msg) = rx.recv() {
+        if is_start(&msg) {
+            // No pump to wait on here — this path already knows there will never be a window, so
+            // the reply can say so outright.
+            apply_start_settings(&mut app, &msg);
+            reply_started(Some(&format!("no display is available ({reason}) — nothing will be drawn")));
+            continue;
+        }
         if let Outcome::Stop = handle_message(&mut app, &msg) {
             break;
         }

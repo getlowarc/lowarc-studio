@@ -3,6 +3,13 @@
 All notable changes to the Audio Playback module are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## 0.2.1 — 2026-09-08
+
+### Added
+
+- Reports a degraded start when no audio output device is available, so a run with no sound says
+  why instead of silently playing nothing.
+
 ## 0.2.0 — 2026-09-07
 
 ### Changed

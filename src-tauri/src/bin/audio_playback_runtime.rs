@@ -146,7 +146,16 @@ fn main() {
                 project_root = msg.get("sourcePath").and_then(|p| p.as_str()).map(PathBuf::from).and_then(|p| p.parent().map(|p| p.to_path_buf()));
                 reply_ok(Map::new());
             }
-            "start" => reply_ok(Map::new()),
+            // No mixer means no output device was available (see main's own comment on racing that
+            // open against a timeout). Playback silently doing nothing for a whole run used to be
+            // indistinguishable from a project that never asked for a sound; this says which.
+            "start" => {
+                let mut extra = Map::new();
+                if mixer.is_none() {
+                    extra.insert("degraded".into(), json!("no audio output device is available — nothing will play"));
+                }
+                reply_ok(extra);
+            }
             "frame" => {
                 let requested: Vec<PlayRequest> = msg
                     .pointer("/shared/director/play")

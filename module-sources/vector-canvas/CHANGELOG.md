@@ -3,6 +3,15 @@
 All notable changes to the Vector Canvas module are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## 0.1.1 — 2026-09-08
+
+### Fixed
+
+- Running where no display exists now genuinely degrades instead of killing the module process.
+  Window creation panics rather than returning an error on a machine with no usable GL, so the
+  error handling never got a turn; the boundary is now guarded directly.
+- Reports a degraded start when no window could be created, so the run says why nothing is drawn.
+
 ## 0.1.0 — 2026-09-07
 
 Initial release — the first module that gives a LowArc run a window.
