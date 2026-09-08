@@ -20,6 +20,12 @@ on:
     tags:
       - "v*"
 
+# Grouped but deliberately NOT cancel-in-progress, unlike ci.yml. Two releases racing would be bad;
+# a half-cancelled one would be worse, since it can publish artifacts and then not finish.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
 

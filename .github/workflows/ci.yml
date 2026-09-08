@@ -3,9 +3,21 @@ name: CI
 # rust-toolchain.toml pins stable-x86_64-pc-windows-msvc — this app is Windows-only today (ConPTY,
 # native .dll modules, WebView2), so this only runs on windows-latest. Extend to other OSes once
 # the toolchain pin itself does.
+# `push` is scoped to main deliberately. Paired with an unscoped `pull_request`, a branch still gets
+# full CI through its PR, main gets it on every push, and nothing runs twice — whereas `push` with no
+# filter alongside `pull_request` runs the whole suite TWICE for any PR from a branch in this repo,
+# which is pure duplicate cost.
 on:
   push:
+    branches: [main]
   pull_request:
+
+# Without this, a push that supersedes an in-flight run leaves the old one grinding to completion on
+# a commit nobody is waiting for any more — which adds up fast during a run of quick fixes. Note this
+# reduces the NUMBER of runs; it does not make any single run faster.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-and-test:
