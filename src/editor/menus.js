@@ -231,6 +231,206 @@
       // that system is gone now, every page (including primitives.html's own showcase examples)
       // has migrated to this one.
 
+      // The project's run configuration — what project.json actually holds. Replaces the old "Set
+      // Entry File…" menu item, which could only set one of the two fields and left the other
+      // (which modules the project needs) editable nowhere at all: a project's requires could only
+      // be changed by hand-editing project.json.
+      //
+      // target is { projectPath }; resolves true if it saved, false otherwise, so a caller that
+      // opened it to fix an unrunnable config knows whether to retry.
+      contribute("popups", {
+        id: "run-config",
+        sourceType: "host",
+        title: "Run configuration",
+        size: 460,
+        mount(container, ctx) {
+          const projectPath = ctx.target.projectPath;
+          const body = document.createElement("div");
+          body.className = "popup-body";
+
+          // Held here and only written on Save — the point of an editor over the old menu item is
+          // that nothing takes effect until you say so, including a cancelled file picker.
+          let entry = "";
+          const selected = new Set();
+
+          // ---- entry file ----
+          const entryField = document.createElement("div");
+          entryField.className = "field";
+          const entryLabel = document.createElement("div");
+          entryLabel.className = "field-label";
+          entryLabel.textContent = "Entry file";
+          entryField.appendChild(entryLabel);
+
+          const entryRow = document.createElement("div");
+          entryRow.style.display = "flex";
+          entryRow.style.gap = "8px";
+          entryRow.style.alignItems = "center";
+          const entryValue = document.createElement("input");
+          entryValue.className = "input";
+          entryValue.type = "text";
+          entryValue.readOnly = true;
+          entryValue.placeholder = "none set";
+          entryValue.style.flex = "1";
+          const browseBtn = document.createElement("button");
+          browseBtn.type = "button";
+          browseBtn.className = "btn btn-md btn-ghost";
+          browseBtn.textContent = "Browse…";
+          entryRow.appendChild(entryValue);
+          entryRow.appendChild(browseBtn);
+          entryField.appendChild(entryRow);
+
+          const entryHint = document.createElement("div");
+          entryHint.className = "field-hint";
+          entryHint.textContent = "Handed to every module as source. Must be inside the project.";
+          entryField.appendChild(entryHint);
+          body.appendChild(entryField);
+
+          browseBtn.addEventListener("click", async () => {
+            const picked = await openDialog({ title: "Choose the project's entry file", defaultPath: projectPath });
+            if (!picked) return;
+            try {
+              // Converted but NOT saved — project.json is only written by the Save button below.
+              entry = await invoke("project_relative_entry", { projectDir: projectPath, absoluteEntryPath: picked });
+              entryValue.value = entry;
+            } catch (err) {
+              showToast({ variant: "error", message: String(err) });
+            }
+          });
+
+          // ---- modules ----
+          const modulesField = document.createElement("div");
+          modulesField.className = "field";
+          modulesField.style.marginTop = "16px";
+          const modulesLabel = document.createElement("div");
+          modulesLabel.className = "field-label";
+          modulesLabel.textContent = "Modules";
+          modulesField.appendChild(modulesLabel);
+
+          const list = document.createElement("div");
+          list.className = "run-config-modules";
+          modulesField.appendChild(list);
+          const modulesHint = document.createElement("div");
+          modulesHint.className = "field-hint";
+          modulesHint.textContent = "Whatever these require is pulled in too, so a dependency needn't be ticked itself.";
+          modulesField.appendChild(modulesHint);
+          body.appendChild(modulesField);
+
+          container.appendChild(body);
+
+          const actions = document.createElement("div");
+          actions.className = "popup-actions";
+          const cancelBtn = document.createElement("button");
+          cancelBtn.type = "button";
+          cancelBtn.className = "btn btn-md btn-ghost";
+          cancelBtn.textContent = "Cancel";
+          cancelBtn.addEventListener("click", () => ctx.close(false));
+          const saveBtn = document.createElement("button");
+          saveBtn.type = "button";
+          saveBtn.className = "btn btn-md btn-confirm";
+          saveBtn.textContent = "Save";
+          saveBtn.disabled = true;
+          actions.appendChild(cancelBtn);
+          actions.appendChild(saveBtn);
+          container.appendChild(actions);
+
+          saveBtn.addEventListener("click", async () => {
+            saveBtn.disabled = true;
+            // The full preset every time, not a patch — same "the frontend always resends
+            // everything" convention set_breakpoints and plugin settings already use.
+            const preset = {
+              entry,
+              requires: [...selected].map((id) => ({ id, version: "*", optional: false })),
+            };
+            try {
+              await invoke("set_project_preset", { projectDir: projectPath, preset });
+              ctx.close(true);
+            } catch (err) {
+              showToast({ variant: "error", message: String(err) });
+              saveBtn.disabled = false;
+            }
+          });
+
+          // Loaded after the shell is on screen so the popup never appears empty while waiting on
+          // two backend calls; Save stays disabled until there is something real to save.
+          (async () => {
+            let preset = { entry: "", requires: [] };
+            let modules = [];
+            try {
+              [preset, modules] = await Promise.all([
+                invoke("get_project_preset", { projectDir: projectPath }),
+                invoke("list_installed_modules"),
+              ]);
+            } catch (err) {
+              showToast({ variant: "error", message: String(err) });
+            }
+
+            entry = (preset.entry || "").trim();
+            entryValue.value = entry;
+            for (const dep of preset.requires || []) {
+              if (dep && dep.id) selected.add(dep.id);
+            }
+
+            list.textContent = "";
+            if (!modules.length) {
+              const empty = document.createElement("div");
+              empty.className = "field-hint";
+              empty.textContent = "No modules are installed. Install one from File > Modules first.";
+              list.appendChild(empty);
+            }
+            for (const m of modules) {
+              const row = document.createElement("label");
+              row.className = "run-config-module";
+              const box = document.createElement("input");
+              box.type = "checkbox";
+              box.checked = selected.has(m.id);
+              box.addEventListener("change", () => {
+                if (box.checked) selected.add(m.id);
+                else selected.delete(m.id);
+              });
+              const text = document.createElement("span");
+              text.className = "run-config-module-name";
+              text.textContent = m.name;
+              const meta = document.createElement("span");
+              meta.className = "run-config-module-meta";
+              meta.textContent = m.id + (m.version ? ` · v${m.version}` : "");
+              row.appendChild(box);
+              row.appendChild(text);
+              row.appendChild(meta);
+              list.appendChild(row);
+            }
+
+            // A requirement whose module has since been uninstalled has no checkbox of its own, so
+            // saving would quietly drop it. It gets a row anyway — still ticked, so saving keeps it
+            // — and stays untickable so the stale entry can actually be removed. Showing it as
+            // plain text would make it visible but unfixable, which is the worse half of both.
+            const installedIds = new Set(modules.map((m) => m.id));
+            for (const id of [...selected].filter((i) => !installedIds.has(i))) {
+              const row = document.createElement("label");
+              row.className = "run-config-module is-missing";
+              const box = document.createElement("input");
+              box.type = "checkbox";
+              box.checked = true;
+              box.addEventListener("change", () => {
+                if (box.checked) selected.add(id);
+                else selected.delete(id);
+              });
+              const text = document.createElement("span");
+              text.className = "run-config-module-name";
+              text.textContent = id;
+              const meta = document.createElement("span");
+              meta.className = "run-config-module-meta";
+              meta.textContent = "required but not installed";
+              row.appendChild(box);
+              row.appendChild(text);
+              row.appendChild(meta);
+              list.appendChild(row);
+            }
+
+            saveBtn.disabled = false;
+          })();
+        },
+      });
+
       contribute("popups", {
         id: "new-project",
         sourceType: "host",

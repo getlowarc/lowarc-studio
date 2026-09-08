@@ -159,7 +159,7 @@
       document.getElementById("run-menu-pause").addEventListener("click", () => togglePause());
       document.getElementById("run-menu-stop").addEventListener("click", () => stopRun());
       document.getElementById("run-menu-restart").addEventListener("click", () => restartRun());
-      document.getElementById("run-menu-set-entry").addEventListener("click", () => pickAndSetEntry());
+      document.getElementById("run-menu-config").addEventListener("click", () => editRunConfig());
 
       document.getElementById("dev-run-settings-item").addEventListener("click", () => {
         showPopup("settings", { url: "settings.html" });

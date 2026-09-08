@@ -797,6 +797,46 @@
         overflow-y: auto;
       }
 
+      /* The Run Config popup's module picker. Capped and scrollable rather than growing with the
+         list — a machine with many modules installed would otherwise push Save off the screen. */
+      .run-config-modules {
+        max-height: 220px;
+        overflow-y: auto;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 4px;
+      }
+
+      .run-config-module {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 6px;
+        border-radius: 3px;
+        font-size: 13px;
+        cursor: pointer;
+      }
+
+      .run-config-module:hover {
+        background: var(--bg-hover);
+      }
+
+      .run-config-module-name {
+        flex: none;
+      }
+
+      /* Pushed right and dimmed: the id and version identify a row without competing with its name,
+         and the id is what project.json actually stores. */
+      .run-config-module-meta {
+        margin-left: auto;
+        color: var(--fg-dim);
+        font-size: 12px;
+      }
+
+      .run-config-module.is-missing .run-config-module-meta {
+        color: var(--danger);
+      }
+
       .plugin-manager-empty {
         padding: 16px 12px;
         font-size: 13px;
@@ -1020,7 +1060,7 @@
               <div class="menu-dropdown-divider"></div>
               <button type="button" class="menu-dropdown-item" id="run-menu-restart">Restart</button>
               <div class="menu-dropdown-divider"></div>
-              <button type="button" class="menu-dropdown-item" id="run-menu-set-entry">Set Entry File…</button>
+              <button type="button" class="menu-dropdown-item" id="run-menu-config">Edit Run Config…</button>
               <button type="button" class="menu-dropdown-item" id="dev-run-settings-item">Dev Run Settings…</button>
             </div>
           </div>

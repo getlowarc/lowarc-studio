@@ -35,33 +35,26 @@
         document.getElementById("run-menu-restart").disabled = !isRunning;
       }
 
-      // Opens the native file picker for the project's entry file and persists whatever gets
-      // picked. Shared by the menu item (change it any time) and ensureEntrySet (prompt only when
-      // Run actually needs one) — both just need "ask, save, tell the user", nothing else differs.
-      async function pickAndSetEntry() {
-        const picked = await openDialog({ title: "Choose the project's entry file", defaultPath: projectPath });
-        if (!picked) return null;
-        try {
-          const entry = await invoke("set_project_entry", { projectDir: projectPath, absoluteEntryPath: picked });
-          showToast({ variant: "success", message: `Entry file set to ${entry}.` });
-          return entry;
-        } catch (err) {
-          showToast({ variant: "error", message: String(err) });
-          return null;
-        }
+      // The Run menu's "Edit Run Config…" — the one place a project's entry file and required
+      // modules are edited. Resolves true if it saved.
+      function editRunConfig() {
+        return showPopup("run-config", { projectPath });
       }
 
-      // Returns a project-relative entry path that's actually there on disk, prompting the picker
-      // if none is set yet or if the one that was set has since moved/been deleted — same dialog
-      // either way, since from the user's side "never set" and "no longer valid" look identical.
-      async function ensureEntrySet(preset) {
-        let entry = preset.entry && preset.entry.trim() ? preset.entry.trim() : null;
-        if (entry && !(await invoke("entry_file_exists", { projectDir: projectPath, entry }))) {
-          entry = null;
-        }
-        return entry || pickAndSetEntry();
+      // A project-relative entry path that is actually on disk, or null. "Never set" and "set but
+      // since moved or deleted" are deliberately one case: from the user's side both mean the same
+      // thing, and both are fixed the same way.
+      async function usableEntry(preset) {
+        const entry = preset.entry && preset.entry.trim() ? preset.entry.trim() : null;
+        if (!entry) return null;
+        return (await invoke("entry_file_exists", { projectDir: projectPath, entry })) ? entry : null;
       }
 
+      // Run just runs the saved config. It deliberately no longer opens a file picker mid-click the
+      // way it used to — picking one file was never enough to make a project runnable anyway (a
+      // project with no modules resolves to nothing), and a Run button that silently sets
+      // configuration as a side effect is a surprise. An unrunnable config opens the editor instead,
+      // and runs on the spot if that edit fixed it.
       async function startRun() {
         if (isRunning) return;
 
@@ -73,8 +66,22 @@
           return;
         }
 
-        const entry = await ensureEntrySet(preset);
-        if (!entry) return; // picker was cancelled, or setting it failed (already toasted)
+        let entry = await usableEntry(preset);
+        if (!entry) {
+          showToast({
+            variant: "error",
+            message: preset.entry ? `Entry file "${preset.entry}" is missing — check the run config.` : "This project has no entry file set.",
+          });
+          if (!(await editRunConfig())) return; // cancelled — nothing changed, so nothing to retry
+          try {
+            preset = await invoke("get_project_preset", { projectDir: projectPath });
+          } catch (err) {
+            showToast({ variant: "error", message: String(err) });
+            return;
+          }
+          entry = await usableEntry(preset);
+          if (!entry) return; // saved, but still without a usable entry
+        }
 
         try {
           await invoke("start_dev_run", { entryFile: entry, projectDir: projectPath });

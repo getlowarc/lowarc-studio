@@ -23,7 +23,7 @@ use settings::Settings;
 use theme::ThemePreset;
 use std::collections::HashSet;
 use std::io::{BufRead, BufReader, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use parking_lot::Mutex;
 use std::process::{Child, ChildStdin};
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -365,22 +365,56 @@ fn get_project_preset(project_dir: String) -> Result<runtime::project::ProjectPr
     runtime::project::ProjectPreset::load(&PathBuf::from(project_dir))
 }
 
-/// Sets a project's entry file from an absolute path (as returned by the native file-picker
-/// dialog) and returns the project-relative path that actually got saved. The entry must live
-/// inside the project directory — canonicalize (not a plain strip_prefix) so a case or `..`
-/// difference between the two paths doesn't produce a false "outside the project" rejection.
+/// Writes a whole preset back — what the Run Config editor saves. Distinct from set_project_entry,
+/// which only ever touched `entry` and takes an absolute path to make relative; this takes the
+/// already-shaped preset the editor built and replaces project.json wholesale, the same "the
+/// frontend always sends the full state" convention set_breakpoints and plugin settings use.
+///
+/// The entry is validated here rather than trusted: the editor picks it through a native dialog
+/// that can reach anywhere on disk, and an entry outside the project would produce a project.json
+/// that only works on the machine that wrote it.
 #[tauri::command]
-fn set_project_entry(project_dir: String, absolute_entry_path: String) -> Result<String, String> {
-    let project_dir = PathBuf::from(project_dir);
+fn set_project_preset(project_dir: String, preset: runtime::project::ProjectPreset) -> Result<(), String> {
+    let dir = PathBuf::from(&project_dir);
+    if !preset.entry.trim().is_empty() {
+        let entry = dir.join(&preset.entry);
+        if !entry.is_file() {
+            return Err(format!("Entry file \"{}\" does not exist in this project.", preset.entry));
+        }
+    }
+    preset.save(&dir)
+}
+
+/// Turns an absolute path (from the native file picker) into the project-relative form project.json
+/// stores, WITHOUT saving anything — the Run Config editor holds unsaved changes until its Save
+/// button, so it needs the conversion on its own. set_project_entry does the same conversion and
+/// then writes; this is that function's first half, shared rather than duplicated.
+#[tauri::command]
+fn project_relative_entry(project_dir: String, absolute_entry_path: String) -> Result<String, String> {
+    relative_entry_for(&PathBuf::from(project_dir), &absolute_entry_path)
+}
+
+/// The project-relative form of an absolute entry path. The entry must live inside the project
+/// directory — canonicalize (not a plain strip_prefix) so a case or `..` difference between the two
+/// paths doesn't produce a false "outside the project" rejection.
+fn relative_entry_for(project_dir: &Path, absolute_entry_path: &str) -> Result<String, String> {
     let canonical_project = project_dir.canonicalize().map_err(|e| format!("Invalid project directory: {e}"))?;
-    let canonical_entry = PathBuf::from(&absolute_entry_path)
+    let canonical_entry = PathBuf::from(absolute_entry_path)
         .canonicalize()
         .map_err(|e| format!("Invalid entry file: {e}"))?;
 
     let relative = canonical_entry
         .strip_prefix(&canonical_project)
         .map_err(|_| "The entry file must be inside the project folder.".to_string())?;
-    let relative = relative.to_string_lossy().into_owned();
+    Ok(relative.to_string_lossy().into_owned())
+}
+
+/// Sets a project's entry file from an absolute path (as returned by the native file-picker
+/// dialog) and returns the project-relative path that actually got saved.
+#[tauri::command]
+fn set_project_entry(project_dir: String, absolute_entry_path: String) -> Result<String, String> {
+    let project_dir = PathBuf::from(project_dir);
+    let relative = relative_entry_for(&project_dir, &absolute_entry_path)?;
 
     let mut preset = runtime::project::ProjectPreset::load(&project_dir).unwrap_or_default();
     preset.entry = relative.clone();
@@ -899,6 +933,8 @@ pub fn run() {
       start_export,
       get_project_preset,
       set_project_entry,
+      set_project_preset,
+      project_relative_entry,
       entry_file_exists,
       read_text_file,
       write_text_file,
