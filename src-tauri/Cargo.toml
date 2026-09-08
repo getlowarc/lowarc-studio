@@ -59,6 +59,12 @@ femtovg = { version = "0.27", features = ["glutin"] }
 winit = "0.30"
 glutin = "0.32"
 glutin-winit = "0.5"
+# bin/lowarc.rs only — turns Ctrl+C into "set the run's stop flag" rather than a hard kill. That
+# matters because spawn_and_run is what sends every module its `stop` phase; skipping it leaves
+# sounds queued, a canvas window never closed, and on non-Windows platforms orphaned child
+# processes. Somebody WILL Ctrl+C a long-running CLI. Three lines of crate beats per-platform unsafe
+# FFI (SetConsoleCtrlHandler and friends) for something this mundane.
+ctrlc = "3.5.2"
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 # Self-updating. Desktop-only both because there's nothing to update on mobile and because that's

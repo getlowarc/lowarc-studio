@@ -59,8 +59,18 @@ impl AppPaths {
         }
     }
 
+    /// LOWARC_MODULES_DIR overrides where modules are resolved from. Added for bin/lowarc.rs's own
+    /// end-to-end tests, which have to build a store of their own — resolving against the real one
+    /// would make them depend on whatever the developer happens to have installed, and pass or fail
+    /// per machine. It is genuinely useful beyond that (running a project against a different module
+    /// set without disturbing the installed one), which is why it is a documented override rather
+    /// than a test-only backdoor. Deliberately NOT applied to plugins()/settings_file(): those are
+    /// Studio's own state, and nothing has asked to relocate them.
     pub fn modules() -> PathBuf {
-        Self::user_data().join("modules")
+        match std::env::var_os("LOWARC_MODULES_DIR") {
+            Some(dir) if !dir.is_empty() => PathBuf::from(dir),
+            _ => Self::user_data().join("modules"),
+        }
     }
     pub fn plugins() -> PathBuf {
         Self::user_data().join("plugins")

@@ -1,4 +1,8 @@
-mod app_paths;
+// Public for bin/lowarc.rs, which has to resolve modules from the SAME store Studio does — the
+// repo's own /modules/ in a source checkout, %APPDATA% in an installed copy, a distinction
+// AppPaths::user_data() already owns. A CLI carrying its own copy of that rule would be a second
+// source of truth for where modules live, and the two would drift.
+pub mod app_paths;
 pub mod dylib;
 pub mod export;
 mod installs;
