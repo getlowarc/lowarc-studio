@@ -1101,6 +1101,7 @@ function relayCall(kind, payload) {
   if (window.parent === window) {
     if (kind === "invoke") return window.__TAURI__.core.invoke(payload.command, payload.params);
     if (kind === "dialog-open") return window.__TAURI__.dialog.open(payload);
+    if (kind === "theme-changed") return Promise.resolve(reapplyTheme());
   }
   return new Promise((resolve, reject) => {
     const id = nextRelayCallId++;
@@ -1115,6 +1116,26 @@ function relayableOpenDialog(opts) {
   return relayCall("dialog-open", opts);
 }
 
+/// Re-resolves and re-applies the theme in THIS document. theme.js sets its CSS custom properties on
+/// its own documentElement and nothing else, so a page that changes the theme only restyles itself —
+/// which is why switching light/dark in Settings used to leave the editor behind it unchanged until
+/// a reload. The Settings page is an iframe, so it relays this to its parent (see relayCall's
+/// "theme-changed" kind) rather than reaching into it directly.
+///
+/// Guarded because primitives.js is loaded by pages that may not have loaded theme.js; a page with
+/// no theme to re-resolve simply has nothing to do here.
+function reapplyTheme() {
+  if (typeof resolveAndApplyTheme === "function") resolveAndApplyTheme();
+}
+
+/// Tells this document AND, when it's an iframe, its parent to re-read the theme. Called after
+/// anything that changes which theme is active — not after a mere colour preview, which is
+/// deliberately local to the Settings page until it's saved.
+function broadcastThemeChange() {
+  reapplyTheme();
+  if (window.parent !== window) relayCall("theme-changed").catch(() => {});
+}
+
 // Parent-side half — called from contributeIframePopup's own onMessage below, which has ALREADY
 // verified e.source === this specific popup's own iframe.contentWindow before this ever runs, so
 // there's no separate trust check needed here: a plugin iframe (sandbox="allow-scripts", a
@@ -1126,6 +1147,9 @@ async function handleRelayCall(sourceWindow, data) {
     let result;
     if (kind === "invoke") result = await window.__TAURI__.core.invoke(payload.command, payload.params);
     else if (kind === "dialog-open") result = await window.__TAURI__.dialog.open(payload);
+    // The popup changed which theme is active; this document has to re-read it too, since theme.js
+    // only ever styles the document it runs in.
+    else if (kind === "theme-changed") result = reapplyTheme();
     else throw new Error(`Unknown relay-call kind "${kind}"`);
     sourceWindow.postMessage({ type: "relay-call-reply", id, ok: true, result }, "*");
   } catch (err) {
