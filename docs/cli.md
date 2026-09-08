@@ -45,6 +45,16 @@ Nothing ends a run on a timer. It ends when:
 - **Ctrl+C**, which sets the same stop flag rather than killing the process, so every module still
   gets its `stop` phase and can clean up
 
+Ctrl+C was verified by delivering a real `CTRL_C_EVENT` to a running `lowarc run` with a
+`vector-canvas` project: the CLI exits **0** — the graceful path, not the `0xC000013A` a hard
+console termination produces — and the canvas child exits with it rather than being orphaned.
+
+It is checked by hand rather than in CI on purpose. Doing it requires attaching to another
+process's console (`AttachConsole` + `GenerateConsoleCtrlEvent`), which is Windows-specific and
+sensitive to the console the *test runner itself* happens to have — the same test reports a false
+failure when its output is piped. A test that fails for reasons unrelated to the code is worse than
+no test.
+
 A project with no module that ever asks to stop will run until you interrupt it. That's correct
 behaviour, not a hang — a game loop has no natural end.
 
