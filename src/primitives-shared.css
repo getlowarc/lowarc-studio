@@ -142,7 +142,7 @@
   color: var(--cyan-ink);
 }
 .btn-main:hover:not(:disabled) {
-  filter: brightness(1.1);
+  filter: brightness(var(--btn-hover-brightness));
 }
 .btn-main:active:not(:disabled) {
   background: var(--cyan-dark);
@@ -157,7 +157,7 @@
   color: var(--fg);
 }
 .btn-sub:hover:not(:disabled) {
-  filter: brightness(1.2);
+  filter: brightness(var(--btn-hover-brightness));
 }
 .btn-sub:active:not(:disabled) {
   filter: brightness(0.9);
@@ -195,7 +195,7 @@
   color: #fff;
 }
 .btn-danger:hover:not(:disabled) {
-  filter: brightness(1.08);
+  filter: brightness(var(--btn-hover-brightness));
 }
 .btn-danger:active:not(:disabled) {
   filter: brightness(0.85);
@@ -207,7 +207,7 @@
   color: #fff;
 }
 .btn-confirm:hover:not(:disabled) {
-  filter: brightness(1.08);
+  filter: brightness(var(--btn-hover-brightness));
 }
 .btn-confirm:active:not(:disabled) {
   filter: brightness(0.85);
@@ -222,7 +222,7 @@
   color: var(--yellow-ink);
 }
 .btn-warning:hover:not(:disabled) {
-  filter: brightness(1.1);
+  filter: brightness(var(--btn-hover-brightness));
 }
 .btn-warning:active:not(:disabled) {
   background: var(--yellow-dark);

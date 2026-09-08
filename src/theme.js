@@ -86,12 +86,36 @@ function systemPrefersDark() {
   return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
+/// Rough perceived brightness of a #rrggbb, 0–1. Only ever used to answer "is this a light theme or
+/// a dark one", so the cheap Rec. 601 weighting is plenty — nothing here needs real colorimetry.
+function luminanceOf(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec((hex || "").trim());
+  if (!m) return 0;
+  const n = parseInt(m[1], 16);
+  return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+}
+
 function applyThemeColors(colors) {
   const root = document.documentElement.style;
   for (const token of THEME_TOKENS) {
     const value = colors[token.key];
     if (value) root.setProperty(token.cssVar, value);
   }
+
+  // Which way a button should move on hover, derived from the theme's own background rather than
+  // hardcoded per built-in theme — so a user's own preset gets the right direction too.
+  //
+  // Buttons hover by brightening, which only works on a dark ground. On a light theme it pushes a
+  // filled button UP toward its own ink: light ink is typically pure white, which cannot get any
+  // brighter, so the two converge and the label or icon vanishes into the button. The Run button in
+  // the header was exactly this — a white play glyph on teal, fading into a brightening surface.
+  // Darkening instead moves them apart, which is also what light UIs conventionally do.
+  //
+  // A filter is used rather than per-type hover colors because it brightens the whole rendered
+  // button, content included; there is no way to filter only the background. Getting the DIRECTION
+  // right is what makes that acceptable, since the content then moves away from the surface rather
+  // than into it.
+  root.setProperty("--btn-hover-brightness", luminanceOf(colors.bg) > 0.5 ? "0.92" : "1.1");
   try {
     localStorage.setItem(THEME_CACHE_KEY, JSON.stringify(colors));
   } catch {

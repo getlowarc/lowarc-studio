@@ -8,6 +8,13 @@
     <link rel="stylesheet" href="primitives-shared.css" />
     <link rel="stylesheet" href="primitives.css" />
     <style>
+      /* Every tab panel sits under the shared search bar, so the gap lives here rather than on the
+         bar itself — one rule covers General, Appearance and Plugins alike. The first heading was
+         previously almost touching the search field. */
+      #settings-search {
+        margin-bottom: 28px;
+      }
+
       .tab-panel {
         display: none;
       }
@@ -31,12 +38,24 @@
         border-bottom: 1px solid var(--border);
       }
 
-      .theme-picker {
-        max-width: 320px;
+      /* Theme dropdown, preset name and the save/delete buttons on one line, bottom-aligned so the
+         buttons sit level with the inputs rather than with their labels. */
+      .theme-row {
+        display: flex;
+        gap: 10px;
+        align-items: flex-end;
+        flex-wrap: wrap;
       }
 
-      .theme-picker .field-hint {
-        margin-top: 6px;
+      .theme-picker {
+        width: 220px;
+        flex: none;
+      }
+
+      /* A preset name is a handful of words; it was previously stretching across the whole dialog. */
+      .preset-name-field {
+        width: 220px;
+        flex: none;
       }
 
       .color-group {
@@ -52,24 +71,30 @@
         margin: 0 0 10px;
       }
 
+      /* Sized off the fields rather than a round number: each column is one swatch plus one hex
+         input, so the track only has to be wide enough for those and its label. The old 220px
+         minimum left most of every column empty and pushed the grid down to a few columns. */
       .color-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-        gap: 14px;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 10px 12px;
       }
 
       .color-field {
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 4px;
       }
 
       .color-field .row {
         display: flex;
-        gap: 8px;
+        gap: 6px;
         align-items: center;
       }
 
+      /* A native colour input paints its own swatch INSIDE the element, with its own border, so a
+         border here produced two outlines — the browser's square one nested in ours. Stripping the
+         inner wrapper's padding and border leaves a single rounded chip. */
       .color-field input[type="color"] {
         width: 36px;
         height: 36px;
@@ -79,24 +104,26 @@
         border-radius: 6px;
         background: none;
         cursor: pointer;
+        overflow: hidden;
       }
 
+      .color-field input[type="color"]::-webkit-color-swatch-wrapper {
+        padding: 0;
+      }
+
+      .color-field input[type="color"]::-webkit-color-swatch {
+        border: none;
+        border-radius: 5px;
+      }
+
+      /* Wide enough for #RRGGBBAA and no wider — ch units so this tracks the mono font rather than
+         a pixel guess, and stays correct if the font changes. Not flex:1: stretching to fill the
+         column is what made these look oversized. */
       .color-field input.input {
-        flex: 1;
+        width: 11ch;
+        flex: none;
         font-family: var(--font-mono, monospace);
         text-transform: uppercase;
-      }
-
-      .save-row {
-        display: flex;
-        gap: 10px;
-        align-items: flex-end;
-        flex-wrap: wrap;
-      }
-
-      .save-row .field {
-        flex: 1;
-        min-width: 200px;
       }
 
       .theme-divider {
@@ -119,7 +146,7 @@
              tab was showing before. See the script below for why this is a plain wired input, not
              initSearchbar() — that helper is built for a type-and-pick-one autocomplete (the
              command-center's job), not a live-filtered list view like this one. -->
-        <div class="searchbar" id="settings-search" style="margin-bottom: 18px">
+        <div class="searchbar" id="settings-search">
           <span class="searchbar-icon">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.6" /><path d="M11 11L14.5 14.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
           </span>
@@ -140,36 +167,34 @@
         </div>
 
         <div class="tab-panel" id="tab-panel-appearance">
+          <!-- Theme and Save-as-preset share one row: picking a theme and saving the colors you
+               just edited as a new one are the same task, and splitting them put the save controls
+               below every colour field, far from the dropdown they relate to. -->
           <div class="section">
             <h2>Theme</h2>
-            <div class="field theme-picker">
-              <label class="field-label">Active theme</label>
-              <div class="dropdown dropdown-full" data-dropdown data-open="false" id="theme-dropdown">
-                <button type="button" class="dropdown-trigger" data-dropdown-trigger>
-                  <span class="dropdown-value" data-dropdown-value>System</span>
-                  <span class="dropdown-chevron">▾</span>
-                </button>
-                <div class="dropdown-menu" data-dropdown-menu id="theme-dropdown-menu"></div>
+            <div class="theme-row">
+              <div class="field theme-picker">
+                <label class="field-label">Active theme</label>
+                <div class="dropdown dropdown-full" data-dropdown data-open="false" id="theme-dropdown">
+                  <button type="button" class="dropdown-trigger" data-dropdown-trigger>
+                    <span class="dropdown-value" data-dropdown-value>System</span>
+                    <span class="dropdown-chevron">▾</span>
+                  </button>
+                  <div class="dropdown-menu" data-dropdown-menu id="theme-dropdown-menu"></div>
+                </div>
               </div>
-              <div class="field-hint">System follows your OS's light/dark setting. Editing colors below previews a new theme without changing this until you save it as a preset.</div>
+              <div class="field preset-name-field">
+                <label class="field-label" for="preset-name">Save as preset</label>
+                <input id="preset-name" class="input" type="text" placeholder="My theme" autocomplete="off" />
+              </div>
+              <button type="button" class="btn btn-md btn-confirm" id="save-preset">Save preset</button>
+              <button type="button" class="btn btn-md btn-danger" id="delete-preset" style="display: none">Delete preset</button>
             </div>
           </div>
 
           <div class="section">
             <h2>Colors</h2>
             <div id="color-groups"></div>
-          </div>
-
-          <div class="section">
-            <h2>Save as preset</h2>
-            <div class="save-row">
-              <div class="field">
-                <label class="field-label" for="preset-name">Preset name</label>
-                <input id="preset-name" class="input" type="text" placeholder="My theme" autocomplete="off" />
-              </div>
-              <button type="button" class="btn btn-md btn-confirm" id="save-preset">Save preset</button>
-              <button type="button" class="btn btn-md btn-danger" id="delete-preset" style="display: none">Delete preset</button>
-            </div>
           </div>
         </div>
       </div>

@@ -1,6 +1,12 @@
 /* Shared styling for every LowArc Studio page. */
 
 :root {
+  /* Which way a button moves on hover. Set for real by theme.js from the active theme's own
+     background — dark themes brighten, light themes darken, so a filled button's content always
+     moves AWAY from its surface rather than into it. These are the dark-theme defaults, and matter
+     only for the instant before theme.js runs. */
+  --btn-hover-brightness: 1.1;
+
   --bg: #1e1e1e;
   --bg-raised: #252526;
   --bg-hover: #2a2d2e;
