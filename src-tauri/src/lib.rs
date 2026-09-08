@@ -912,12 +912,16 @@ pub fn run() {
     .manage(plugin_session::SessionRegistry::default());
   #[cfg(desktop)]
   let builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
-  // Registered unconditionally, but it can't actually do anything until tauri.conf.json carries a
-  // pubkey and endpoints (see docs/updating.md) — check() just errors until then, which is the
-  // honest failure rather than a silent no-op. Registering it now means the only thing left to
-  // turn updates on is configuration, not code.
-  #[cfg(desktop)]
-  let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+  // The updater plugin is deliberately NOT registered yet. It refuses to initialize without a
+  // `plugins.updater` block in tauri.conf.json — not at check() time, at STARTUP:
+  //
+  //   PluginInitialization("updater", "Error deserializing 'plugins.updater' ...
+  //    invalid type: null, expected struct Config")
+  //
+  // which takes the whole app down rather than leaving one feature unavailable. Registering it
+  // before the config exists therefore isn't a harmless head start, it's a broken build, and it
+  // compiles and passes tests either way — only launching the app catches it. Add this line back in
+  // the same change that adds the pubkey and endpoints; see docs/updating.md.
 
   builder
     .plugin(tauri_plugin_dialog::init())

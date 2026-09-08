@@ -89,8 +89,22 @@ becomes one, that needs its own design; it's the only case where the "one channe
 - `.github/workflows/release.yml`, tag-triggered, which checks the tag against `Cargo.toml` before
   building and refuses to publish a release whose contents disagree with its own name.
 
-The updater is **inert**: `check()` errors until the config below exists. That's deliberate — an
-honest failure rather than a silent no-op.
+**The plugin is not registered in the builder yet, and must not be until the config below exists.**
+An earlier version of this document claimed registering it early was harmless — that the feature
+would sit inert and `check()` would error until configured. That is wrong. The plugin refuses to
+initialize at all without a `plugins.updater` block:
+
+```
+PluginInitialization("updater", "Error deserializing 'plugins.updater' within your
+ Tauri configuration: invalid type: null, expected struct Config")
+```
+
+which panics at startup and takes the whole app down, rather than leaving one feature unavailable.
+
+Worth noting how it got missed: `cargo build` and `cargo test` both pass with the plugin registered
+and unconfigured, because nothing about it fails until a window is actually created. Only launching
+the app catches it. Add the registration line in the same change that adds the pubkey and endpoints,
+and launch the app afterwards — not just build it.
 
 ## What's left, and what it depends on
 
