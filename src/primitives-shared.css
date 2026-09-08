@@ -155,10 +155,12 @@
   filter: none;
 }
 
+/* Ink for the same reason .btn-main:active uses it — this is a cyan fill, and --fg is the color for
+   text on the PAGE, which on a light theme is near-black sitting on dark teal. */
 .btn-sub {
   background: var(--cyan-dark);
   border-color: var(--cyan-dark);
-  color: var(--fg);
+  color: var(--cyan-ink);
 }
 .btn-sub:hover:not(:disabled) {
   filter: brightness(var(--btn-hover-brightness));

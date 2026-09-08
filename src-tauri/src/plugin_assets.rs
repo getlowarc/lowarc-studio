@@ -46,6 +46,19 @@ pub const HARNESS_JS: &str = r#"(function () {
       pending.delete(data.id);
       if (data.ok) waiter.resolve(data.result);
       else waiter.reject(new Error(data.error || "plugin call failed"));
+    } else if (data.type === "theme") {
+      // Handled here rather than dispatched to on() listeners: every plugin that links
+      // __lowarc.css wants this, and none of them should have to write code to stay in step with
+      // the IDE's theme. __lowarc-theme.css already themed this document at load; this is only for
+      // a theme CHANGED while the plugin is open, which a sandboxed iframe cannot otherwise notice
+      // without being reloaded — and reloading would throw away whatever the plugin was showing.
+      // Custom properties only, so a malformed payload can't set arbitrary styles.
+      const vars = data.vars && typeof data.vars === "object" ? data.vars : {};
+      for (const [name, value] of Object.entries(vars)) {
+        if (typeof name === "string" && name.startsWith("--") && typeof value === "string") {
+          document.documentElement.style.setProperty(name, value);
+        }
+      }
     } else if (data.type === "emit") {
       (listeners.get(data.event) || []).forEach((handler) => handler(data.payload));
     }
@@ -418,13 +431,12 @@ pub const CSP: &str = "default-src 'none'; script-src 'self'; style-src 'self' '
 ///
 /// A plugin opts in entirely on its own — nothing forces this on any plugin, first-party or not —
 /// by adding `<link rel="stylesheet" href="__lowarc.css">` to its own HTML, same convention as
-/// `<script src="__lowarc.js">`. Not theme-live: this bakes in style.css's own `:root` values
-/// (the app's default dark palette), not whatever theme.js resolves Settings.themeMode to at
-/// runtime — theme.js itself can't run inside a plugin (it calls Tauri commands a sandboxed plugin
-/// has no access to), so a plugin using this always renders in the default palette regardless of
-/// whether the IDE itself is currently on Light or a custom preset. A real fix for that would mean
-/// serving a theme-resolved stylesheet dynamically (a new Rust-side route mirroring theme.js's own
-/// resolution) — a deliberate, acknowledged scope cut, not an oversight.
+/// `<script src="__lowarc.js">`. Its `:root` block is the DEFAULT palette only — the resolved theme
+/// comes from the separate `__lowarc-theme.css` route (see plugin_asset_server.rs), which a plugin
+/// links after this one and which serves whatever Settings.themeMode currently resolves to. That
+/// covers a plugin's initial load; a theme changed while it is already open arrives over the
+/// harness's own `lowarc:theme` message instead, since re-fetching a stylesheet is not something the
+/// host can make a sandboxed iframe do without reloading it.
 pub const SHARED_STYLE_CSS: &str = include_str!("../../src/style.css");
 
 /// The host's genuinely reusable component styles — buttons, text/numeric inputs, checkboxes, a

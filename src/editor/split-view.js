@@ -468,6 +468,33 @@
         }
       });
 
+      // The theme just changed in THIS document (theme.js announces every apply). A plugin runs in
+      // a sandboxed iframe: it got the resolved theme from __lowarc-theme.css when it loaded, but it
+      // has no way to notice a later change, and reloading it to pick one up would throw away
+      // whatever it was showing — an editor's unsaved buffer, a terminal's scrollback. So the
+      // resolved values are pushed straight in and applied as custom properties.
+      //
+      // Read off documentElement's inline style rather than a token list, because that IS what
+      // applyThemeColors wrote — including derived values like --btn-hover-brightness that aren't
+      // colors at all and would be forgotten by anything maintaining its own list.
+      window.addEventListener("lowarc-theme-applied", () => {
+        const style = document.documentElement.style;
+        const vars = {};
+        for (const name of style) {
+          if (name.startsWith("--")) vars[name] = style.getPropertyValue(name);
+        }
+        const message = { type: "theme", vars };
+
+        const notified = new Set();
+        const push = (iframe) => {
+          if (!iframe || notified.has(iframe)) return;
+          notified.add(iframe);
+          iframe.contentWindow.postMessage(message, "*");
+        };
+        for (const entry of pluginPanels.values()) push(entry.iframe);
+        for (const file of openFiles.values()) push(file.iframe);
+      });
+
       // A setting was changed in settings.html (a separate window/document, so it can't ride
       // plugin-emit — that one only fires as a side effect of invoke_plugin, and no plugin call
       // happens here) — see set_plugin_setting in lib.rs. Relayed the same way plugin-emit relays

@@ -116,6 +116,17 @@ function applyThemeColors(colors) {
   // right is what makes that acceptable, since the content then moves away from the surface rather
   // than into it.
   root.setProperty("--btn-hover-brightness", luminanceOf(colors.bg) > 0.5 ? "0.92" : "1.1");
+
+  // Announced rather than pushed anywhere from here: this file has no business knowing which
+  // iframes a page happens to be hosting. The editor listens and forwards to its plugin panels (see
+  // split-view.js), and anything else that needs to react can do the same without theme.js growing
+  // a list of consumers. Fires on EVERY apply, so an OS light/dark switch propagates the same way a
+  // deliberate one does.
+  try {
+    window.dispatchEvent(new CustomEvent("lowarc-theme-applied"));
+  } catch {
+    // CustomEvent is unavailable in some minimal contexts; the theme itself is already applied.
+  }
   try {
     localStorage.setItem(THEME_CACHE_KEY, JSON.stringify(colors));
   } catch {
