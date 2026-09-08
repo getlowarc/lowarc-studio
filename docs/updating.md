@@ -108,18 +108,65 @@ created by you and never pass through anything else.
   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`). Never committed.
 - Public key → `tauri.conf.json`, committed. Safe by design; it only verifies.
 
-### 2. Decide where artifacts and the manifest live — **open**
+### 2. Hosting — **decided: lowarc.com**
 
-The repo is private, so GitHub release assets can't be fetched anonymously by the updater. Two ways
-out:
+The repo is private, so GitHub release assets can't be fetched anonymously by the updater. The
+alternative was making releases public while the source stayed closed; **lowarc.com was chosen
+instead** — no coupling to GitHub, full control over the manifest, and the site is being built
+anyway.
 
-- **Public releases on a private repo.** Cheapest. Release assets become world-readable while source
-  stays closed.
-- **Host on the website.** More control, no coupling to GitHub, and `lowarc.com` is already an
-  allowed opener URL in `capabilities/default.json`. Likely the better fit, since the site is coming
-  anyway for leaderboards.
+The site doesn't exist yet, so nothing here can be wired up. What the site will need to implement is
+specified below so it can be built against a fixed contract rather than reverse-engineered later.
 
-Not decided. It determines the `endpoints` value below.
+Note this needs nothing from the webview's CSP. The updater performs its request from Rust, so
+`connect-src 'self'` does not apply to it — that restriction only governs plugins.
+
+#### The contract lowarc.com has to satisfy
+
+The configured endpoint is a URL template. With `endpoints` set to
+`https://lowarc.com/updates/{{target}}/{{arch}}/{{current_version}}`, a Windows machine on 0.1.0
+requests exactly:
+
+```
+GET https://lowarc.com/updates/windows/x86_64/0.1.0
+```
+
+`{{target}}` is `windows` | `darwin` | `linux`; `{{arch}}` is `x86_64` | `aarch64` | `i686` |
+`armv7`; `{{current_version}}` is the running version.
+
+Two valid responses:
+
+- **`204 No Content`** — already current. This is the common case and should be cheap.
+- **`200`** with the manifest below — an update exists.
+
+```jsonc
+{
+  "version": "0.2.0",
+  "notes": "What changed.",
+  "pub_date": "2026-01-01T00:00:00Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "<contents of the .sig file produced by the release build>",
+      "url": "https://lowarc.com/downloads/lowarc-studio_0.2.0_x64-setup.exe"
+    }
+  }
+}
+```
+
+The server is free to decide *whether* an update applies (it knows the requesting version), but the
+client independently refuses anything not newer than itself, and refuses anything whose signature
+doesn't verify against the baked-in public key. A compromised server cannot push code without the
+private key.
+
+Serve artifacts over HTTPS. The `url` need not be on lowarc.com — it just has to be publicly
+fetchable.
+
+#### Getting artifacts to the site
+
+`release.yml` currently creates a **draft** GitHub release, which works as a staging area regardless
+of hosting: it builds and signs, and nothing is published publicly. Once the site exists, either add
+an upload step to the workflow or copy the artifacts and their `.sig` files across by hand. Nothing
+about the current workflow needs to change to keep that option open.
 
 ### 3. Add the config block
 
