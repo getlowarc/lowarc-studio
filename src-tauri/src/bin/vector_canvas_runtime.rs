@@ -204,12 +204,29 @@ impl App {
         }
         let Some(settings) = self.settings.as_ref() else { return };
 
-        match build_window(event_loop, settings) {
-            Ok(gfx) => self.gfx = Some(gfx),
-            Err(e) => {
-                self.init_failed = true;
-                log("error", &format!("vector-canvas could not open a window: {e}"));
+        // catch_unwind, not just the Result, because this stack PANICS rather than returning Err on
+        // a machine with no usable GL — and that is not hypothetical, it is what a CI runner does.
+        // Two known panics, neither of which the Result can express: glutin's config picker is
+        // required by its own signature to produce a Config or panic (a machine with no matching GL
+        // config yields an empty iterator), and build_surface_attributes panics on a zero-sized
+        // window. Enumerating them individually would still leave whatever the next driver quirk
+        // turns out to be, so the boundary is the thing that gets guarded, not each known cause.
+        //
+        // This is the module's whole "degrades where there is no display" promise. An earlier
+        // version returned a Result here and looked correct; CI proved the process just died
+        // instead, which is exactly the failure the audio module was already bitten by once.
+        let built = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| build_window(event_loop, settings)));
+
+        self.init_failed = true;
+        match built {
+            Ok(Ok(gfx)) => {
+                self.gfx = Some(gfx);
+                self.init_failed = false;
             }
+            Ok(Err(e)) => log("warn", &format!("vector-canvas has no window ({e}) — running without one")),
+            // The panic's own message has already gone to stderr, which the host relays; this only
+            // has to say the run is continuing regardless.
+            Err(_) => log("warn", "vector-canvas could not create a window on this machine — running without one"),
         }
     }
 
@@ -686,8 +703,12 @@ fn run_headless(rx: Receiver<Value>, reason: &str) {
 
 fn main() {
     let rx = spawn_stdin_reader();
-    match EventLoop::new() {
-        Ok(event_loop) => run_windowed(event_loop, rx),
-        Err(e) => run_headless(rx, &e.to_string()),
+    // Same reasoning as ensure_window's own catch_unwind: creating an event loop can panic as well
+    // as fail on a machine without a usable window system, and either way this module still owes
+    // the engine a working protocol participant rather than a dead process.
+    match std::panic::catch_unwind(EventLoop::new) {
+        Ok(Ok(event_loop)) => run_windowed(event_loop, rx),
+        Ok(Err(e)) => run_headless(rx, &e.to_string()),
+        Err(_) => run_headless(rx, "creating an event loop panicked"),
     }
 }

@@ -24,6 +24,11 @@ struct Module {
     child: Child,
     stdin: ChildStdin,
     stdout: BufReader<std::process::ChildStdout>,
+    /// Only ever read when the module dies unexpectedly. Piping it and then never reading it is how
+    /// an earlier version of this test reported "the module closed its output before replying" and
+    /// nothing else, while the actual panic message sat in a pipe nobody drained — on a CI runner,
+    /// which is the one machine where that message was the whole answer.
+    stderr: Option<std::process::ChildStderr>,
 }
 
 impl Module {
@@ -36,7 +41,21 @@ impl Module {
             .expect("vector_canvas_runtime should start");
         let stdin = child.stdin.take().expect("piped stdin");
         let stdout = BufReader::new(child.stdout.take().expect("piped stdout"));
-        Self { child, stdin, stdout }
+        let stderr = child.stderr.take();
+        Self { child, stdin, stdout, stderr }
+    }
+
+    /// Whatever the module wrote to stderr before dying — its panic message, in practice.
+    fn drain_stderr(&mut self) -> String {
+        let Some(mut err) = self.stderr.take() else { return "<stderr already taken>".into() };
+        let mut buf = String::new();
+        use std::io::Read;
+        let _ = err.read_to_string(&mut buf);
+        if buf.trim().is_empty() {
+            "<nothing on stderr>".into()
+        } else {
+            buf
+        }
     }
 
     fn send(&mut self, msg: Value) {
@@ -51,7 +70,9 @@ impl Module {
         loop {
             let mut line = String::new();
             let read = self.stdout.read_line(&mut line).expect("reading the module's stdout");
-            assert!(read > 0, "the module closed its output before replying");
+            if read == 0 {
+                panic!("the module closed its output before replying. Its stderr:\n{}", self.drain_stderr());
+            }
             let Ok(value) = serde_json::from_str::<Value>(&line) else { continue };
             if value.get("log").is_some() || value.get("requestStop").is_some() {
                 continue;
