@@ -1,0 +1,69 @@
+name: Release
+
+# Tag-triggered, not push-triggered — a release is a deliberate act, and the tag is what names the
+# version. The tag must match the version in src-tauri/Cargo.toml, which is now the single source of
+# truth for it (tauri.conf.json inherits it); check-version below fails the run rather than
+# publishing a release whose contents disagree with its own name.
+#
+# Windows-only for the same reason CI is — see ci.yml's own note. Extend the matrix when the
+# toolchain pin does; the manifest format already keys artifacts per platform, so adding one is a
+# matrix entry rather than a redesign.
+#
+# INERT UNTIL CONFIGURED. This workflow needs two repository secrets that do not exist yet, and
+# without them a tag push fails here rather than shipping something unsigned:
+#   TAURI_SIGNING_PRIVATE_KEY           the private key from `cargo tauri signer generate`
+#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD  its password ("" if generated without one)
+# See docs/updating.md for generating them and for what still has to be decided about hosting.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # The tag and Cargo.toml must agree. Publishing v0.2.0 from a tree that still says 0.1.0 would
+      # produce an update no client ever takes (the updater compares against its own baked-in
+      # version), which is a silent failure — far better to stop here.
+      - name: Check the tag matches Cargo.toml
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}" -replace '^v', ''
+          $cargo = (Select-String -Path src-tauri/Cargo.toml -Pattern '^version\s*=\s*"(.+)"').Matches[0].Groups[1].Value
+          if ($tag -ne $cargo) {
+            Write-Error "Tag $tag does not match Cargo.toml version $cargo"
+            exit 1
+          }
+          Write-Host "Tag and Cargo.toml agree on $cargo"
+
+      # Everything CI already runs. A release should never be the first time these are checked, but
+      # a tag can be pushed to a commit CI hasn't finished, so they run again here rather than being
+      # assumed.
+      - name: Test
+        working-directory: src-tauri
+        run: cargo test
+
+      # Builds, bundles, signs the updater artifacts (createUpdaterArtifacts is on in
+      # tauri.conf.json) and creates the GitHub release. The signature comes from the private key
+      # below and is verified by clients against the public key baked into tauri.conf.json.
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "LowArc Studio ${{ github.ref_name }}"
+          releaseDraft: true
+          prerelease: false

@@ -61,4 +61,10 @@ glutin = "0.32"
 glutin-winit = "0.5"
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+# Self-updating. Desktop-only both because there's nothing to update on mobile and because that's
+# how the plugin ships. Deliberately NOT hand-rolled: this is the one feature where a bug is a
+# remote-code-execution hole rather than an annoyance, and signature verification against the
+# embedded public key is exactly the part that must not be improvised. Inert until a signing key
+# and endpoint are configured — see docs/updating.md.
+tauri-plugin-updater = "2.11.0"
 tauri-plugin-window-state = "2"

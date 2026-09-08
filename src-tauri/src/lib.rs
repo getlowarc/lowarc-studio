@@ -874,6 +874,12 @@ pub fn run() {
     .manage(plugin_session::SessionRegistry::default());
   #[cfg(desktop)]
   let builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
+  // Registered unconditionally, but it can't actually do anything until tauri.conf.json carries a
+  // pubkey and endpoints (see docs/updating.md) — check() just errors until then, which is the
+  // honest failure rather than a silent no-op. Registering it now means the only thing left to
+  // turn updates on is configuration, not code.
+  #[cfg(desktop)]
+  let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
 
   builder
     .plugin(tauri_plugin_dialog::init())
