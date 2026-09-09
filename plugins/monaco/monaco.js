@@ -81,13 +81,25 @@ function numSetting(settings, key, fallback) {
 
 // Monaco does NOT read the app's CSS variables — it owns its own theme registry, so the panel
 // around the editor restyles with the rest of the IDE while the editor surface itself stays on
-// whatever theme it was last told about. Hardcoding "vs-dark" therefore left a dark editor sitting
-// in a light IDE.
+// whatever theme it was last told about.
 //
-// The two built-in themes carry all the syntax colouring, so this inherits from whichever matches
-// the app's ground and overrides only the handful of chrome colours that should agree exactly with
-// the IDE — otherwise the editor is a slightly different shade of background than the panel it sits
-// in, which reads as a rendering bug rather than a theme.
+// WHERE THE LINE IS. Monaco splits its theming in two, and only one half is ours:
+//
+//   rules   54 syntax token scopes (comment, keyword, string, number, ...) — colours the WORDS.
+//   colors  431 ids (editor.background, editorGutter.*, ...)              — colours the FURNITURE.
+//
+// `rules` stays empty here, permanently and on purpose. The rule of thumb: if it would still make
+// sense with the editor empty, it belongs to LowArc; if it only means something because there is
+// code on screen, it belongs to Monaco. An empty editor still has a background, a gutter, line
+// numbers, a cursor, a scrollbar and a find box — IDE furniture that happens to live inside Monaco,
+// and it should match the IDE exactly. Keywords, strings, brackets and error squiggles only exist
+// because of the code; Monaco already colours those well, and this app's palette has four
+// chromatic hues against syntax's need for eight-plus roles, so remapping them would make code
+// harder to read and put danger-red on keywords.
+//
+// So this inherits from whichever built-in matches the app's ground (which brings all 54 rules with
+// it) and overrides ~30 furniture colours. Everything not listed falls back to the base theme, so
+// the map goes stale rather than broken as Monaco adds ids.
 function luminanceOfHex(hex) {
   const m = /^#?([0-9a-f]{6})$/i.exec((hex || "").trim());
   if (!m) return 0;
@@ -103,19 +115,71 @@ function applyEditorTheme() {
     return /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(value) ? value : fallback;
   };
 
+  // The app's tokens are opaque, but half of these colours are WASHES laid over text — a solid
+  // selection would bury whatever it highlights. Monaco takes #rrggbbaa, so the alpha is synthesised
+  // here rather than being something every theme has to define.
+  const alpha = (hex, aa) => hex.slice(0, 7) + aa;
+
   const bg = token("--bg", "#1e1e1e");
+  const bgRaised = token("--bg-raised", "#252526");
+  const bgHover = token("--bg-hover", "#2a2d2e");
+  const border = token("--border", "#3c3c3c");
+  const fg = token("--fg", "#d4d4d4");
+  const fgDim = token("--fg-dim", "#8a8a8a");
+  const cyan = token("--cyan", "#00ffff");
+
   const base = luminanceOfHex(bg) > 0.5 ? "vs" : "vs-dark";
   try {
     monaco.editor.defineTheme("lowarc", {
       base,
       inherit: true,
-      rules: [],
+      rules: [], // see the note above — syntax is Monaco's, deliberately
       colors: {
+        // The page itself.
         "editor.background": bg,
-        "editor.foreground": token("--fg", "#d4d4d4"),
+        "editor.foreground": fg,
         "editorGutter.background": bg,
-        "editorLineNumber.foreground": token("--fg-dim", "#8a8a8a"),
-        "editorCursor.foreground": token("--cyan", "#00ffff"),
+        "minimap.background": bg,
+
+        // Margin furniture: present and meaningful with no code at all.
+        "editorLineNumber.foreground": fgDim,
+        "editorLineNumber.activeForeground": fg,
+        "editorCursor.foreground": cyan,
+        "editorWhitespace.foreground": alpha(fgDim, "59"),
+        "editorIndentGuide.background1": border,
+        "editorIndentGuide.activeBackground1": fgDim,
+        "editorOverviewRuler.border": border,
+
+        // Washes. The alphas differ by intent: a selection has to stay readable through it, a find
+        // match should shout slightly louder, and the current-line tint should be barely there.
+        "editor.selectionBackground": alpha(cyan, "40"),
+        "editor.inactiveSelectionBackground": alpha(cyan, "24"),
+        "editor.selectionHighlightBackground": alpha(cyan, "24"),
+        "editor.findMatchBackground": alpha(cyan, "59"),
+        "editor.findMatchHighlightBackground": alpha(cyan, "33"),
+        "editor.lineHighlightBackground": alpha(fg, "0d"),
+
+        // Panels Monaco floats over the editor — these are dialogs, and should look like the app's
+        // dialogs rather than like VS Code's.
+        "editorWidget.background": bgRaised,
+        "editorWidget.foreground": fg,
+        "editorWidget.border": border,
+        "editorHoverWidget.background": bgRaised,
+        "editorHoverWidget.foreground": fg,
+        "editorHoverWidget.border": border,
+        "editorSuggestWidget.background": bgRaised,
+        "editorSuggestWidget.foreground": fg,
+        "editorSuggestWidget.border": border,
+        "editorSuggestWidget.selectedBackground": bgHover,
+        "input.background": bg,
+        "input.foreground": fg,
+        "input.border": border,
+        "focusBorder": cyan,
+
+        // Scrollbar: a wash again, so the code under it stays legible while dragging.
+        "scrollbarSlider.background": alpha(fgDim, "40"),
+        "scrollbarSlider.hoverBackground": alpha(fgDim, "66"),
+        "scrollbarSlider.activeBackground": alpha(fgDim, "99"),
       },
     });
     monaco.editor.setTheme("lowarc");
