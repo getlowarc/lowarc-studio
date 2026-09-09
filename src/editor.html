@@ -636,12 +636,40 @@
       /* Always hosts either .center-viewport-empty or one iframe per mounted viewer instance (see
          the tab-bar/open-files JS below — one instance can now show several open files, so this
          isn't one-per-file any more) — never bare text of its own any more, so this stays a plain
-         block container; whichever child is actually showing manages its own sizing/centering. */
+         block container; whichever child is actually showing manages its own sizing/centering.
+         Positioned so the viewer frames below can stack inside it. */
       .center-viewport {
         flex: 1;
         min-height: 0;
         display: block;
         overflow: hidden;
+        position: relative;
+      }
+
+      /* A viewer frame hides by going INVISIBLE, not by going display:none like every other
+         .plugin-panel-frame — because an editor has to measure the font it is about to draw with,
+         and a display:none document has no layout to measure. Monaco reads offsetWidth off test
+         glyphs; in a frame with no layout every one of those reads back 0, so it falls back to a
+         5px-per-character placeholder, marks the reading untrusted, and schedules a re-read five
+         seconds out. For those five seconds the browser paints real Consolas at 7.7px while Monaco
+         places the caret and maps clicks at 5px — a 35% error that grows with distance from the
+         left margin, so clicking near the end of a line put the caret five or six characters short,
+         and everything jumped when the timer finally fired. Measured, not guessed: 5.0 at 146ms,
+         still 5.0 against 7.7px glyphs at 197ms, corrected at 5129ms.
+         visibility:hidden keeps the box (so measurements are real) without painting it, and the
+         absolute positioning is what lets several frames share the viewport without stacking now
+         that they are no longer taken out of flow. Scoped to this viewport deliberately — sidebar
+         and console panels sit in flex columns where a laid-out hidden frame WOULD take up space,
+         and nothing in them has a font to measure. */
+      .center-viewport > .plugin-panel-frame {
+        position: absolute;
+        inset: 0;
+        display: block;
+        visibility: hidden;
+      }
+
+      .center-viewport > .plugin-panel-frame.is-active {
+        visibility: visible;
       }
 
       /* ---------- Console ---------- */

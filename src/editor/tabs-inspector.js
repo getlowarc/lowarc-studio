@@ -352,25 +352,36 @@
         })();
       }
 
-      // Tears down whatever a plugin instance was tracking for one path — disposing (e.g. Monaco's
-      // model), not necessarily removing the iframe itself, since other open files may still be
-      // relying on it. Only once nothing else references it does the instance actually go away.
+      // Tells a plugin instance to drop what it was tracking for one path (Monaco disposes that
+      // file's model, its undo history and its view state) — but leaves the instance itself
+      // mounted, even once its last file is gone. showActiveFile() has already taken the
+      // .is-active class off it by the time anyone looks, so an instance with nothing open is
+      // simply an idle hidden iframe behind the "Nothing to display" panel.
+      //
+      // It used to remove the iframe here, which meant closing the last tab threw away a fully
+      // loaded editor and the next open rebuilt it from nothing: re-fetch 4.4MB across 21 files,
+      // re-parse it, re-register every language, re-measure the font. That is the "reopen a file
+      // and wait" behaviour, and it is entirely self-inflicted — this plugin is already built to
+      // outlive any one file (see monaco.js's docs map), so the instance was always safe to keep.
+      // Keeping it is also what every editor with tabs does; a mounted editor with no document is
+      // the normal resting state, not a leak.
+      //
+      // The cost is one idle instance per (group, viewer plugin) actually used this session, held
+      // until the page reloads — which is also when a plugin being enabled or disabled takes
+      // effect (View > Reload), so a retained iframe can never outlive the plugin that owns it.
+      //
       // Callers run this BEFORE removing their own openFiles entry for `path` (closeFile) or before
       // reassigning it to the new iframe (moveFileToGroup) — excluding `path` itself from the
-      // "still used" check is what keeps that from always finding itself and never actually
-      // tearing the instance down.
-      function unmountFileFromGroup(path, iframe, groupId, pluginId) {
+      // "still used" check is what keeps that from always finding itself.
+      function unmountFileFromGroup(path, iframe) {
         if (!iframe) return;
         iframe.contentWindow.postMessage({ type: "emit", event: "lowarc:closeFile", payload: { path } }, "*");
         const paths = windowToFilePaths.get(iframe.contentWindow);
         if (paths) paths.delete(path);
-        const stillUsed = Array.from(openFiles.entries()).some(([p, f]) => p !== path && f.iframe === iframe);
-        if (stillUsed) return;
-        windowToFilePaths.delete(iframe.contentWindow);
-        windowToPlugin.delete(iframe.contentWindow);
-        groupViewerIframes.delete(viewerIframeKey(groupId, pluginId));
-        viewerIframeReady.delete(iframe);
-        iframe.remove();
+        // Deliberately no teardown branch here any more. windowToFilePaths keeps an empty set and
+        // windowToPlugin keeps its entry, because a retained iframe is still a live, trusted plugin
+        // window that can send the host messages (and must still be recognised when a file is
+        // opened into it again).
       }
 
       // Re-shown on every active-file switch (see showActiveFile below) and every setDiffStatus
@@ -520,7 +531,7 @@
         }
 
         const groupId = file.groupId;
-        unmountFileFromGroup(path, file.iframe, groupId, file.pluginId);
+        unmountFileFromGroup(path, file.iframe);
         openFiles.delete(path);
         removeContribution(`center-${groupId}`, path);
 
@@ -579,7 +590,7 @@
             : "";
 
         removeContribution(`center-${fromGroupId}`, path);
-        unmountFileFromGroup(path, file.iframe, fromGroupId, file.pluginId);
+        unmountFileFromGroup(path, file.iframe);
 
         try {
           file.iframe = await mountFileInGroup(path, contents ?? "", viewer, targetGroupId);
