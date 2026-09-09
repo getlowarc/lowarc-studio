@@ -34,6 +34,18 @@ pub const HARNESS_JS: &str = r#"(function () {
   // this ever runs, so that path is unaffected. Anything without one just gets no menu at all.
   window.addEventListener("contextmenu", (e) => e.preventDefault());
 
+  // A click inside a sandboxed iframe never bubbles to the host document, so the host's own
+  // "click outside closes it" handlers never see it and an open menu stays stuck open — noticed
+  // on the main panel, which is simply the biggest click target in the app. The host already
+  // closes its overlays when an iframe takes FOCUS, but that only fires on the transition: once
+  // this iframe already has focus (right-click a tab while the caret is in the editor, then click
+  // back into it) no focus moves and nothing fires. A pointerdown always happens, so this is the
+  // signal that does not depend on where focus already was. Capture phase, so a plugin that stops
+  // propagation inside its own content cannot accidentally disable the host's menus.
+  window.addEventListener("pointerdown", () => {
+    try { window.parent.postMessage({ type: "pointerdown" }, "*"); } catch (e) {}
+  }, true);
+
   let nextId = 1;
   const pending = new Map();
   const listeners = new Map();

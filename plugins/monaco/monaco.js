@@ -216,6 +216,35 @@ Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve
     // even after the keybindings below were overridden, since a context-menu click calls the
     // action directly rather than going through keybinding dispatch.
     contextmenu: false,
+
+    // Everything below is VS Code furniture that Monaco turns on by default and that nothing in
+    // this app ever feeds. Each one is either a control with no provider behind it (so it can only
+    // ever render empty), or a second surface competing with one LowArc already owns. Measured
+    // against the vendored build rather than assumed — all of these read as enabled out of the box.
+    //
+    // Sticky scroll is the most visible: a floating breadcrumb bar pinned over the top lines,
+    // duplicating what the Outline panel is already for, while eating editor rows to do it.
+    stickyScroll: { enabled: false },
+    // Code lens and the lightbulb only ever appear when a language service contributes actions.
+    // Nothing here does, so they are dead affordances — the lightbulb in particular shifts the
+    // gutter around when it thinks it might show.
+    codeLens: false,
+    lightbulb: { enabled: "off" },
+    inlayHints: { enabled: "off" },
+    // Ghost-text completion, with its own hover toolbar and its own "snooze" commands. There is no
+    // inline completion provider, and adding one is a plugin's business, not the editor's.
+    inlineSuggest: { enabled: false },
+    // The swatch beside a hex colour opens Monaco's own colour picker — a second, differently
+    // styled colour UI inside an app whose Appearance page already has one.
+    colorDecorators: false,
+    // Ctrl+click on a URL calls window.open, which this sandbox has no allow-popups for: the
+    // control renders, offers the hand cursor, and silently does nothing.
+    links: false,
+    // Dropping a file is the host's gesture — it decides which group and which viewer opens it.
+    // Monaco's own drop handling would insert the path as text instead.
+    dropIntoEditor: { enabled: false },
+    // A hairline down the right edge that belongs to VS Code's chrome, not this panel's.
+    overviewRulerBorder: false,
   });
 
   // Live counterpart to the getSettings() read above — see set_plugin_setting/
@@ -448,9 +477,44 @@ Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve
   // replaces this plugin's previous registration rather than accumulating duplicates — see
   // setDynamicPluginCommands in editor.html); this just also removes the redundancy itself,
   // rather than merely being harmless underneath it.
+  // Monaco reports 127 labelled actions, and the palette is a list a person reads — so the ones
+  // that cannot work here are dropped rather than left to be found and clicked. Three reasons, in
+  // order of how much they matter:
+  //
+  //  - toggleHighContrast swaps Monaco onto a theme of its own, wiping the palette mapping in
+  //    applyEditorTheme() with no way back short of reopening the file. That one is not clutter,
+  //    it is a trap.
+  //  - fontZoom* changes the font size behind the app's own Editor setting, so the setting and the
+  //    editor disagree until something re-applies it.
+  //  - the rest simply have nothing behind them: features turned off above, a context menu that is
+  //    disabled, Monaco's own clipboard reads that the sandbox blocks anyway (the host does paste),
+  //    "in Files" variants of marker navigation that assume VS Code's multi-file workspace, and
+  //    Monaco's internal Developer: entries.
+  //
+  // A list, not a pattern match, so adding one is a deliberate act — and anything Monaco adds in a
+  // future version shows up rather than being silently swallowed by an over-broad rule.
+  const DEAD_COMMANDS = new Set([
+    "editor.action.quickCommand", // the host owns the palette; see the kill switch above
+    "editor.action.toggleHighContrast",
+    "editor.action.fontZoomIn",
+    "editor.action.fontZoomOut",
+    "editor.action.fontZoomReset",
+    "editor.action.showContextMenu",
+    "editor.action.inlineSuggest.trigger",
+    "editor.action.inlineSuggest.toggleShowCollapsed",
+    "editor.action.openLink",
+    "editor.action.pasteAs",
+    "editor.action.pasteAsText",
+    "editor.action.marker.nextInFiles",
+    "editor.action.marker.prevInFiles",
+    "editor.action.debugEditorGpuRenderer",
+    "editor.action.forceRetokenize",
+    "editor.action.inspectTokens",
+  ]);
+
   function refreshCommands() {
     const commands = editor.getSupportedActions()
-      .filter((a) => a.label && a.id !== "editor.action.quickCommand")
+      .filter((a) => a.label && !DEAD_COMMANDS.has(a.id))
       .map((a) => ({ id: a.id, label: a.label }));
     window.lowarc.setCommands(commands);
   }

@@ -107,6 +107,16 @@
         if (!data || typeof data !== "object") return;
         if (event.origin !== "null") return;
 
+        // Every plugin iframe reports its own pointerdowns (see the harness in plugin_assets.rs
+        // for why focus alone wasn't enough) purely so the host's overlays can dismiss on a click
+        // that lands inside one. No windowToPlugin check: the origin check above already proves it
+        // came from a sandboxed frame, and "close the menus" is not an authority worth gating —
+        // the worst a forged one can do is close a menu the user was about to click.
+        if (data.type === "pointerdown") {
+          closeAllOverlays();
+          return;
+        }
+
         // A plugin replying to a HOST-initiated request — the only such request today is
         // requestPluginContent() (see moveFileToGroup) — not one of the usual plugin-initiated
         // "call"/"host" messages, so it gets its own type rather than overloading "reply" (which
