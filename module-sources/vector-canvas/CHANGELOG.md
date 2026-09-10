@@ -3,6 +3,12 @@
 All notable changes to the Vector Canvas module are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## 0.2.0 — 2026-09-09
+
+### Changed
+
+- Consumes the `draw-commands` contract instead of a module named `director`, and GATHERS: every provider's command list is concatenated in run order, so any number of modules can draw and run order is z-order. Provides `input-state`.
+
 ## 0.1.1 — 2026-09-08
 
 ### Fixed

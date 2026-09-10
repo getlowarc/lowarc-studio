@@ -17,14 +17,18 @@ module's own interface, not an engine-wide drawing protocol.
 
 ## How it works
 
-Optionally requires a convention-based `director` role — any project module, whatever it's actually
-built as, installed with that id. This module doesn't know or care what fills the role; the same
-pattern the `audio` module uses.
+Optionally consumes the **`draw-commands`** contract, whose specification ships beside this module
+(`module-sources/draw-commands`). Any number of modules may provide it, and this one gathers: every
+frame it concatenates the `draw` list from every provider, **in run order**, and executes the
+result **in order**, which is also the draw order.
 
-Every frame it reads a list of draw commands from `shared.director.draw` and executes them **in
-order**, which is also the draw order. Unlike audio's declarative "what should be playing" list,
-drawing is immediate-mode: a frame draws exactly what it was handed, and a frame handed nothing
-draws nothing.
+Nothing is elected to speak for the rest. A world module, a UI layer and a debug overlay each
+publish their own commands and each simply draws; since a provider always runs before its
+consumers, run order is z-order, and a module that requires the one it annotates therefore draws on
+top of it without anyone arranging that.
+
+Unlike audio's declarative "what should be playing" list, drawing is immediate-mode: a frame draws
+exactly what it was handed, and a frame handed nothing draws nothing.
 
 An unknown `op` is logged and skipped rather than failing the frame — one bad command must not take
 down everything else being drawn.

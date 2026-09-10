@@ -35,6 +35,22 @@ artistically; modules can't afford to be.)
 | `node-graph-runtime` | `src-tauri/src/bin/node_graph_runtime.rs` |
 | `vector-canvas` | `src-tauri/src/bin/vector_canvas_runtime.rs` |
 
+## Contracts
+
+`draw-commands`, `audio-cues` and `input-state` are **contract** modules (`"kind": "contract"`):
+a manifest and a README, no binary and no `process.json`. They define a vocabulary so a module that
+produces something and a module that consumes it can agree without either depending on the other's
+implementation. The runtime resolves them like any other module and never spawns them.
+
+A module says which contracts it speaks with `provides`, and reads one with
+`requires: [{ "contract": ... }]`. That is what replaced the old convention where filling a role
+meant being **named** the role — a module publishing under its own id meant `shared.director.draw`
+could only ever come from a module whose id was literally `director`, so there could be exactly one
+of anything and no module could take a job without renaming itself into it.
+
+A contract key in `shared` holds an ordered array, one entry per provider, tagged with `from`. See
+`docs/modules.md` for the full design and each contract's own README for its specification.
+
 ## Reporting a degraded start
 
 A module's `start` reply may carry a `degraded` reason beside its `ok`:

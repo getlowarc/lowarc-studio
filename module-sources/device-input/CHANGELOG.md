@@ -3,6 +3,12 @@
 All notable changes to the Device Input module are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## 0.3.0 — 2026-09-09
+
+### Changed
+
+- Provides the `input-state` contract, so a consumer can read input by role rather than by this module's name — alongside `vector-canvas`, which reports the same kind of state in canvas coordinates.
+
 ## 0.2.0 — 2026-09-07
 
 ### Changed

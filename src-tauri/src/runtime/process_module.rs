@@ -74,6 +74,10 @@ pub struct ProcessModule {
     /// ids in this list, never a module it never declared depending on. No separate permission
     /// concept to introduce; requiring something already means "I depend on it existing."
     requires: Vec<String>,
+    /// Contracts this module declares it provides. Whatever it publishes is mirrored under each of
+    /// these alongside its own id, which is what lets a consumer read a ROLE without knowing which
+    /// module happens to be filling it. Empty for the overwhelming majority of modules.
+    provides: Vec<String>,
     pub wants_frames: bool,
     timeout: Duration,
     stdin: Mutex<ChildStdin>,
@@ -92,6 +96,7 @@ impl ProcessModule {
         name: String,
         id: String,
         requires: Vec<String>,
+        provides: Vec<String>,
         log: LogFn,
         stop_flag: Arc<AtomicBool>,
         breakpoints: Arc<Mutex<Vec<Breakpoint>>>,
@@ -113,6 +118,7 @@ impl ProcessModule {
             name,
             id,
             requires,
+            provides,
             wants_frames: desc.wants_frames,
             timeout: Duration::from_millis(desc.timeout_ms.max(1)),
             stdin: Mutex::new(stdin),
@@ -330,7 +336,11 @@ pub fn spawn_and_run(descriptors: Vec<(&ModuleInfo, ProcessDescriptor)>, ctx: &R
             desc,
             info.manifest.name.clone(),
             info.manifest.id.clone(),
-            info.manifest.requires.iter().map(|d| d.id.clone()).collect(),
+            // store_id(), not id: a contract requirement names the contract, and the contract id is
+            // exactly the key its gathered array lives under in shared — so the existing filter
+            // below needs no special case for contracts at all.
+            info.manifest.requires.iter().map(|d| d.store_id().to_string()).collect(),
+            info.manifest.provides.iter().map(|p| p.contract.clone()).collect(),
             ctx.log.clone(),
             ctx.stop_flag.clone(),
             ctx.debug.breakpoints.clone(),
@@ -396,6 +406,7 @@ pub fn spawn_and_run(descriptors: Vec<(&ModuleInfo, ProcessDescriptor)>, ctx: &R
             let Some((request, reply, duration_ms)) = m.frame(delta, &shared) else { continue };
             if let Some(publish) = reply.get("publish").and_then(|p| p.as_object()) {
                 shared.entry(m.id.clone()).or_insert_with(|| Value::Object(Default::default())).as_object_mut().unwrap().extend(publish.clone());
+                mirror_onto_contracts(&mut shared, &m.id, &m.provides);
             }
             if triggered.is_none() {
                 triggered = runtime_loader::check_frame_breakpoints(&ctx.debug.breakpoints, &m.id, &reply);
@@ -432,20 +443,61 @@ pub fn spawn_and_run(descriptors: Vec<(&ModuleInfo, ProcessDescriptor)>, ctx: &R
 /// ProcessLoader: a run mixing in a native-kind module has to go through NativeLoader instead.
 pub struct ProcessLoader;
 
+/// Mirrors `m`'s accumulated published state onto every contract it provides, so a consumer can
+/// read a ROLE (`shared["draw-commands"]`) without knowing which module is filling it. The
+/// per-module-id entry stays exactly where it was — this is an alias beside it, not a replacement,
+/// so anything depending on one specific module still reads it the way it always did.
+///
+/// A contract holds an ARRAY, one entry per provider, each tagged with the id it came from. Two
+/// reasons it isn't a map keyed by provider id: serde_json's map is sorted rather than
+/// insertion-ordered, which would silently make a gathered draw list's z-order alphabetical by
+/// module id; and an array is the shape that says "several of these are expected," which is the
+/// point of the contract mechanism. Entries are appended on a provider's first publish and updated
+/// in place after that, so the array's order is run order — and run order already guarantees a
+/// provider ran before its consumers this same tick.
+fn mirror_onto_contracts(shared: &mut serde_json::Map<String, Value>, id: &str, provides: &[String]) {
+    if provides.is_empty() {
+        return;
+    }
+    let Some(state) = shared.get(id).cloned() else { return };
+    for contract in provides {
+        let list = shared.entry(contract.clone()).or_insert_with(|| Value::Array(Vec::new()));
+        let Some(entries) = list.as_array_mut() else { continue };
+        let mut entry = state.clone();
+        if let Some(obj) = entry.as_object_mut() {
+            obj.insert("from".into(), Value::String(id.to_string()));
+        }
+        match entries.iter().position(|e| e.get("from").and_then(|f| f.as_str()) == Some(id)) {
+            Some(i) => entries[i] = entry,
+            None => entries.push(entry),
+        }
+    }
+}
+
 impl RuntimeLoader for ProcessLoader {
     fn id(&self) -> &'static str {
         "process"
     }
 
+    /// Contract modules are excluded from the question entirely rather than counted as modules this
+    /// loader can't handle: a contract defines a vocabulary and has no process.json by design, so
+    /// counting it here would make one installed contract answer "no loader recognises this
+    /// project" for a project that is otherwise perfectly ordinary.
     fn can_handle(&self, modules: &[ModuleInfo]) -> bool {
-        !modules.is_empty() && modules.iter().all(|i| i.folder.join(DESCRIPTOR_NAME).exists())
+        let runnable: Vec<&ModuleInfo> = modules.iter().filter(|i| !i.manifest.is_contract()).collect();
+        !runnable.is_empty() && runnable.iter().all(|i| i.folder.join(DESCRIPTOR_NAME).exists())
     }
 
     fn run(&self, modules: Vec<ModuleInfo>, ctx: &RunContext) -> Result<(), String> {
+        // Ranked BEFORE contracts are dropped, so a consumer still lands after everything providing
+        // what it requires — the contract entries themselves just never become processes.
         let load_order = order_by_requires(modules);
 
         let mut descriptors = Vec::new();
         for info in &load_order {
+            if info.manifest.is_contract() {
+                continue; // a definition, not something to run — see Manifest::kind
+            }
             match ProcessDescriptor::read(&info.folder) {
                 Some(desc) => descriptors.push((info, desc)),
                 None => (ctx.log)(LogLevel::Error, &format!("Module folder \"{}\" has no readable process.json — skipped.", info.folder.display())),
@@ -453,5 +505,70 @@ impl RuntimeLoader for ProcessLoader {
         }
 
         spawn_and_run(descriptors, ctx)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn publish(shared: &mut serde_json::Map<String, Value>, id: &str, provides: &[&str], state: Value) {
+        let entry = shared.entry(id.to_string()).or_insert_with(|| Value::Object(Default::default()));
+        entry.as_object_mut().unwrap().extend(state.as_object().unwrap().clone());
+        let provides: Vec<String> = provides.iter().map(|s| s.to_string()).collect();
+        mirror_onto_contracts(shared, id, &provides);
+    }
+
+    #[test]
+    fn a_contract_gathers_every_provider_in_the_order_they_published() {
+        let mut shared = serde_json::Map::new();
+        publish(&mut shared, "world", &["draw-commands"], json!({"draw": ["floor"]}));
+        publish(&mut shared, "overlay", &["draw-commands"], json!({"draw": ["fps"]}));
+
+        let gathered = shared["draw-commands"].as_array().expect("a contract key is an array");
+        let order: Vec<&str> = gathered.iter().map(|e| e["from"].as_str().unwrap()).collect();
+        // Order is the whole point: draw order is list order, so publish order is z-order. A map
+        // keyed by provider id would have sorted these alphabetically and put the overlay under
+        // the floor.
+        assert_eq!(order, vec!["world", "overlay"]);
+        assert_eq!(gathered[0]["draw"], json!(["floor"]));
+    }
+
+    #[test]
+    fn a_provider_publishing_again_updates_its_own_entry_rather_than_appending_a_second() {
+        let mut shared = serde_json::Map::new();
+        publish(&mut shared, "world", &["draw-commands"], json!({"draw": ["frame one"]}));
+        publish(&mut shared, "world", &["draw-commands"], json!({"draw": ["frame two"]}));
+
+        let gathered = shared["draw-commands"].as_array().unwrap();
+        assert_eq!(gathered.len(), 1, "a provider has one entry, however many frames it publishes");
+        assert_eq!(gathered[0]["draw"], json!(["frame two"]));
+    }
+
+    #[test]
+    fn publishing_under_a_contract_never_replaces_the_per_module_entry() {
+        // Both addressing modes have to keep working: anything depending on one specific module
+        // still reads it by id, exactly as it did before contracts existed.
+        let mut shared = serde_json::Map::new();
+        publish(&mut shared, "vector-canvas", &["input-state"], json!({"width": 800}));
+
+        assert_eq!(shared["vector-canvas"]["width"], json!(800), "the module's own id must still address it");
+        assert_eq!(shared["input-state"][0]["width"], json!(800), "and the contract aliases the same state");
+    }
+
+    #[test]
+    fn one_module_can_answer_several_contracts_at_once() {
+        let mut shared = serde_json::Map::new();
+        publish(&mut shared, "everything", &["draw-commands", "audio-cues"], json!({"draw": [], "play": []}));
+
+        assert_eq!(shared["draw-commands"][0]["from"], json!("everything"));
+        assert_eq!(shared["audio-cues"][0]["from"], json!("everything"));
+    }
+
+    #[test]
+    fn a_module_providing_nothing_adds_no_contract_keys() {
+        let mut shared = serde_json::Map::new();
+        publish(&mut shared, "quiet", &[], json!({"anything": 1}));
+        assert_eq!(shared.len(), 1, "only its own id, no stray keys: {shared:?}");
     }
 }

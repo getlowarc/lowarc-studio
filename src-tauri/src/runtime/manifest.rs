@@ -8,7 +8,19 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Default, Deserialize, Serialize, Clone)]
 #[serde(default)]
 pub struct Dependency {
+    /// The module this depends on, by manifest id. `"module"` is accepted as a spelling of the
+    /// same field so a manifest can say which KIND of thing it means without the reader having to
+    /// infer it — `{"module": "vector-canvas"}` and `{"id": "vector-canvas"}` are identical, and
+    /// the explicit spelling is the one to prefer in anything newly written.
+    #[serde(alias = "module")]
     pub id: String,
+    /// A CONTRACT this depends on, instead of a specific module — "I read whatever provides this,"
+    /// where a plain id means "I depend on this exact implementation." Contracts are themselves
+    /// modules (kind: "contract"), so this resolves through the same store and the same version
+    /// check; what differs is that the consumer then reads the published state of every module
+    /// that PROVIDES it, not the contract's own (a contract publishes nothing — it has no process).
+    /// Mutually exclusive with `id` in practice; `id` wins if a manifest somehow sets both.
+    pub contract: String,
     pub version: String,
     /// False (the default) means what it always has: project::resolve() fails the whole run if
     /// this id isn't installed. True means the opposite — a module that cooperates with another
@@ -21,6 +33,36 @@ pub struct Dependency {
     pub optional: bool,
 }
 
+impl Dependency {
+    /// What this entry actually names in the module store. A contract requirement resolves to the
+    /// contract module itself (that's what gets version-checked and installed); which modules end
+    /// up PROVIDING it is a separate, runtime question — see `providers_of` below.
+    pub fn store_id(&self) -> &str {
+        if self.id.is_empty() {
+            &self.contract
+        } else {
+            &self.id
+        }
+    }
+
+    pub fn is_contract(&self) -> bool {
+        self.id.is_empty() && !self.contract.is_empty()
+    }
+}
+
+/// One contract a module declares it speaks. Being listed here is the ONLY thing that makes a
+/// module eligible to fill a role — which is the whole point of the change this type exists for.
+/// Before it, the only way to fill a role was to be NAMED the role (a module publishing under its
+/// own id meant `shared.director.draw` required a module whose id was literally "director"), so
+/// there could only ever be one of anything, and a module could not take a job without renaming
+/// itself into it.
+#[derive(Debug, Default, Deserialize, Serialize, Clone)]
+#[serde(default)]
+pub struct Provision {
+    pub contract: String,
+    pub version: String,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(default)]
 pub struct Manifest {
@@ -29,6 +71,14 @@ pub struct Manifest {
     #[serde(rename = "loadOrder")]
     pub load_order: i32,
     pub requires: Vec<Dependency>,
+    /// Contracts this module speaks. See Provision.
+    pub provides: Vec<Provision>,
+    /// `"contract"` marks a manifest that DEFINES a vocabulary rather than implementing anything.
+    /// It resolves and version-checks like any other module — contracts are modules, which is what
+    /// lets them install and distribute through machinery that already exists — but it has no
+    /// process, so the runtime never spawns it and it never publishes anything of its own. Any
+    /// other value (or none) means an ordinary module.
+    pub kind: Option<String>,
     /// Purely descriptive — shown in the Modules manage page, never read by resolve()'s
     /// dependency-closure logic (Dependency.version is the thing that's actually checked, and
     /// isn't even satisfied yet — see resolve()'s own note on that gap).
@@ -45,7 +95,18 @@ pub struct Manifest {
 
 impl Default for Manifest {
     fn default() -> Self {
-        Self { id: String::new(), name: "Unnamed Module".into(), load_order: 100, requires: Vec::new(), version: None, description: None, website: None, icon: None }
+        Self {
+            id: String::new(),
+            name: "Unnamed Module".into(),
+            load_order: 100,
+            requires: Vec::new(),
+            provides: Vec::new(),
+            kind: None,
+            version: None,
+            description: None,
+            website: None,
+            icon: None,
+        }
     }
 }
 
@@ -54,6 +115,22 @@ impl Manifest {
         let text = std::fs::read_to_string(folder.join("manifest.json")).ok()?;
         serde_json::from_str(&text).ok()
     }
+
+    /// A definition rather than an implementation — resolved and version-checked, never run.
+    pub fn is_contract(&self) -> bool {
+        self.kind.as_deref() == Some("contract")
+    }
+
+    pub fn provides_contract(&self, contract: &str) -> bool {
+        self.provides.iter().any(|p| p.contract == contract)
+    }
+}
+
+/// Which of `infos` provide `contract`, in the order given — callers pass an already-ranked list,
+/// so the result is in run order, which is what makes a gathered contract's array meaningful
+/// (draw order is list order, so run order is z-order).
+pub fn providers_of<'a>(infos: &[&'a ModuleInfo], contract: &str) -> Vec<&'a ModuleInfo> {
+    infos.iter().copied().filter(|i| i.manifest.provides_contract(contract)).collect()
 }
 
 #[derive(Debug)]
@@ -95,10 +172,22 @@ pub fn requires_rank(infos: &[&ModuleInfo]) -> std::collections::HashMap<String,
         }
         seen[idx] = true;
         for req in &infos[idx].manifest.requires {
-            if req.id.is_empty() {
+            if req.store_id().is_empty() {
                 continue;
             }
-            if let Some(&dep_idx) = by_id.get(&req.id) {
+            // A contract requirement has to order this module after everything that PROVIDES the
+            // contract, not merely after the contract's own definition — the definition has no
+            // process and publishes nothing, so ordering against it would guarantee nothing. This
+            // is what keeps the shared/publish rule true for contracts: a consumer's frame sees
+            // this tick's output from every provider, not last tick's.
+            if req.is_contract() {
+                for (dep_idx, info) in infos.iter().enumerate() {
+                    if dep_idx != idx && info.manifest.provides_contract(&req.contract) {
+                        visit(dep_idx, infos, by_id, seen, order);
+                    }
+                }
+            }
+            if let Some(&dep_idx) = by_id.get(req.store_id()) {
                 if dep_idx != idx {
                     visit(dep_idx, infos, by_id, seen, order);
                 }
@@ -156,6 +245,80 @@ mod tests {
         let infos = vec![info("a", 1, &["b"]), info("b", 2, &["a", "missing"])];
         let ordered = order_by_requires(infos);
         assert_eq!(ordered.len(), 2, "a cycle or a dangling requires id should never drop or duplicate a module");
+    }
+
+    fn contract_consumer(id: &str, load_order: i32, contract: &str) -> ModuleInfo {
+        ModuleInfo {
+            folder: PathBuf::from(id),
+            manifest: Manifest {
+                id: id.to_string(),
+                load_order,
+                requires: vec![Dependency { contract: contract.to_string(), ..Dependency::default() }],
+                ..Manifest::default()
+            },
+        }
+    }
+
+    fn contract_provider(id: &str, load_order: i32, contract: &str) -> ModuleInfo {
+        ModuleInfo {
+            folder: PathBuf::from(id),
+            manifest: Manifest {
+                id: id.to_string(),
+                load_order,
+                provides: vec![Provision { contract: contract.to_string(), ..Provision::default() }],
+                ..Manifest::default()
+            },
+        }
+    }
+
+    #[test]
+    fn a_contract_consumer_runs_after_everything_that_provides_it() {
+        // The provider is not named after the contract and the consumer never names the provider —
+        // that indirection is the entire point, and it's exactly what a naive id-only walk misses.
+        // Load order is set against the desired result so only the contract link can produce it.
+        let infos = vec![contract_consumer("canvas", 1, "draw-commands"), contract_provider("some-director", 2, "draw-commands")];
+        let ordered = order_by_requires(infos);
+        let ids: Vec<&str> = ordered.iter().map(|i| i.manifest.id.as_str()).collect();
+        assert_eq!(ids, vec!["some-director", "canvas"], "a provider must run before its consumer, or shared state is a tick stale");
+    }
+
+    #[test]
+    fn every_provider_of_a_contract_runs_before_the_consumer_not_just_one() {
+        let infos = vec![
+            contract_consumer("canvas", 1, "draw-commands"),
+            contract_provider("world", 2, "draw-commands"),
+            contract_provider("overlay", 3, "draw-commands"),
+        ];
+        let ordered = order_by_requires(infos);
+        let ids: Vec<&str> = ordered.iter().map(|i| i.manifest.id.as_str()).collect();
+        assert_eq!(ids.last(), Some(&"canvas"), "the consumer gathers from all of them, so it goes last: {ids:?}");
+    }
+
+    #[test]
+    fn ordering_against_a_contract_nothing_provides_is_not_an_error() {
+        // The optional case, and the normal one for a project that hasn't written its director yet:
+        // the canvas still runs, and simply draws nothing.
+        let infos = vec![contract_consumer("canvas", 1, "draw-commands")];
+        let ordered = order_by_requires(infos);
+        assert_eq!(ordered.len(), 1);
+    }
+
+    #[test]
+    fn a_requirement_spells_out_which_kind_it_is() {
+        let module: Dependency = serde_json::from_str(r#"{"module": "vector-canvas"}"#).unwrap();
+        let bare: Dependency = serde_json::from_str(r#"{"id": "vector-canvas"}"#).unwrap();
+        let contract: Dependency = serde_json::from_str(r#"{"contract": "draw-commands"}"#).unwrap();
+
+        // "module" is a spelling of "id", so every manifest written before contracts existed keeps
+        // resolving to exactly what it always did.
+        assert_eq!(module.store_id(), "vector-canvas");
+        assert_eq!(bare.store_id(), "vector-canvas");
+        assert!(!module.is_contract() && !bare.is_contract());
+
+        // A contract resolves through the same store — contracts are modules — but is read from
+        // the gathered key rather than from one module's own published state.
+        assert_eq!(contract.store_id(), "draw-commands");
+        assert!(contract.is_contract());
     }
 
     #[test]

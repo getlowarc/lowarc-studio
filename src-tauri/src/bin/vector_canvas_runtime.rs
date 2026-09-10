@@ -354,6 +354,25 @@ fn build_window(event_loop: &ActiveEventLoop, settings: &WindowSettings) -> Resu
     Ok(Gfx { window, surface, context, canvas })
 }
 
+/// Concatenates `key`'s array from every provider of `contract`, in the order they appear —
+/// which the engine guarantees is run order (see mirror_onto_contracts in process_module.rs).
+///
+/// This is the gathering half of the contract mechanism, and it's what stops this module being
+/// something producers must funnel through one privileged "director" to reach. Any number of
+/// modules can draw; each publishes its own list, and they land here concatenated. Since draw order
+/// is list order, run order is z-order — a debug overlay that requires the module it annotates
+/// therefore draws on top of it, for free, with nobody arranging that.
+fn gather(msg: &Value, contract: &str, key: &str) -> Vec<Value> {
+    let Some(providers) = msg.pointer(&format!("/shared/{contract}")).and_then(|v| v.as_array()) else {
+        return Vec::new();
+    };
+    providers
+        .iter()
+        .filter_map(|p| p.get(key).and_then(|v| v.as_array()))
+        .flat_map(|list| list.iter().cloned())
+        .collect()
+}
+
 // ---------- draw commands ----------
 
 fn color_of(value: Option<&Value>, fallback: Color) -> Color {
@@ -633,11 +652,7 @@ fn handle_message(app: &mut App, msg: &Value) -> Outcome {
         // handle it themselves; see apply_start_settings.
         "start" => reply_err("internal: start is handled by the run loop, not here"),
         "frame" => {
-            let commands: Vec<Value> = msg
-                .pointer("/shared/director/draw")
-                .and_then(|v| v.as_array())
-                .cloned()
-                .unwrap_or_default();
+            let commands = gather(msg, "draw-commands", "draw");
             render_frame(app, &commands);
 
             let mut extra = Map::new();

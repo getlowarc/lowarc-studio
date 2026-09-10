@@ -54,10 +54,20 @@ fn write_test_tone(path: &std::path::Path) {
     std::fs::write(path, bytes).unwrap();
 }
 
+// The contract itself, installed into the store: a manifest and nothing else. It exists here to
+// prove the runtime treats a definition as a definition — it resolves, it takes part in ordering,
+// and it is never spawned despite having no process.json, which without the explicit skip in
+// ProcessLoader would have made can_handle() answer "no loader recognises this project."
+fn write_contract_module(modules_dir: &std::path::Path, id: &str) {
+    let dir = modules_dir.join(id);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("manifest.json"), format!(r#"{{"id":"{id}","kind":"contract","name":"{id}","loadOrder":0,"requires":[]}}"#)).unwrap();
+}
+
 fn write_audio_module(modules_dir: &std::path::Path) {
     let dir = modules_dir.join("audio-playback");
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("manifest.json"), r#"{"id":"audio-playback","name":"Audio Playback","loadOrder":1,"requires":[{"id":"director","version":"*","optional":true}]}"#).unwrap();
+    std::fs::write(dir.join("manifest.json"), r#"{"id":"audio-playback","name":"Audio Playback","loadOrder":1,"requires":[{"contract":"audio-cues","version":"^1","optional":true}]}"#).unwrap();
     std::fs::write(dir.join("process.json"), r#"{"command":"audio_playback_runtime","args":[],"wantsFrames":true}"#).unwrap();
     let built_exe = std::path::PathBuf::from(env!("CARGO_BIN_EXE_audio_playback_runtime"));
     let file_name = if cfg!(windows) { "audio_playback_runtime.exe" } else { "audio_playback_runtime" };
@@ -70,7 +80,7 @@ fn write_audio_module(modules_dir: &std::path::Path) {
 fn write_director_module(modules_dir: &std::path::Path, tone_path: &std::path::Path) {
     let dir = modules_dir.join("director");
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("manifest.json"), r#"{"id":"director","name":"Test Director","loadOrder":1,"requires":[]}"#).unwrap();
+    std::fs::write(dir.join("manifest.json"), r#"{"id":"director","name":"Test Director","loadOrder":1,"requires":[],"provides":[{"contract":"audio-cues","version":"^1"}]}"#).unwrap();
     std::fs::write(
         dir.join("process.json"),
         r#"{"command":"powershell","args":["-NoProfile","-ExecutionPolicy","Bypass","-File","module.ps1"],"wantsFrames":true}"#,
@@ -106,7 +116,7 @@ while ($line = [Console]::In.ReadLine()) {{
 fn write_pausing_director_module(modules_dir: &std::path::Path, tone_path: &std::path::Path, paused_frames: u32) {
     let dir = modules_dir.join("director");
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("manifest.json"), r#"{"id":"director","name":"Test Director","loadOrder":1,"requires":[]}"#).unwrap();
+    std::fs::write(dir.join("manifest.json"), r#"{"id":"director","name":"Test Director","loadOrder":1,"requires":[],"provides":[{"contract":"audio-cues","version":"^1"}]}"#).unwrap();
     std::fs::write(
         dir.join("process.json"),
         r#"{"command":"powershell","args":["-NoProfile","-ExecutionPolicy","Bypass","-File","module.ps1"],"wantsFrames":true}"#,
@@ -170,10 +180,11 @@ fn the_audio_module_plays_a_real_file_and_reports_when_it_finishes() {
     let tone_path = temp_dir("assets").join("tone.wav");
     write_test_tone(&tone_path);
     write_audio_module(&modules_dir);
+    write_contract_module(&modules_dir, "audio-cues");
     write_director_module(&modules_dir, &tone_path);
 
     let project_dir = temp_dir("project");
-    std::fs::write(project_dir.join("project.json"), r#"{"requires":[{"id":"audio-playback","version":"*"},{"id":"director","version":"*"}]}"#).unwrap();
+    std::fs::write(project_dir.join("project.json"), r#"{"requires":[{"id":"audio-playback","version":"*"},{"id":"director","version":"*"},{"id":"audio-cues","version":"*"}]}"#).unwrap();
     let entry = project_dir.join("main.txt");
     std::fs::write(&entry, "unused by this module").unwrap();
 
@@ -248,6 +259,7 @@ fn pausing_holds_position_and_resuming_continues_it() {
     let tone_path = temp_dir("pause_assets").join("tone.wav");
     write_test_tone(&tone_path);
     write_audio_module(&modules_dir);
+    write_contract_module(&modules_dir, "audio-cues");
     // Paused for its first 3 frames — at a real ~30fps free-running pace that's ~100ms of actual
     // elapsed wall-clock time, comfortably past the 0.1s tone's own natural length. If "paused"
     // didn't genuinely hold consumption, this alone would already show it as finished.
@@ -255,7 +267,7 @@ fn pausing_holds_position_and_resuming_continues_it() {
     write_pausing_director_module(&modules_dir, &tone_path, paused_frames);
 
     let project_dir = temp_dir("pause_project");
-    std::fs::write(project_dir.join("project.json"), r#"{"requires":[{"id":"audio-playback","version":"*"},{"id":"director","version":"*"}]}"#).unwrap();
+    std::fs::write(project_dir.join("project.json"), r#"{"requires":[{"id":"audio-playback","version":"*"},{"id":"director","version":"*"},{"id":"audio-cues","version":"*"}]}"#).unwrap();
     let entry = project_dir.join("main.txt");
     std::fs::write(&entry, "unused by this module").unwrap();
 

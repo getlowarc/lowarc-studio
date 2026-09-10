@@ -157,10 +157,20 @@ fn main() {
                 reply_ok(extra);
             }
             "frame" => {
+                // Gathered across every provider of the contract, in run order, rather than read
+                // from one privileged module's key — see the audio-cues README. Several modules
+                // can ask for sound at once without one of them being elected to speak for the
+                // others; the lists simply concatenate.
                 let requested: Vec<PlayRequest> = msg
-                    .pointer("/shared/director/play")
+                    .pointer("/shared/audio-cues")
                     .and_then(|v| v.as_array())
-                    .map(|arr| arr.iter().filter_map(|v| serde_json::from_value(v.clone()).ok()).collect())
+                    .map(|providers| {
+                        providers
+                            .iter()
+                            .filter_map(|p| p.get("play").and_then(|v| v.as_array()))
+                            .flat_map(|list| list.iter().filter_map(|v| serde_json::from_value(v.clone()).ok()))
+                            .collect()
+                    })
                     .unwrap_or_default();
                 let requested_by_handle: HashMap<&str, &PlayRequest> = requested.iter().map(|r| (r.handle.as_str(), r)).collect();
 

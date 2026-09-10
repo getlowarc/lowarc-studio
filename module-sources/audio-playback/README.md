@@ -6,12 +6,12 @@ hand-rolling a decoder. Cross-platform: Windows, macOS, Linux.
 
 ## How it works
 
-Optionally requires a convention-based `director` role — any project module, whatever it's
-actually built as, installed with that id. This module doesn't know or care what fills the role;
-same pattern `node-graph-runtime`'s own optional `input` dependency uses.
+Optionally consumes the **`audio-cues`** contract, whose specification ships beside this module
+(`module-sources/audio-cues`). Any number of modules may provide it; this one gathers every
+provider's list in run order, so several modules can ask for sound at once without one of them
+being elected to speak for the others.
 
-Every frame, it reads a declarative "what should be playing right now" list from
-`shared.director.play`:
+Every frame, it reads that gathered, declarative "what should be playing right now" list:
 
 ```json
 [{ "handle": "music", "file": "bgm.mp3", "volume": 0.8, "loop": true, "paused": false }]

@@ -69,7 +69,7 @@ pub fn resolve(preset: &ProjectPreset, modules_dir: &Path) -> Result<Vec<ModuleI
     let mut resolved: Vec<ModuleInfo> = Vec::new();
     // (id, optional) — a project's own top-level requires is always mandatory (see Dependency's
     // own doc comment on why); only a MODULE's own manifest.requires can mark one optional.
-    let mut queue: VecDeque<(String, bool)> = preset.requires.iter().map(|d| (d.id.clone(), false)).collect();
+    let mut queue: VecDeque<(String, bool)> = preset.requires.iter().map(|d| (d.store_id().to_string(), false)).collect();
 
     while let Some((id, optional)) = queue.pop_front() {
         if id.is_empty() || resolved_ids.contains(&id) {
@@ -102,8 +102,13 @@ pub fn resolve(preset: &ProjectPreset, modules_dir: &Path) -> Result<Vec<ModuleI
                 };
                 resolved_ids.insert(id);
                 for dep in &manifest.requires {
-                    if !dep.id.is_empty() {
-                        queue.push_back((dep.id.clone(), dep.optional));
+                    // store_id(), not id: a contract requirement names the contract MODULE, which is
+                    // what gets installed and version-checked. Which modules provide it is a
+                    // separate question answered at run time, and deliberately not resolved here —
+                    // pulling in every installed provider would silently add modules the project
+                    // never asked for.
+                    if !dep.store_id().is_empty() {
+                        queue.push_back((dep.store_id().to_string(), dep.optional));
                     }
                 }
                 resolved.push(ModuleInfo { folder, manifest });

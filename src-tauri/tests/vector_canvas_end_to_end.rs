@@ -92,9 +92,11 @@ impl Module {
         reply
     }
 
-    /// One frame carrying `draw` as the director's published command list, returning the reply.
+    /// One frame carrying `draw` as a single provider's contribution to the draw-commands
+    /// contract — the gathered array shape the canvas reads now that any number of modules may
+    /// draw (see module-sources/draw-commands/README.md).
     fn frame(&mut self, draw: Value) -> Value {
-        self.send(serde_json::json!({"phase": "frame", "delta": 0.016, "shared": {"director": {"draw": draw}}}));
+        self.send(serde_json::json!({"phase": "frame", "delta": 0.016, "shared": {"draw-commands": [{"from": "test-director", "draw": draw}]}}));
         self.reply()
     }
 
