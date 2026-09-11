@@ -97,8 +97,10 @@ relayed through the host, which enforces per-plugin identity on every relayed ac
 
 ## Contributing
 
-Only commits/pushes that pass `cargo build`, `cargo test`, and `cargo clippy --all-targets -- -D
-warnings` should land on `main`: CI enforces the same three.
+Only commits that pass `cargo build`, `cargo test` and `cargo clippy --all-targets -- -D warnings`
+should land on `main`; CI enforces the same three. See [CONTRIBUTING.md](CONTRIBUTING.md) before
+you start on anything large, and [SECURITY.md](SECURITY.md) if you found a vulnerability rather
+than a bug.
 
 ## License
 

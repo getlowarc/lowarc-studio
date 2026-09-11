@@ -20,7 +20,7 @@
     "window-state:default",
     {
       "identifier": "opener:allow-default-urls",
-      "allow": [{ "url": "https://lowarc.com" }, { "url": "https://github.com/NolanLT/lowarc-studio/issues" }]
+      "allow": [{ "url": "https://lowarc.com" }, { "url": "https://github.com/getlowarc/lowarc-studio/issues" }]
     }
   ]
 }

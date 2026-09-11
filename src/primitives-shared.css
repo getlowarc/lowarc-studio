@@ -530,6 +530,7 @@
 }
 
 .dropdown-chevron {
+  display: flex;
   flex: none;
   color: var(--fg-dim);
   font-size: 11px;

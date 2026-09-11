@@ -19,6 +19,11 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Read-only token. This workflow only builds and tests; nothing it runs needs to write to the
+# repository, and on a public repo it runs against pull requests from forks.
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     runs-on: windows-latest

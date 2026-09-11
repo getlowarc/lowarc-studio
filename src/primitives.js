@@ -931,7 +931,7 @@ function renderSettingRow(entry, value, onCommit) {
     dropdown.dataset.dropdown = "";
     dropdown.dataset.open = "false";
     dropdown.innerHTML =
-      '<button type="button" class="dropdown-trigger" data-dropdown-trigger><span class="dropdown-value" data-dropdown-value></span><span class="dropdown-chevron">▾</span></button><div class="dropdown-menu" data-dropdown-menu></div>';
+      '<button type="button" class="dropdown-trigger" data-dropdown-trigger><span class="dropdown-value" data-dropdown-value></span><span class="dropdown-chevron"><svg viewBox="0 0 16 16" width="10" height="10" fill="none"><path d="M4 6.5l4 4 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg></span></button><div class="dropdown-menu" data-dropdown-menu></div>';
     const menu = dropdown.querySelector("[data-dropdown-menu]");
     (entry.options || []).forEach((opt) => {
       const btn = document.createElement("button");
@@ -956,7 +956,7 @@ function renderSettingRow(entry, value, onCommit) {
     const wrap = document.createElement("div");
     wrap.className = "numeric-input";
     wrap.innerHTML =
-      '<input type="text" inputmode="numeric" /><div class="numeric-steppers"><button type="button" class="stepper-up" aria-label="Increase">▲</button><button type="button" class="stepper-down" aria-label="Decrease">▼</button></div>';
+      '<input type="text" inputmode="numeric" /><div class="numeric-steppers"><button type="button" class="stepper-up" aria-label="Increase"><svg viewBox="0 0 16 16" width="8" height="8"><path d="M8 5l4.5 6.5h-9z" fill="currentColor" /></svg></button><button type="button" class="stepper-down" aria-label="Decrease"><svg viewBox="0 0 16 16" width="8" height="8"><path d="M8 11L3.5 4.5h9z" fill="currentColor" /></svg></button></div>';
     const input = wrap.querySelector("input");
     input.value = value;
     if (entry.placeholder) input.placeholder = entry.placeholder;

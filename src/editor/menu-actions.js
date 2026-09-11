@@ -171,7 +171,7 @@
       });
 
       document.getElementById("help-report-issue-item").addEventListener("click", () => {
-        openUrl("https://github.com/NolanLT/lowarc-studio/issues");
+        openUrl("https://github.com/getlowarc/lowarc-studio/issues");
       });
 
       // version::label() rather than __TAURI__.app.getVersion(), which returns the number without

@@ -20,7 +20,7 @@ function createLowarcDropdown(options, value, onChange) {
   valueEl.className = "dropdown-value";
   const chevron = document.createElement("span");
   chevron.className = "dropdown-chevron";
-  chevron.textContent = "▾";
+  chevron.innerHTML = "<svg viewBox=\"0 0 16 16\" width=\"10\" height=\"10\" fill=\"none\"><path d=\"M4 6.5l4 4 4-4\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" /></svg>";
   trigger.appendChild(valueEl);
   trigger.appendChild(chevron);
 

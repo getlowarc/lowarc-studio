@@ -1,0 +1,21 @@
+version: 2
+
+# Cargo and Actions only. There is no package.json: the frontend is plain files under src/, and
+# every JS library here is vendored on purpose (see NOTICE), so there is no manifest for Dependabot
+# to read and nothing for it to bump. Vendored copies get updated by hand, deliberately.
+updates:
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # One PR for the patch-level noise; anything that could actually break a build still comes
+      # through on its own so it gets read.
+      patch-updates:
+        update-types: [patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

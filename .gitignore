@@ -43,3 +43,12 @@ node_modules/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Claude Code's per-developer local settings. The rest of .claude/ (a shared settings.json, a
+# launch.json) is committable on purpose; only the .local. one is personal.
+.claude/settings.local.json
+
+# VS Code. Separate from .vs/ above, which is Visual Studio.
+.vscode/
+
+*.log

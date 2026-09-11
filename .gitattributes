@@ -9,3 +9,22 @@
 # those are Cargo build output copied in at runtime (see AppPaths::ensure_builtin_plugin_
 # binaries()), never committed — but if that ever changes, this is still the right rule.
 *.exe binary
+
+# Explicit, though `text=auto` already detects every one of these correctly (they all carry NUL
+# bytes well inside the first 8000). Being explicit costs a line and removes the question.
+*.png binary
+*.ico binary
+*.icns binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+
+# Vendored third-party code, excluded from GitHub's language statistics. Without this the 24MB of
+# Monaco under plugins/monaco/vs decides what language GitHub thinks this repo is written in, and
+# the answer it gives is wrong by an order of magnitude.
+plugins/monaco/vs/** linguist-vendored
+plugins/3d-viewer/vendor/** linguist-vendored
+src/vendor/** linguist-vendored
+
+# Generated from vscode's theme-seti, not written here. See the file's own header.
+src/vendor/seti-icons/icons.js linguist-generated
