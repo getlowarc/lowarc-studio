@@ -299,14 +299,10 @@ function createInlineCreateRow(dir, isDir, depth) {
   return row;
 }
 
-// Every renderTree() call gets a generation stamp; if a newer call starts before an older one's
-// awaits (loadChildren/resolveCompactChain, each a real round-trip to the backend) finish, the
-// older one abandons itself at the next checkpoint instead of appending stale rows into a
-// container a newer render has already cleared and started refilling. Without this, two
-// overlapping renders (e.g. beginCreate's render still in flight when commitCreate's own render
-// starts right after the backend call resolves) interleave their DOM writes into the same
-// container — confirmed live: creating a file duplicated the whole tree until a chevron click
-// forced a fresh, non-overlapping render.
+// Every renderTree() call gets a generation stamp. If a newer call starts while an older one is
+// still awaiting a backend round-trip, the older abandons itself at the next checkpoint rather than
+// appending stale rows into a container the newer one has already cleared. Without it, two
+// overlapping renders interleave their DOM writes and the tree duplicates itself.
 let renderGeneration = 0;
 
 async function renderDirChildren(dirPath, container, depth, generation) {

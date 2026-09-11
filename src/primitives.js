@@ -1279,17 +1279,14 @@ function escapeHtml(text) {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-// Security: modules.html/plugins.html load in an UN-sandboxed popup iframe with real Tauri access
-// via relayableInvoke (see this file's own note above that function) — a README/CHANGELOG is
-// local-but-foreign content that must never be able to inject live markup into that trusted
-// document. marked's OWN default output is not safe by itself — raw HTML in the source passes
-// straight through, and it doesn't reject a `javascript:` link/image href — verified live before
-// this shipped (`marked.parse("<script>alert(1)</script>")` and a `javascript:` link both come
-// back executable with no configuration). This overrides exactly the three renderer hooks that
-// matter: every raw-HTML token is stripped entirely (its surrounding plain text survives, only the
-// tag markup itself is dropped), and a link/image href is only ever emitted verbatim when it has
-// no scheme at all (an ordinary relative path) or an explicit http(s) scheme — anything else
-// (javascript:, data:, ...) falls back to plain escaped text/nothing instead of a live element.
+// Security: modules.html and plugins.html load in an UN-sandboxed popup iframe with real Tauri
+// access, and a README is local-but-foreign content that must never inject live markup into that
+// document. marked's default output is not safe on its own: raw HTML passes straight through and a
+// `javascript:` href is not rejected.
+//
+// So three renderer hooks are overridden. Raw-HTML tokens are stripped entirely, keeping the
+// surrounding text. A link or image href is emitted verbatim only when it has no scheme, meaning
+// an ordinary relative path, or an explicit http(s) one; anything else degrades to escaped text.
 let markedConfigured = false;
 function configureMarkedOnce() {
   if (markedConfigured || typeof marked === "undefined") return;

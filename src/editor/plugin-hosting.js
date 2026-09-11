@@ -572,15 +572,9 @@
         panel.scrollTop = panel.scrollHeight;
       }
 
-      // order:-10 so Run always sorts first, matching its old fixed "always first" position in the
-      // static HTML. closeable:false — nothing currently renders a per-tab close control for ANY
-      // console tab (Terminal manages closing its own sessions through its own UI, not a host-drawn
-      // X), so this is forward-looking metadata, not something consumed yet. mount(el) just
-      // re-parents the one #console-run-panel element that already exists and that
-      // appendConsoleLine() already writes into regardless of migration — its own "is-active" class
-      // (already set in its static HTML) is left untouched and permanent, exactly like a plugin
-      // sidebar iframe's is-active is (see showSlotTab's wrapper comment); the WRAPPER's is-active
-      // is what actually governs visibility once mounted.
+      // order:-10 so Run always sorts first. mount(el) re-parents the existing #console-run-panel
+      // rather than building anything, and leaves that element's own is-active permanently set: the
+      // WRAPPER's is-active governs visibility once mounted (see showSlotTab).
       contribute("console", {
         id: "__run",
         sourceType: "host",

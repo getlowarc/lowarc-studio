@@ -439,18 +439,15 @@ pub fn spawn_and_run(descriptors: Vec<(&ModuleInfo, ProcessDescriptor)>, ctx: &R
 /// ProcessLoader: a run mixing in a native-kind module has to go through NativeLoader instead.
 pub struct ProcessLoader;
 
-/// Mirrors `m`'s accumulated published state onto every contract it provides, so a consumer can
-/// read a ROLE (`shared["draw-commands"]`) without knowing which module is filling it. The
-/// per-module-id entry stays exactly where it was — this is an alias beside it, not a replacement,
-/// so anything depending on one specific module still reads it the way it always did.
+/// Mirrors a module's published state onto every contract it provides, so a consumer can read a
+/// ROLE without knowing which module fills it. An alias beside the per-module-id entry, not a
+/// replacement.
 ///
-/// A contract holds an ARRAY, one entry per provider, each tagged with the id it came from. Two
-/// reasons it isn't a map keyed by provider id: serde_json's map is sorted rather than
-/// insertion-ordered, which would silently make a gathered draw list's z-order alphabetical by
-/// module id; and an array is the shape that says "several of these are expected," which is the
-/// point of the contract mechanism. Entries are appended on a provider's first publish and updated
-/// in place after that, so the array's order is run order — and run order already guarantees a
-/// provider ran before its consumers this same tick.
+/// A contract holds an ARRAY, one entry per provider, tagged with the id it came from. Not a map
+/// keyed by provider id, because serde_json's map is sorted rather than insertion-ordered, which
+/// would silently make a gathered draw list's z-order alphabetical. Entries append on first publish
+/// and update in place after, so the array is in run order, which already guarantees a provider ran
+/// before its consumers this tick.
 fn mirror_onto_contracts(shared: &mut serde_json::Map<String, Value>, id: &str, provides: &[String]) {
     if provides.is_empty() {
         return;

@@ -491,14 +491,11 @@
         },
       });
 
-      // A plain reference list, not a settings surface — nothing here is configurable yet, so
-      // there's no rebinding UI, just what each combination currently does. The Undo/Redo/Cut/
-      // Copy/Paste/Find/Replace rows are Monaco's own built-in keybindings (only live while an
-      // editor tab has focus); Save/Save As/Command Palette are the host's own, added alongside
-      // the matching menu items and working regardless of which panel has focus, EXCEPT while a
-      // plugin iframe (an editor tab included) is the one actually focused — a sandboxed iframe's
-      // keydown never reaches this document, so the host-level bindings only fire from host chrome
-      // (the sidebar, empty space, etc.), a real cross-iframe limitation, not a bug.
+      // A reference list, not a settings surface: nothing here is rebindable yet. The editing rows
+      // are Monaco's own bindings, live only while an editor tab has focus. Save, Save As and the
+      // Command Palette are the host's, working from any panel EXCEPT while a plugin iframe is
+      // focused, since a sandboxed iframe's keydown never reaches this document. That is a real
+      // cross-iframe limitation rather than a bug.
       const SHORTCUT_GROUPS = [
         { keys: "Ctrl+S", label: "Save" },
         { keys: "Ctrl+Shift+S", label: "Save As…" },

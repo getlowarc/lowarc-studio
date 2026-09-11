@@ -96,15 +96,11 @@
       document.getElementById("edit-find-item").addEventListener("click", () => sendEditorCommand("actions.find"));
       document.getElementById("edit-replace-item").addEventListener("click", () => sendEditorCommand("editor.action.startFindReplaceAction"));
 
-      // Paste doesn't go through sendEditorCommand/editor.action.clipboardPasteAction like the
-      // other six — that action reads via the sandboxed viewer iframe's OWN navigator.clipboard,
-      // which Chromium denies clipboard-READ to for an opaque-origin iframe (Cut/Copy's writeText
-      // calls aren't subject to the same restriction — confirmed already working from an iframe by
-      // the file explorer's existing "Copy Path"). The host document itself has no such
-      // restriction, so this reads the OS clipboard here (via tauri-plugin-clipboard-manager, a
-      // real Tauri command, not the browser Clipboard API) and hands the text to the active
-      // viewer to insert, the same "host holds the privilege, plugin executes the edit" split
-      // applyLineEdit already uses for Outline.
+      // Paste does not go through sendEditorCommand like the other six. That action would read via
+      // the sandboxed iframe's own navigator.clipboard, and Chromium denies clipboard READ to an
+      // opaque origin; writeText, which Cut and Copy use, is not restricted the same way. The host
+      // document has no such restriction, so it reads the OS clipboard through Tauri and hands the
+      // text to the active viewer: the same host-holds-the-privilege split applyLineEdit uses.
       document.getElementById("edit-paste-item").addEventListener("click", async () => {
         const file = activeFileEntry();
         if (!file || !file.iframe) return;

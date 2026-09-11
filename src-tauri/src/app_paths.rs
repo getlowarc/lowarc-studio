@@ -88,18 +88,12 @@ impl AppPaths {
     pub fn themes() -> PathBuf {
         Self::user_data().join("themes")
     }
-    /// Where a native binary this app needs at runtime, but that isn't part of any one plugin,
-    /// lives for an INSTALLED copy — native_module_host (see runtime/native_module.rs) and
-    /// lowarc_runtime, the exported/standalone engine binary (see export/runtime_source.rs).
-    /// Both are genuine binary targets of this same Cargo workspace (src/bin auto-discovery), so
-    /// a SOURCE checkout doesn't need this at all — they resolve next to the running exe instead,
-    /// since Cargo already puts every one of this workspace's binaries in the same target/
-    /// directory as a normal side effect of building it. An installed copy has no such guarantee
-    /// (Tauri doesn't bundle a sibling binary just because it happened to exist in the same build
-    /// output directory), so both resolvers fall back to here, populated by
-    /// ensure_installed_copy_resources() from this app's own bundled resources on first run — see
-    /// prepare-bundle.ps1 for how they get into that bundle. Distinct from plugins() since neither
-    /// of these is a plugin or has a plugin.json of its own.
+    /// Where native binaries this app needs at runtime, but that belong to no plugin, live for an
+    /// INSTALLED copy: native_module_host and lowarc_runtime. A source checkout does not need this,
+    /// since both are binary targets of this workspace and Cargo puts them next to the running exe.
+    /// An installed copy has no such guarantee, so both resolvers fall back here, populated by
+    /// ensure_installed_copy_resources() on first run. Distinct from plugins(), since neither is a
+    /// plugin or has a plugin.json.
     pub fn runtime_helpers() -> PathBuf {
         Self::user_data().join("runtime-helpers")
     }
@@ -175,10 +169,9 @@ impl AppPaths {
     }
 }
 
-/// The real logic behind ensure_installed_copy_resources(), minus its dev_root() guard — split out
-/// the same way needs_copy() was, so this is directly testable with real temp directories instead
-/// of needing to fake AppPaths' own dev-checkout detection (which would always say "yes, dev" when
-/// tests run from this actual repo, making the guarded version untestable here).
+/// The logic behind ensure_installed_copy_resources() without its dev_root() guard, so it is
+/// testable against real temp directories. The guarded version is not: dev-checkout detection
+/// always says "dev" when tests run from this repo.
 fn unpack_installed_resources(resource_dir: &Path, plugins_dest: &Path, helpers_dest: &Path) -> std::io::Result<()> {
     let src_plugins = resource_dir.join("plugins");
     if src_plugins.is_dir() {

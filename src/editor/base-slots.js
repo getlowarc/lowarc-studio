@@ -153,13 +153,10 @@
       }
 
       // ---------- Rail/Console icon visibility (right-click to show/hide individual entries) ----------
-      // Purely a display filter, independent of whether a plugin/module is actually enabled — hiding
-      // an icon here only removes it from THIS strip; the underlying contribution (its panel, its
-      // other slots if it has any) is untouched and still reachable everywhere else (Command
-      // Palette, etc. — every OTHER getSlot() consumer besides renderTabStrip's own filter above
-      // still sees it). Scoped to Rail (sidebar) and Console only, per Nolan: "Just the Console and
-      // Rail. Nowhere else for now" — even though renderTabStrip's filter itself is generic enough
-      // to already work for any slot the moment a menu is wired up for one.
+      // A display filter only, independent of whether a plugin is enabled: hiding an icon removes
+      // it from THIS strip, while the contribution stays reachable everywhere else, including the
+      // Command Palette. Scoped to the Rail and Console, though renderTabStrip's filter is generic
+      // enough to work for any slot once a menu is wired up for one.
       function isSlotItemHidden(slot, id) {
         return (loadedSettings?.hiddenSlotItems?.[slot] || []).includes(id);
       }

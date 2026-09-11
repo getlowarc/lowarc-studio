@@ -363,12 +363,10 @@ fn get_project_preset(project_dir: String) -> Result<runtime::project::ProjectPr
     runtime::project::ProjectPreset::load(&PathBuf::from(project_dir))
 }
 
-/// Writes a whole preset back — what the Run Config editor saves. Distinct from set_project_entry,
-/// which only ever touched `entry` and takes an absolute path to make relative; this takes the
-/// already-shaped preset the editor built and replaces project.json wholesale, the same "the
-/// frontend always sends the full state" convention set_breakpoints and plugin settings use.
+/// Writes a whole preset back, which is what the Run Config editor saves: it replaces project.json
+/// wholesale, the same send-the-full-state convention set_breakpoints and plugin settings use.
 ///
-/// The entry is validated here rather than trusted: the editor picks it through a native dialog
+/// The entry is validated rather than trusted, since the editor picks it through a native dialog
 /// that can reach anywhere on disk, and an entry outside the project would produce a project.json
 /// that only works on the machine that wrote it.
 #[tauri::command]
@@ -425,18 +423,16 @@ fn entry_file_exists(project_dir: String, entry: String) -> bool {
     PathBuf::from(project_dir).join(entry).is_file()
 }
 
-/// A sanity backstop, not a full capability boundary — these two commands are reachable by any
-/// code that can invoke a Tauri command, and this app's editor legitimately opens/saves files
-/// anywhere the user has picked via a native dialog, so there's no "must be inside X" allowlist to
-/// enforce without breaking real usage. "Is this specific plugin allowed to touch this specific
-/// file" still lives where it has to — editor.html's own windowToFilePath map, checked before a
-/// plugin's saveFile request ever reaches invoke() at all — since only the host knows which iframe
-/// asked and what path it was actually opened for; Rust has no visibility into that session state
-/// and isn't trying to fake it. What THIS catches: an empty path, a relative one (every real
-/// caller already has an absolute one — a file explorer entry or a native dialog result, never a
-/// bare relative string), and a parent directory that doesn't genuinely resolve to what it claims
-/// (canonicalizing it collapses any `..`/symlink misdirection in the directory portion, then the
-/// file name — which doesn't need to exist yet, for a save of new content — is rejoined as-is).
+/// A sanity backstop, NOT a capability boundary. The editor legitimately opens and saves anywhere
+/// the user picked through a native dialog, so there is no allowlist to enforce here without
+/// breaking real usage. Whether a specific plugin may touch a specific file is checked in the
+/// frontend's windowToFilePaths map before the request ever reaches invoke(), since only the host
+/// knows which iframe asked and what it opened.
+///
+/// What this catches: an empty path, a relative one (every real caller has an absolute path), and a
+/// parent directory that does not resolve to what it claims. Canonicalizing collapses `..` and
+/// symlink misdirection in the directory portion, then the file name is rejoined as-is, since it
+/// need not exist yet for a save.
 fn validate_file_path(path: &str) -> Result<PathBuf, String> {
     if path.trim().is_empty() {
         return Err("No file path given.".into());

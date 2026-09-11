@@ -379,17 +379,13 @@ Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve
     window.parent.postMessage({ type: "hostRequestReply", replyId: payload.replyId, content: doc ? doc.model.getValue() : null }, "*");
   });
 
-  // A plugin that isn't this file's own viewer asking for a specific line's text to change (the
-  // Outline plugin, editing a value it parsed out). editor.executeEdits(), not model.applyEdits()
-  // or model.setValue() — this is the one that actually integrates with the editor's own
-  // undo-redo controller the same way a real keystroke does; a bare model-level edit still lands
-  // in the model's own undo stack, but doesn't reliably wire up to Ctrl+Z the way a genuine editor
-  // operation does, so without it an Outline edit cannot be undone at all. Only valid while this
-  // file is the one actually showing in the editor:
-  // executeEdits acts on whatever model is CURRENTLY SET, so editing a backgrounded file through
-  // it would silently corrupt whichever OTHER file happens to be on screen; falls back to a plain
-  // model edit for that case; genuinely rare in practice, since Outline only ever shows the active
-  // file's own symbols to begin with.
+  // A plugin that is not this file's viewer asking for one line's text to change. executeEdits(),
+  // not applyEdits() or setValue(): only executeEdits integrates with the undo-redo controller the
+  // way a keystroke does, so without it the edit cannot be undone.
+  //
+  // It acts on whatever model is CURRENTLY SET, so using it on a backgrounded file would corrupt
+  // whichever file is on screen. That case falls back to a plain model edit; it is rare, since
+  // Outline only shows the active file's symbols.
   window.lowarc.on("lowarc:applyLineEdit", (payload) => {
     if (!payload || typeof payload.line !== "number" || typeof payload.text !== "string") return;
     const doc = docs.get(payload.path);

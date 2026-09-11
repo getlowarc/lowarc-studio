@@ -40,15 +40,12 @@
       const groupActiveFilePath = { 0: null, 1: null };
       let activeGroupId = 0;
 
-      // The reverse of call()/saveFile()'s own request/reply plumbing (see plugin_assets.rs) — this
-      // is the one place the HOST initiates a request a plugin must reply to, used by
-      // moveFileToGroup() to pull a file's current (possibly unsaved) content out of its source
-      // instance before mounting it in the other group. A plugin replies by posting
-      // {type: "hostRequestReply", replyId, content} — matched in the message listener below.
-      // A misbehaving (or just slow/stuck) plugin never replying would otherwise hang whatever
-      // was awaiting it forever — moveFileToGroup's own move, or now the Outline panel's refresh.
-      // Resolving null on timeout instead of leaving that stuck is the whole reason for it; both
-      // callers already treat a null/falsy content result as "fall back to reading from disk."
+      // The one place the HOST initiates a request a plugin must reply to, used to pull a file's
+      // current, possibly unsaved, content out of its source instance. A plugin replies by posting
+      // {type: "hostRequestReply", replyId, content}.
+      //
+      // The timeout exists because a stuck plugin that never replies would otherwise hang the
+      // caller forever. Both callers treat a null result as "read from disk instead".
       const REQUEST_CONTENT_TIMEOUT_MS = 2000;
       let nextHostRequestId = 1;
       const hostPendingRequests = new Map();
@@ -126,15 +123,11 @@
         return entry ? entry.iframe : null;
       }
 
-      // Tells whatever's in the Inspector slot (Outline, today) what the currently-focused file
-      // actually is — null when there isn't one, or its viewer is a binary one (an image has
-      // nothing for a symbols outline to extract). Live content, not a disk read: asks the owning
-      // viewer instance directly (same requestPluginContent() moveFileToGroup uses), since an
-      // outline that only ever reflected the last save would silently drift from what's actually
-      // on screen the moment someone starts editing — falls back to a disk read only if that
-      // times out or the viewer doesn't implement lowarc:getContent at all. Deliberately NOT wired
-      // to every keystroke — only file focus changes and successful saves trigger this, matching
-      // the scope this was actually built to.
+      // Tells whatever is in the Inspector slot what the focused file is, or null when there is
+      // none or its viewer is a binary one. Live content rather than a disk read: it asks the owning
+      // viewer directly, since an outline reflecting only the last save drifts from the screen the
+      // moment someone edits. Falls back to disk if that times out or the viewer has no
+      // lowarc:getContent. Fires on focus changes and saves, not on every keystroke.
       async function updateInspectorForActiveFile() {
         const iframe = inspectorIframe();
         if (!iframe) return;

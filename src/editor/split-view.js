@@ -476,9 +476,9 @@
       // whatever it was showing — an editor's unsaved buffer, a terminal's scrollback. So the
       // resolved values are pushed straight in and applied as custom properties.
       //
-      // Read off documentElement's inline style rather than a token list, because that IS what
-      // applyThemeColors wrote — including derived values like --btn-hover-brightness that aren't
-      // colors at all and would be forgotten by anything maintaining its own list.
+      // Read off documentElement's inline style rather than a token list, because that is exactly
+      // what applyThemeColors wrote, including derived values like --btn-hover-brightness that are
+      // not colours and would be forgotten by anything keeping its own list.
       window.addEventListener("lowarc-theme-applied", () => {
         const style = document.documentElement.style;
         const vars = {};
@@ -542,13 +542,11 @@
       loadPluginContributions();
 
       // ---------- Drag-to-resize, with VS Code's two-stage close ----------
-      // Dragging past the minimum doesn't close the panel right away — it sticks at the minimum
-      // size (a dead zone) until the drag reaches a second, closer-to-the-edge threshold
-      // (closeAt), only then does it actually collapse. Below closeAt, the panel goes visually
-      // closed (0) but stays "live" — dragging back out past closeAt reopens it pinned at the
-      // minimum, no need to release and start a new drag. While fully closed, the remembered size
-      // is left untouched, so reopening later (via the header icon or the rail) restores the size
-      // from before the drag, not 0 or whatever the mouse last happened to be at.
+      // Dragging past the minimum sticks there, a dead zone, until a second threshold closer to the
+      // edge (closeAt) actually collapses it. Below closeAt the panel is visually closed but stays
+      // live, so dragging back out reopens it pinned at the minimum without releasing first. The
+      // remembered size is untouched while closed, so reopening later restores the size from before
+      // the drag rather than 0.
 
       // Pointer Capture, not plain mousedown/mousemove/mouseup on document — every panel this
       // resizes sits right next to a sandboxed iframe (the file explorer, Monaco, Terminal...),
