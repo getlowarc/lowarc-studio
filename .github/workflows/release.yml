@@ -63,7 +63,7 @@ jobs:
       # Builds, bundles, signs the updater artifacts (createUpdaterArtifacts is on in
       # tauri.conf.json) and creates the GitHub release. The signature comes from the private key
       # below and is verified by clients against the public key baked into tauri.conf.json.
-      - uses: tauri-apps/tauri-action@v0
+      - uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
