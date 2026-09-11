@@ -3,6 +3,12 @@
 All notable changes to the Node Graph plugin are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## 0.2.2 - 2026-09-11
+
+### Changed
+
+- The Inspector's numeric steppers are drawn as SVG rather than Unicode triangles.
+
 ## 0.2.1 - 2026-09-03
 
 ### Fixed

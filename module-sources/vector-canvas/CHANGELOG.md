@@ -3,6 +3,12 @@
 All notable changes to the Vector Canvas module are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## 0.2.1 - 2026-09-11
+
+### Fixed
+
+- States a concrete version of the `input-state` contract it provides, rather than a range.
+
 ## 0.2.0 - 2026-09-09
 
 ### Changed

@@ -1,6 +1,6 @@
 {
   "name": "Debugger",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Pause, step, and set breakpoints on a running project. Works against any module — it operates on the wire protocol every module already speaks (frame requests/replies, log lines), never anything module-internal like a source line.",
   "contributes": {
     "consoleTabs": [

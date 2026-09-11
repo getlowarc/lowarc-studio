@@ -3,6 +3,13 @@
 All notable changes to the Media Viewer plugin are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## 0.2.1 - 2026-09-11
+
+### Changed
+
+- The zoom controls are drawn as SVG rather than borrowed from the font as Unicode glyphs, which
+  render as nothing wherever the font lacks them.
+
 ## 0.2.0 - 2026-09-03
 
 ### Added

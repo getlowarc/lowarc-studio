@@ -55,10 +55,8 @@ fn main() {
     let mut reader = pair.master.try_clone_reader().expect("pty master reader");
 
     // Forwards shell output as lines of JSON, not lines of terminal output: a read often lands
-    // mid-escape-sequence, which is fine, since xterm.js parses a continuous byte stream. EOF is
-    // the one reliable "the shell exited" signal, and it cannot come from the stdin loop below,
-    // which blocks waiting on the host while the shell can exit on its own. Exits the whole process
-    // rather than this thread, which also unblocks the main thread's stdin read.
+    // mid-escape-sequence, which is fine, since xterm.js parses a continuous byte stream. Ends on
+    // EOF, and does NOT report the exit itself: see the waiter thread below for why it cannot.
     std::thread::spawn(move || {
         let mut stdout = std::io::stdout();
         let mut buf = [0u8; 4096];
@@ -75,9 +73,27 @@ fn main() {
                 Err(_) => break,
             }
         }
+    });
+
+    // Reporting the exit has to hang off the CHILD, not off the reader above reaching EOF.
+    //
+    // On Unix those amount to the same thing: the child exits, the last slave handle closes, the
+    // master's reader sees EOF. On Windows they do not. ConPTY's master reader simply never
+    // returns EOF when the child exits, so a read blocks forever on a shell that is already gone,
+    // the exit message is never sent, and this process lives on with nothing to talk to. Typing
+    // `exit` in the terminal panel used to do exactly that.
+    //
+    // Waiting on the child covers both, since a child that has exited is the actual fact both
+    // platforms agree on. The short pause afterwards lets the reader drain whatever the shell
+    // wrote on its way out, which would otherwise be cut off by the exit below.
+    std::thread::spawn(move || {
         let code = child.wait().ok().map(|status| status.exit_code());
+        std::thread::sleep(std::time::Duration::from_millis(120));
+        let mut stdout = std::io::stdout();
         let _ = writeln!(stdout, "{}", json!({"type": "exit", "code": code}));
         let _ = stdout.flush();
+        // Exits the whole process rather than this thread, which also unblocks the main thread's
+        // stdin read.
         std::process::exit(0);
     });
 

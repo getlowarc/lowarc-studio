@@ -1,6 +1,6 @@
 {
   "name": "Media Viewer",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Views images, video, and audio in formats the browser already renders natively — no bundled decoder, unlike Monaco/xterm. Exotic formats (RAW, PSD, HEIC, TIFF) aren't supported yet.",
   "contributes": {
     "viewers": [

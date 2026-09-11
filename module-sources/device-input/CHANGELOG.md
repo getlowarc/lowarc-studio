@@ -3,6 +3,13 @@
 All notable changes to the Device Input module are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## 0.3.1 - 2026-09-11
+
+### Fixed
+
+- States a concrete version of the `input-state` contract it provides, rather than a range. A
+  provider says what it speaks; only a consumer states what it will accept.
+
 ## 0.3.0 - 2026-09-09
 
 ### Changed

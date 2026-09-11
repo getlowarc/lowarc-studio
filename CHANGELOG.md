@@ -51,6 +51,9 @@ means reading back through the commit log.
 
 ### Fixed
 
+- The Terminal no longer hangs when you type `exit`. On Windows the pty reader never reports
+  end-of-file when the shell exits, so the backend never noticed it had gone, never told the panel,
+  and stayed running. It watches the shell process itself now.
 - `Manifest::read` reports why a manifest could not be read, down to the line and column, instead of
   discarding the parse error and leaving every caller to say "unreadable".
 
