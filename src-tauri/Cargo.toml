@@ -53,7 +53,7 @@ rodio = "0.22"
 # and later a real unified diff) for the review functionality bolted onto the file explorer. A
 # correctness-sensitive algorithm (Myers diff) is worth a small, well-tested real dependency rather
 # than hand-rolling it.
-similar = "2"
+similar = "3"
 # bin/vector_canvas_runtime.rs only — the windowed 2D drawing surface. femtovg is a GPU vector
 # renderer (OpenGL ES 3.0+) whose API is modelled on the HTML5 Canvas API, which is the same drawing
 # model p5.js wraps; adopting it is why that module is a command dispatcher rather than a
