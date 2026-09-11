@@ -155,7 +155,7 @@ impl AppPaths {
     }
 
     /// True for a name that's safe to join as a single path component onto some other directory
-    /// without checking anything further — rejects an empty string, a bare "." or "..", or
+    /// without checking anything further. Rejects an empty string, a bare "." or "..", or
     /// anything containing a path separator, any of which could otherwise turn `dir.join(name)`
     /// into a path outside `dir`. Named for its original and most common use (a plugin/module id
     /// is always meant to name exactly one folder directly under plugins()/modules() — see
@@ -182,7 +182,7 @@ fn unpack_installed_resources(resource_dir: &Path, plugins_dest: &Path, helpers_
             }
             let dest = plugins_dest.join(entry.file_name());
             if dest.join("plugin.json").is_file() {
-                continue; // already there — either a prior first-run, or a deliberate removal
+                continue; // already there: either a prior first-run, or a deliberate removal
             }
             copy_dir_all(&entry.path(), &dest)?;
         }

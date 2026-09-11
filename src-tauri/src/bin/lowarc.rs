@@ -5,7 +5,7 @@
 // report.
 //
 // Deliberately thin. runtime::start_run already loads the preset, resolves modules against the
-// store, picks a loader and runs — Studio only writes a temporary launch.json because it drives the
+// store, picks a loader and runs. Studio only writes a temporary launch.json because it drives the
 // run in a SEPARATE process (bin/dev_run_host.rs) and has to hand the resolved set across a process
 // boundary. This binary IS the process, so it skips all of that: no scratch folder, no temp file,
 // nothing to clean up. What is left is argument parsing, a log callback, and one call.

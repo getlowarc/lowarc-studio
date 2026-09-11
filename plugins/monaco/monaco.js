@@ -127,7 +127,7 @@ function applyEditorTheme() {
     monaco.editor.defineTheme("lowarc", {
       base,
       inherit: true,
-      rules: [], // see the note above — syntax is Monaco's, deliberately
+      rules: [], // see the note above. Syntax is Monaco's, deliberately
       colors: {
         // The page itself.
         "editor.background": bg,
@@ -178,7 +178,7 @@ function applyEditorTheme() {
     });
     monaco.editor.setTheme("lowarc");
   } catch (err) {
-    // A malformed custom theme must not leave the editor unstyled — fall back to the built-in that
+    // A malformed custom theme must not leave the editor unstyled: fall back to the built-in that
     // matches the app's ground, which is still better than staying on the wrong one.
     monaco.editor.setTheme(base);
   }
@@ -234,7 +234,7 @@ Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve
     // Ctrl+click on a URL calls window.open, which this sandbox has no allow-popups for: the
     // control renders, offers the hand cursor, and silently does nothing.
     links: false,
-    // Dropping a file is the host's gesture — it decides which group and which viewer opens it.
+    // Dropping a file is the host's gesture. It decides which group and which viewer opens it.
     // Monaco's own drop handling would insert the path as text instead.
     dropIntoEditor: { enabled: false },
     // A hairline down the right edge that belongs to VS Code's chrome, not this panel's.

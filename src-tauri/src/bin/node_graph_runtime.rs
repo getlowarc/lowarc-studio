@@ -8,7 +8,7 @@
 // {"activeNodeId", "activeNodeLabel", "activeNodeFiles", "choices"} — for any OTHER module to react
 // to however makes sense for it (an audio module playing something in a node's own files list, a
 // dialogue module rendering one, ...). This module only ever tracks POSITION in the graph; it never
-// interprets what a node's files mean, on purpose — that's a different module's job, whichever one
+// interprets what a node's files mean, on purpose: that's a different module's job, whichever one
 // a project actually installs for it.
 //
 // Advancing is deliberately NOT automatic from topology alone. A node with exactly one outgoing

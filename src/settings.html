@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="primitives.css" />
     <style>
       /* Every tab panel sits under the shared search bar, so the gap lives here rather than on the
-         bar itself — one rule covers General, Appearance and Plugins alike. The first heading was
+         bar itself: one rule covers General, Appearance and Plugins alike. The first heading was
          previously almost touching the search field. */
       #settings-search {
         margin-bottom: 28px;
@@ -93,7 +93,7 @@
       }
 
       /* A native colour input paints its own swatch INSIDE the element, with its own border, so a
-         border here produced two outlines — the browser's square one nested in ours. Stripping the
+         border here produced two outlines: the browser's square one nested in ours. Stripping the
          inner wrapper's padding and border leaves a single rounded chip. */
       .color-field input[type="color"] {
         width: 36px;
@@ -134,7 +134,7 @@
     </style>
   </head>
   <body>
-    <!-- No titlebar, no page-header, no local tab strip — this page exists only as popup content
+    <!-- No titlebar, no page-header, no local tab strip: this page exists only as popup content
          now (see contributeIframePopup() in primitives.js); the popup shell supplies title/close
          chrome, and the General/Appearance tabs render in ITS header too (see
          setPopupHeaderControls() below). -->
@@ -144,7 +144,7 @@
              swaps the visible panel to #tab-panel-search, same showTab() every header tab already
              uses, just never listed as one of ITS OWN clickable tabs. Clearing it restores whatever
              tab was showing before. See the script below for why this is a plain wired input, not
-             initSearchbar() — that helper is built for a type-and-pick-one autocomplete (the
+             initSearchbar(): that helper is built for a type-and-pick-one autocomplete (the
              command-center's job), not a live-filtered list view like this one. -->
         <div class="searchbar" id="settings-search">
           <span class="searchbar-icon">
@@ -200,7 +200,7 @@
       </div>
     </div>
 
-    <!-- showPopup()'s stack (see primitives.js) — a sibling of the page's main content so nothing
+    <!-- showPopup()'s stack (see primitives.js): a sibling of the page's main content so nothing
          can clip it, same placement editor.html uses. -->
     <div class="popup-stack" id="popup-stack"></div>
 

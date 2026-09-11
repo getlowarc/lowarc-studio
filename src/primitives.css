@@ -11,7 +11,7 @@
 
 /* ---------- Numeric input ---------- */
 /* Deliberately type="text" + inputmode="numeric" (see initNumericInputs() in primitives.js), never
-   type="number" — a native number input's spin arrows can't be restyled to match the app, so this
+   type="number": a native number input's spin arrows can't be restyled to match the app, so this
    sidesteps them entirely with its own drawn steppers instead. */
 
 .numeric-input {
@@ -73,16 +73,16 @@
 
 /* ---------- Dropdown (grouped/search-specific extras) ---------- */
 /* The core dropdown component (.dropdown/.dropdown-trigger/.dropdown-menu/.dropdown-option and
-   friends) moved to primitives-shared.css — a plugin can use the same look via
+   friends) moved to primitives-shared.css: a plugin can use the same look via
    __lowarc-primitives.css, driven by the small standalone behavior in __lowarc-dropdown.js
    (see that file's own header for why it's a second, simpler implementation rather than reusing
    initDropdowns() below: grouping/multiselect/search integration are genuinely host-chrome-only
    concerns, not something worth forcing a plugin to carry). What's left here is specific to the
-   grouped/searchable variant (the header search dropdown, Command Palette) — the group label/line/
+   grouped/searchable variant (the header search dropdown, Command Palette): the group label/line/
    chevron divider between categories, which a plain single-select dropdown never has. */
 
 /* A small title, a line, then (only when that group actually has more than initSearchbar's
-   previewLimit) a chevron — one per category in a grouped searchbar result list (see
+   previewLimit) a chevron: one per category in a grouped searchbar result list (see
    initSearchbar's `categories` option), never on its own without at least one matching option
    under it. The chevron toggles that one category between truncated and fully shown, hence being a
    real element here rather than the line's own ::after — something has to sit to its right. */
@@ -192,7 +192,7 @@
 
 /* ---------- Navigation: sidebar tab ---------- */
 /* A vertical list of sections where one is always active (a left panel's page list, an editor's
-   inspector sections). The active indicator is an inset box-shadow, not a border-left — a border
+   inspector sections). The active indicator is an inset box-shadow, not a border-left: a border
    (even transparent, at rest) reserves real box-model width, which shifts the padding/content box
    off-center from the button's true outer width. box-shadow paints the same line without touching
    layout at all, so padding can stay symmetric and anything centered inside (e.g. an icon-only
@@ -238,7 +238,7 @@
 /* ---------- Drag-to-reorder ---------- */
 /* See initReorderable() in primitives.js. Only ever active on a container carrying
    data-reorderable. Every strip this applies to (the rail, editor file tabs, console tabs) is
-   click-first — switching panel/file/tab — with drag-to-reorder layered on as a secondary
+   click-first (switching panel/file/tab) with drag-to-reorder layered on as a secondary
    affordance, so the resting cursor stays pointer; grab would read as "drag me", not "click me".
    The open hand only shows up once a drag actually starts, via .is-reordering below. */
 [data-reorderable].is-reordering {
@@ -273,7 +273,7 @@
 
 /* ---------- Navigation: header tab ---------- */
 /* A horizontal strip for switching views within one header (Editor / Console / Output). The
-   underline is 2px solid transparent at rest for the same reason as sidebar-tab's left border —
+   underline is 2px solid transparent at rest for the same reason as sidebar-tab's left border:
    no layout shift when a tab becomes active. */
 
 .header-tabs {
@@ -317,7 +317,7 @@
   bottom: 20px;
   right: 20px;
   /* Above every popup (POPUP_Z_FLOOR=200 in editor.html, +10 per stacked level — never realistically
-     anywhere near 500) and above tooltips (300) — a toast is an urgent, dismissible notification,
+     anywhere near 500) and above tooltips (300): a toast is an urgent, dismissible notification,
      the one thing that should stay visible no matter what dialog happens to be open on top of it,
      the same reasoning style.css's .titlebar-controls comment already gives for staying reachable
      above a popup backdrop. Below .titlebar-controls (1000), which stays topmost of all. */
@@ -501,7 +501,7 @@
 }
 
 /* Extra tabs/buttons a popup's content asks to have rendered in the SHELL's own header, next to
-   the title — see ctx.header in showPopup() and contributeIframePopup's postMessage relay for an
+   the title. See ctx.header in showPopup() and contributeIframePopup's postMessage relay for an
    embedded iframe page's own header content (see .header-tabs' own tab-button look, reused here
    via .header-tab directly rather than a second style). flex:1 claims the space .popup-header's
    own justify-content:space-between would otherwise split evenly between three children, so the
@@ -668,7 +668,7 @@
    cannot escape a sandboxed subframe's own box on Windows/WebView2 (see plugin_asset_server.rs's
    note on the same platform limit). .floating-menu is the actual fix: ONE shared surface, appended
    once outside every panel and every iframe, JS-positioned at an arbitrary screen point and clamped
-   to the real viewport edges (see openMenuOverlay() in editor.html) — everything that needs a menu,
+   to the real viewport edges (see openMenuOverlay() in editor.html): everything that needs a menu,
    host chrome or a plugin's own content, calls into this one instead of rendering its own. Reuses
    .menu-dropdown-item/.menu-dropdown-divider verbatim for its items, so a menu looks identical
    regardless of which system rendered it. */
@@ -693,10 +693,10 @@
 
 /* ---------- Manage list/detail ---------- */
 /* The "installed items, pick one to see its details" layout shared by the Modules page, the
-   Plugins page, and the editor's own in-editor managers (see editor.html) — a left list
+   Plugins page, and the editor's own in-editor managers (see editor.html): a left list
    (.sidebar-nav/.sidebar-tab) plus a right detail pane, both scrolling independently. Consolidated
    here after the third copy of this exact CSS showed up (Modules and Plugins pages each had their
-   own near-identical block) — one definition instead of three drifting slowly apart. */
+   own near-identical block): one definition instead of three drifting slowly apart. */
 .manage-list {
   width: 240px;
   flex: none;

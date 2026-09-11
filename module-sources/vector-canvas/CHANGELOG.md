@@ -3,13 +3,13 @@
 All notable changes to the Vector Canvas module are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
-## 0.2.0 — 2026-09-09
+## 0.2.0 - 2026-09-09
 
 ### Changed
 
 - Consumes the `draw-commands` contract instead of a module named `director`, and GATHERS: every provider's command list is concatenated in run order, so any number of modules can draw and run order is z-order. Provides `input-state`.
 
-## 0.1.1 — 2026-09-08
+## 0.1.1 - 2026-09-08
 
 ### Fixed
 
@@ -18,7 +18,7 @@ All notable changes to the Vector Canvas module are documented here. Format loos
   error handling never got a turn; the boundary is now guarded directly.
 - Reports a degraded start when no window could be created, so the run says why nothing is drawn.
 
-## 0.1.0 — 2026-09-07
+## 0.1.0 - 2026-09-07
 
 Initial release: the first module that gives a LowArc run a window.
 

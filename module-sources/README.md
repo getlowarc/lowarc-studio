@@ -60,7 +60,7 @@ A module's `start` reply may carry a `degraded` reason beside its `ok`:
 ```
 
 That means "I started, and I will keep answering, but something I needed isn't here." The engine
-logs it at Warn — so it reaches the dev-run console and an export's diagnostics log alike — and
+logs it at Warn (so it reaches the dev-run console and an export's diagnostics log alike), and
 otherwise leaves the module running, because degrading is the intended behaviour, not a failure.
 
 Use it whenever a module can't do its actual job but chooses to carry on anyway. `audio-playback`
@@ -74,8 +74,8 @@ Purely additive: a module that never sends it is unaffected.
 
 Some ids name a *role* a project fills, not a module that ships here. `director` is one: both
 `audio-playback` and `vector-canvas` optionally require it and read what it publishes, without
-caring what actually provides it. `node-graph-runtime`'s optional `input` dependency is another —
-it wants `shared.input.advanceTo`, a node id, from whatever a project installs under that name.
+caring what actually provides it. `node-graph-runtime`'s optional `input` dependency is another.
+It wants `shared.input.advanceTo`, a node id, from whatever a project installs under that name.
 
 That second one used to collide with the shipped input module, which claimed the same id while
 publishing `keyboard`/`mouse`/`gamepads` and no `advanceTo` at all. Renaming it to `device-input`

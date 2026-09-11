@@ -39,7 +39,7 @@
 
   /* Same chevron convention as the file explorer: a real drawn arrow (see CHEVRON_SVG in
      outline.js), rotated when expanded, invisible-but-still-taking-its-space on a row that can't
-     expand — so names stay aligned in a column whether or not a given row has anything to expand
+     expand, so names stay aligned in a column whether or not a given row has anything to expand
      into, rather than editable and non-editable rows drifting out of sync with each other. */
   .chevron { width: 14px; height: 14px; flex: none; display: flex; align-items: center; justify-content: center; color: var(--fg-dim); transform: rotate(0deg); transition: transform 0.08s ease; }
   .chevron.expanded { transform: rotate(90deg); }
@@ -65,7 +65,7 @@
      here, no badge shapes. (This used to be the leading element, before the chevron above took
      that spot back — a bare "V" alone in a chevron's usual position read as one, which is why it
      moved to a trailing label instead of just changing what the letter said.) Hidden once a row
-     is open — the inline control takes this same trailing slot instead, no reason to show both. */
+     is open: the inline control takes this same trailing slot instead, no reason to show both. */
   .outline-kind {
     flex: none;
     font-size: 10px;

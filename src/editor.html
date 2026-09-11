@@ -91,7 +91,7 @@
       /* Every top-level item is a real dropdown (.menu-dropdown/.menu-dropdown-list/etc. are the
          shared primitive in primitives.css). Items the app can't actually do yet (Edit's
          clipboard/undo commands, anything needing a plugin surface that doesn't exist) render
-         disabled rather than being omitted — same placeholder-over-omission approach as the rest
+         disabled rather than being omitted: same placeholder-over-omission approach as the rest
          of the shell. */
 
       .menu-bar-drag {
@@ -171,7 +171,7 @@
       /* Every current .menu-bar-icon is a "change the IDE's own layout" control (split/console/
          inspector toggles) — info-blue on hover, same semantic the console header's .btn-ghost-info
          buttons use. .is-active (currently toggled open) reuses the app's one accent color for
-         "this is on" everywhere else, deliberately not the hover color — see the .btn-ghost-*
+         "this is on" everywhere else, deliberately not the hover color. See the .btn-ghost-*
          primitives in primitives.css for the fuller reasoning. */
       .menu-bar-icon:hover {
         background: var(--bg-hover);
@@ -217,7 +217,7 @@
       /* All three current .rail-item buttons (bell/account/settings) open a floating panel of some
          kind — yellow on hover, the "opens a menu" semantic. (No .is-active rule here any more:
          that was left over from before the panel-switching rail icons moved to the shared
-         .sidebar-tab primitive — see renderTabStrip's "sidebar" slot below — and nothing has
+         .sidebar-tab primitive (see renderTabStrip's "sidebar" slot below), and nothing has
          toggled .is-active on a .rail-item since.) */
       .rail-item:hover {
         color: var(--yellow);
@@ -350,7 +350,7 @@
       }
 
       /* .sidebar-tab (primitives.css) is shared with the Modules/Plugins pages' wider, labelled
-         list — this narrows *only* the rail's own icon-only usage of it, rather than shrinking
+         list: this narrows *only* the rail's own icon-only usage of it, rather than shrinking
          the shared primitive itself and affecting those other, unrelated places too. */
       #rail-tabs.sidebar-nav {
         gap: 2px;
@@ -364,7 +364,7 @@
            the padding/radius above) is what actually centers it in the rail's own width. Padding
            is symmetric (7px both sides) and the active indicator is an inset box-shadow rather than
            a border (see .sidebar-tab in primitives.css), so nothing here shifts the button's true
-           center — this centers on the rail's full width, active or not. */
+           center: this centers on the rail's full width, active or not. */
         justify-content: center;
       }
 
@@ -373,7 +373,7 @@
       }
 
       /* Account/settings triggers open through .floating-menu (see openMenuFromTrigger in the
-         script below), not a local .menu-dropdown — no positioning override needed here any more. */
+         script below), not a local .menu-dropdown: no positioning override needed here any more. */
 
       /* ---------- Left / right panels ---------- */
       /* Darker than the center panel on purpose. See the background-shade section below. */
@@ -464,7 +464,7 @@
       /* Brightest of the panels — it's the focus. One background on the wrapper so every group's
          Tab Bar and viewport read as one continuous surface instead of needing the shade set per
          group. .center-panel itself is now just a flex row hosting one or two .editor-group
-         columns (each the old .center-panel content verbatim) plus the divider between them — the
+         columns (each the old .center-panel content verbatim) plus the divider between them: the
          outer grid's "center" cell/area is unchanged, split lives entirely inside it. */
       .center-panel {
         grid-area: center;
@@ -499,7 +499,7 @@
       }
 
       /* Reuses .divider's own hover/hit-region styling (see the Dividers section below) via a
-         second class rather than duplicating it — this one just isn't grid-area-positioned, since
+         second class rather than duplicating it: this one just isn't grid-area-positioned, since
          it sits inside the flex-row .center-panel, not as its own grid track. */
       .editor-group-divider {
         flex: none;
@@ -539,7 +539,7 @@
       }
 
       /* One tab per open file. A div (not a button) because it hosts a real <button> of its own
-         (the close control) — buttons can't nest, and a div with role="button" is the correct
+         (the close control). Buttons can't nest, and a div with role="button" is the correct
          substitute rather than reaching for a click handler on something semantically wrong.
          Status (clean/dirty/missing) is shown as the underline's color, the same "line, not a
          dot" language as the header-tab/console-tab primitives' active-state underline. Unlike
@@ -548,7 +548,7 @@
          at rest (Nolan: "tabs, sidebar or header, shouldn't have that border line if they aren't
          selected... if it is not blue and not selected, don't show a line"). Dirty/missing are
          real status signals worth seeing on a background tab too, so those two keep showing
-         unconditionally regardless of which tab is active — only "selected and otherwise
+         unconditionally regardless of which tab is active: only "selected and otherwise
          unremarkable" needs the active check. border-box so the border itself doesn't add to the
          tab's height. */
       .file-tab {
@@ -607,7 +607,7 @@
       }
 
       /* Always present and laid out (never swapped for something a different size) so hovering a
-         tab never shifts its width — just invisible and inert until the tab is hovered or active. */
+         tab never shifts its width: just invisible and inert until the tab is hovered or active. */
       .file-tab-close {
         display: flex;
         opacity: 0;
@@ -635,7 +635,7 @@
 
       /* Always hosts either .center-viewport-empty or one iframe per mounted viewer instance (see
          the tab-bar/open-files JS below — one instance can now show several open files, so this
-         isn't one-per-file any more) — never bare text of its own any more, so this stays a plain
+         isn't one-per-file any more): never bare text of its own any more, so this stays a plain
          block container; whichever child is actually showing manages its own sizing/centering.
          Positioned so the viewer frames below can stack inside it. */
       .center-viewport {
@@ -647,12 +647,12 @@
       }
 
       /* A viewer frame hides by going INVISIBLE, not by going display:none like every other
-         .plugin-panel-frame — because an editor has to measure the font it is about to draw with,
+         .plugin-panel-frame, because an editor has to measure the font it is about to draw with,
          and a display:none document has no layout to measure. Monaco reads offsetWidth off test
          glyphs; in a frame with no layout every one of those reads back 0, so it falls back to a
          5px-per-character placeholder, marks the reading untrusted, and schedules a re-read five
          seconds out. For those five seconds the browser paints real Consolas at 7.7px while Monaco
-         places the caret and maps clicks at 5px — a 35% error that grows with distance from the
+         places the caret and maps clicks at 5px: a 35% error that grows with distance from the
          left margin, so clicking near the end of a line put the caret five or six characters short,
          and everything jumped when the timer finally fired. Measured, not guessed: 5.0 at 146ms,
          still 5.0 against 7.7px glyphs at 197ms, corrected at 5129ms.
@@ -713,11 +713,11 @@
       }
 
       /* "New Terminal With…" opens through .floating-menu (see openMenuFromTrigger in the script
-         below), not a local .menu-dropdown — no positioning override needed here any more. */
+         below), not a local .menu-dropdown: no positioning override needed here any more. */
 
 
       /* Reinstated for plugin-contributed console tabs (see PanelContribution.location ==
-         "console") — same underline pattern as .header-tab, tuned for the console's smaller row. */
+         "console"): same underline pattern as .header-tab, tuned for the console's smaller row. */
       .console-tab {
         all: unset;
         box-sizing: border-box;
@@ -776,7 +776,7 @@
 
       /* ---------- In-editor plugin manager ---------- */
       /* Single-column accordion, not the wide two-pane .manage-list/.manage-detail layout the
-         standalone Plugins page uses — the sidebar defaults to 240px, the same width .manage-list
+         standalone Plugins page uses: the sidebar defaults to 240px, the same width .manage-list
          alone takes on that page, nowhere near enough room for a detail pane beside it too. Each
          row expands in place instead of navigating to a separate detail view. */
       .plugin-manager-toolbar {
@@ -828,7 +828,7 @@
       }
 
       /* The Run Config popup's module picker. Capped and scrollable rather than growing with the
-         list — a machine with many modules installed would otherwise push Save off the screen. */
+         list: a machine with many modules installed would otherwise push Save off the screen. */
       .run-config-modules {
         max-height: 220px;
         overflow-y: auto;
@@ -945,7 +945,7 @@
       }
 
       /* Zeroes the placeholder-era padding/centering once the inspector actually hosts a plugin
-         panel — a value editor shouldn't sit inset behind decorative padding. .center-viewport
+         panel: a value editor shouldn't sit inset behind decorative padding. .center-viewport
          doesn't need this toggle any more; it stays padding:0 permanently now that it always
          hosts either .center-viewport-empty or an open file's iframe, same reasoning as
          .console-body below staying padding:0 permanently for the same kind of always-hosts-
@@ -965,7 +965,7 @@
       /* The one console tab that isn't plugin-contributed — dev-run and plugin log output. Always
          present, since it's core functionality rather than something a plugin supplies (see the
          "__run" contribute("console", ...) call, order:-10 so it always sorts first). Its own
-         is-active never toggles again once set — see showSlotTab()'s per-tab .host-panel-frame
+         is-active never toggles again once set. See showSlotTab()'s per-tab .host-panel-frame
          wrapper, which is what actually governs whether this is visible. */
       #console-run-panel {
         display: none;
@@ -1159,22 +1159,22 @@
       </div>
 
       <nav class="rail" id="rail">
-        <!-- Panel-switching icons — the shared sidebar-nav/sidebar-tab primitive (see
+        <!-- Panel-switching icons: the shared sidebar-nav/sidebar-tab primitive (see
              primitives.css), same one the Modules/Plugins pages use, not the bespoke .rail-item
              look. Account/settings stay plain .rail-item buttons below: they open flyouts, not
              switch a panel, so they're deliberately not part of this [data-tabs] list.
-             Every button here — the two in-editor managers (Modules, Plugins) included — is built
+             Every button here (the two in-editor managers (Modules, Plugins) included), is built
              by renderTabStrip() from the "sidebar" slot registry (see contribute()/getSlot() in
              primitives.js), not hand-authored HTML; this container starts empty and fills once the
              script below runs. The managers are host-owned chrome, not plugin-contributed panels,
              specifically so they can call real Tauri commands (list_installed_plugins/set_plugin_
              enabled/remove_plugin, and the module equivalents) a sandboxed plugin never gets
-             access to — see the contribute("sidebar", ...) calls near createManagerPanel(). -->
+             access to. See the contribute("sidebar", ...) calls near createManagerPanel(). -->
         <div class="sidebar-nav" data-tabs data-reorderable id="rail-tabs"></div>
         <div class="rail-spacer"></div>
 
         <!-- Host-owned, not a plugin (Nolan: "the bell shouldn't be a plugin... other plugins are
-             going to want to get a slice of the notif-pie") — sits above Account/Settings, per his
+             going to want to get a slice of the notif-pie"). Sits above Account/Settings, per his
              explicit placement. Opens through the shared .floating-menu overlay too (see
              openNotificationPanel below), same as the two triggers under it. -->
         <button type="button" class="rail-item" id="bell-trigger" data-tooltip="Notifications" aria-label="Notifications">
@@ -1183,7 +1183,7 @@
         </button>
 
         <!-- Flyouts for both of these render through the shared .floating-menu overlay (see
-             openMenuFromTrigger in the script below) rather than a local .menu-dropdown-list — the
+             openMenuFromTrigger in the script below) rather than a local .menu-dropdown-list: the
              rail sits at the window's far-left edge, exactly the kind of trigger position that used
              to need a bespoke "open rightward, bottom-anchored" CSS override to avoid running off
              the window; the overlay clamps to the real viewport instead, so no override is needed. -->
@@ -1237,7 +1237,7 @@
       <div class="divider divider-row divider-console" data-resize="console"></div>
 
       <div class="console-panel">
-        <!-- Every tab here — Run included — is built by renderTabStrip() from the "console" slot
+        <!-- Every tab here (Run included), is built by renderTabStrip() from the "console" slot
              registry (see contribute()/getSlot() in primitives.js), same as the rail's
              sidebar-tabs; this container starts with just its trailing controls, no tab buttons,
              and fills once the script below runs. -->
@@ -1252,7 +1252,7 @@
             <button type="button" class="btn btn-icon-only btn-xs btn-ghost-confirm" id="console-new-session" data-tooltip="New Terminal" aria-label="New Terminal">
               <svg viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" /></svg>
             </button>
-            <!-- Renders through .floating-menu (see openMenuFromTrigger) — the console sits at the
+            <!-- Renders through .floating-menu (see openMenuFromTrigger): the console sits at the
                  bottom of the window, another edge that used to need a bespoke "open upward"
                  override; the overlay clamps automatically instead. -->
             <button type="button" class="btn btn-icon-only btn-xs btn-ghost-warning" id="console-session-menu-trigger" data-tooltip="New Terminal With…" aria-label="New Terminal With…" aria-haspopup="true" aria-expanded="false">
@@ -1260,9 +1260,9 @@
             </button>
           </div>
 
-          <!-- Only shown while "__run" (Run) is active — see activateConsoleTab(). Every other
+          <!-- Only shown while "__run" (Run) is active. See activateConsoleTab(). Every other
                console tab already owns its own way to clear itself (Debug's own Clear button;
-               Terminal is a live shell, not a log, so clearing doesn't apply there at all) — this
+               Terminal is a live shell, not a log, so clearing doesn't apply there at all): this
                is specifically for the one console tab with no plugin/UI of its own to put a Clear
                control in. -->
           <button type="button" class="btn btn-icon-only btn-xs btn-ghost-warning" id="console-clear-run" data-tooltip="Clear" aria-label="Clear" style="display: none">
@@ -1271,7 +1271,7 @@
 
           <div class="console-header-divider"></div>
 
-          <!-- Permanent, like Close — not scoped to any one console tab. -->
+          <!-- Permanent, like Close: not scoped to any one console tab. -->
           <button type="button" class="btn btn-icon-only btn-xs btn-ghost-info" id="console-expand" data-tooltip="Maximize Console" aria-label="Maximize console">
             <svg viewBox="0 0 16 16" fill="none"><path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" /></svg>
           </button>
@@ -1292,13 +1292,13 @@
       </div>
     </div>
 
-    <!-- A sibling of .shell, not nested inside it — see openMenuOverlay()'s comment for why that
+    <!-- A sibling of .shell, not nested inside it. See openMenuOverlay()'s comment for why that
          matters (nothing inside .shell can clip or contain this). -->
     <div class="floating-menu" id="floating-menu">
       <div class="floating-menu-list" id="floating-menu-list"></div>
     </div>
 
-    <!-- Popup Base's stack — a sibling of .shell/.floating-menu for the same reason (nothing can
+    <!-- Popup Base's stack: a sibling of .shell/.floating-menu for the same reason (nothing can
          clip it). Empty by default; showPopup() (see the script below) creates and removes each
          instance's own .popup-backdrop/.popup on demand, rather than static markup toggled by
          class like the three popups this replaced. -->

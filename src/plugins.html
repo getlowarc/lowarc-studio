@@ -23,16 +23,16 @@
         display: flex;
       }
 
-      /* .manage-list/.manage-detail/.detail-* now live in primitives.css — shared with
+      /* .manage-list/.manage-detail/.detail-* now live in primitives.css: shared with
          modules.html and editor.html's own in-editor managers. */
     </style>
   </head>
   <body>
-    <!-- No titlebar, no page title/close — this page exists only as popup content now (see
+    <!-- No titlebar, no page title/close: this page exists only as popup content now (see
          contributeIframePopup() in primitives.js); the popup shell supplies title/close chrome. -->
     <div class="page">
       <!-- The Installed/Marketplace tabs and Add-plugin button render in the POPUP's own header
-           instead (see setPopupHeaderControls()/onPopupHeaderAction() in primitives.js) — this page
+           instead (see setPopupHeaderControls()/onPopupHeaderAction() in primitives.js): this page
            only exists as popup content, so there's nothing else that needs its own header row here. -->
 
       <div class="tab-panel is-active" id="tab-panel-installed">
@@ -49,11 +49,11 @@
       </div>
     </div>
 
-    <!-- showPopup()'s stack (see primitives.js) — a sibling of the page's main content so nothing
+    <!-- showPopup()'s stack (see primitives.js): a sibling of the page's main content so nothing
          can clip it, same placement editor.html uses. -->
     <div class="popup-stack" id="popup-stack"></div>
 
-    <!-- Overview/Changelog Markdown rendering — see renderMarkdown/configureMarkedOnce in
+    <!-- Overview/Changelog Markdown rendering. See renderMarkdown/configureMarkedOnce in
          primitives.js for the security-relevant renderer overrides applied on top of this. -->
     <script src="vendor/marked/marked.umd.js"></script>
     <script src="primitives.js"></script>
@@ -72,7 +72,7 @@
         installDialogTitle: "Choose a plugin folder to install",
         addButtonLabel: "Add Plugin…",
         detailFields: (item) => [{ label: "Command", value: item.command, mono: true }],
-        // What VSCode's "Feature Contributions" tab conveys for an extension — what this plugin
+        // What VSCode's "Feature Contributions" tab conveys for an extension: what this plugin
         // actually plugs into the app with. All of this already reaches the frontend via
         // list_installed_plugins (see PluginListItem in installs.rs): nothing new to fetch here.
         contributionFields: (item) => {

@@ -208,7 +208,7 @@ pub const HARNESS_JS: &str = r#"(function () {
     openInspector(context, onlyIfOpen) {
       window.parent.postMessage({ type: "host", action: "openInspector", context: context ?? null, onlyIfOpen: Boolean(onlyIfOpen) }, "*");
     },
-    // Sends event/payload to every OTHER currently-mounted iframe belonging to THIS SAME plugin —
+    // Sends event/payload to every OTHER currently-mounted iframe belonging to THIS SAME plugin:
     // never the caller itself, and never a different plugin's iframe. Fire-and-forget. Exists for
     // a plugin with more than one simultaneous iframe that need to coordinate (e.g. Node Graph's
     // Inspector drawer editing a node that a separate canvas iframe owns and renders). Everything
@@ -266,8 +266,8 @@ pub const HARNESS_JS: &str = r#"(function () {
         window.parent.postMessage({ type: "host", action: "showMenu", id, items, x, y }, "*");
       });
     },
-    // Asks the host to open a popup from its shared Popup stack (see showPopup() in editor.html) —
-    // id must name a popup some contribution already registered; target is passed straight through
+    // Asks the host to open a popup from its shared Popup stack (see showPopup() in editor.html).
+    // Id must name a popup some contribution already registered; target is passed straight through
     // to that popup's own mount(). Resolves to whatever that popup closed with, or null if it was
     // dismissed (Escape, backdrop, the X) or no such popup exists. Same reply plumbing as showMenu.
     openPopup(id, target) {
@@ -436,7 +436,7 @@ pub const SHARED_DROPDOWN_JS: &str = include_str!("../../src/dropdown-shared.js"
 pub const SHARED_FORMAT_JS: &str = include_str!("../../src/format-shared.js");
 
 /// Resolves `<plugin_id>/<rel_path>` to a real file, refusing anything that canonicalizes outside
-/// that plugin's own folder — shared between plugin_asset_server.rs and `read_plugin_asset`
+/// that plugin's own folder: shared between plugin_asset_server.rs and `read_plugin_asset`
 /// (lib.rs), since both need the exact same path-traversal protection and there's no reason for
 /// two copies of security-critical logic to drift apart.
 pub fn resolve_asset_path(plugin_id: &str, rel_path: &str) -> Option<PathBuf> {
@@ -447,7 +447,7 @@ pub fn resolve_asset_path(plugin_id: &str, rel_path: &str) -> Option<PathBuf> {
     // could shift plugin_root itself outside that directory (a bare "..", an embedded path
     // separator, or a "." component) before it's ever joined onto a real path. Without this, a
     // plugin_id of ".." would make plugin_root canonicalize to plugins()'s own parent, and the
-    // starts_with(plugin_root) check below would then accept any rel_path reachable from there —
+    // starts_with(plugin_root) check below would then accept any rel_path reachable from there:
     // the check has to hold on plugin_id itself, not just on the eventual resolved path.
     if !AppPaths::is_valid_component_id(plugin_id) {
         return None;

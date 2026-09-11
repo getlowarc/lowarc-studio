@@ -7,15 +7,15 @@
    there's exactly one copy of this file, never a drifting duplicate) so a plugin author can
    `<link rel="stylesheet" href="__lowarc-primitives.css">` and get the exact same buttons/inputs/
    checkboxes/progress-bar/setting-row look as the host, entirely opt-in, for close to zero styling
-   work of their own. Every section here works with nothing but plain markup and class names — no
-   HOST-ONLY JS required — which is the actual bar for belonging in this file, not primitives.css.
+   work of their own. Every section here works with nothing but plain markup and class names: no
+   HOST-ONLY JS required, which is the actual bar for belonging in this file, not primitives.css.
    .numeric-input/.numeric-steppers and .tooltip-popup are the two exceptions, and only because
    they each ship with a companion in __lowarc.js: window.lowarc.initNumericInputs(root) and
    window.lowarc.initTooltips(root) do the same job as their host-only namesakes in primitives.js
    (separate copies on purpose — the harness ones are the plugin-facing contract and shouldn't
    secretly depend on a host-only script a plugin can never load). Before 2026-09-01 both were left
    out for the opposite reason: a plugin linking just this CSS with no way to wire the behavior
-   would get either buttons that visibly do nothing, or a tooltip that never appears — that's now
+   would get either buttons that visibly do nothing, or a tooltip that never appears: that's now
    solved by the harness call instead of by leaving the CSS out. .tooltip-popup's max-width/wrapping
    below is ALSO not a byte-for-byte copy of the host's own rule for that reason — see
    window.lowarc.initTooltips()'s own comment in plugin_assets.rs. primitives.css itself stays host-only
@@ -104,7 +104,7 @@
   height: 20px;
 }
 
-/* Below .btn-sm on the size ladder — for dense chrome rows (a panel header, a tab's own close
+/* Below .btn-sm on the size ladder: for dense chrome rows (a panel header, a tab's own close
    control) where even .btn-sm's 28px reads as too heavy sitting among several other icons at once. */
 .btn-xs {
   padding: 2px 8px;
@@ -237,7 +237,7 @@
   filter: none;
 }
 
-/* Ghost-shaped, but the color signals consequence only on hover rather than as a permanent fill —
+/* Ghost-shaped, but the color signals consequence only on hover rather than as a permanent fill:
    for a dense row of always-visible icon buttons (a panel header, the console header, a file tab)
    where every icon being solid-red/green/yellow/blue all the time would be loud, but the row still
    needs "close reads red, adding reads green, opening a menu reads yellow, changing the IDE's own
@@ -340,7 +340,7 @@
 
 /* ---------- Numeric input ---------- */
 /* Deliberately type="text" + inputmode="numeric" (see window.lowarc.initNumericInputs() in
-   __lowarc.js), never type="number" — a native number input's spin arrows can't be restyled to
+   __lowarc.js), never type="number": a native number input's spin arrows can't be restyled to
    match the app, so this sidesteps them entirely with its own drawn steppers instead. */
 
 .numeric-input {
@@ -408,7 +408,7 @@
 /* Pairs with window.lowarc.initTooltips() in __lowarc.js. max-width + wrapping (not nowrap) is
    load-bearing here, unlike the host's own ".tooltip-popup" in primitives.css: this element is
    "position: fixed" WITHIN WHICHEVER IFRAME LOADS IT, which for a plugin means a narrow panel, not
-   the app window — a long tooltip at nowrap width would just be wider than the whole panel and get
+   the app window: a long tooltip at nowrap width would just be wider than the whole panel and get
    clipped no matter how its left/top get computed, which is exactly what happened the first time a
    plugin tried this (see initTooltips()'s own comment). Wrapping is what actually keeps it visible. */
 .tooltip-popup {
@@ -479,7 +479,7 @@
 
 /* ---------- Dropdown (single-select core) ---------- */
 /* Moved here from primitives.css so a plugin can use the real IDE dropdown look, not something
-   hand-rolled — behavior comes from a small standalone script (__lowarc-dropdown.js), since this
+   hand-rolled. Behavior comes from a small standalone script (__lowarc-dropdown.js), since this
    is CSS-only and dropdown genuinely needs JS to do anything (same reasoning .numeric-input was
    kept OUT of this file for). The host's own fuller dropdown (grouped categories, multiselect,
    search integration — primitives.js's initDropdowns) stays a separate, more capable
@@ -595,7 +595,7 @@
 /* No fixed width of its own — sizes to whatever a caller sets (inline style, a wrapper, a flex
    item's own basis), so one primitive covers a full-width bar or a small footer indicator alike.
    Fill width and color are both driven from JS (see setProgress() in primitives.js): color isn't a
-   fixed danger/warning/success — it travels red->yellow->green as the fraction climbs, since this
+   fixed danger/warning/success. It travels red->yellow->green as the fraction climbs, since this
    is for "how far along," not "what state," which the fixed status colors elsewhere already
    handle correctly for their own case. */
 .progress {

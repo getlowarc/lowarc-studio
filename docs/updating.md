@@ -35,7 +35,7 @@ User data lives outside the bundle, so an app update doesn't touch it. **One exc
 plugins are refreshed from bundle resources when the bundled copy is newer
 (`ensure_installed_copy_resources` / `needs_copy`).
 
-That is intended — it's how a shipped plugin fix reaches users — but it has a consequence worth
+That is intended (it's how a shipped plugin fix reaches users), but it has a consequence worth
 stating out loud: **a user who edits a built-in plugin loses those edits on the next app update,
 silently.** Currently accepted. If that becomes a real complaint, the fix is a marker file recording
 the shipped hash, and a warning when the on-disk copy diverges from it.

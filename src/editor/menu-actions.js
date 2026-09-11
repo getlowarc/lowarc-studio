@@ -42,7 +42,7 @@
       // writing disk directly: the iframe holds whatever's actually in its buffer (unsaved edits
       // included), the same reasoning moveFileToGroup() already relies on via
       // requestPluginContent(). A viewer with nothing to save (no open file, or a read-only viewer
-      // like Media Viewer that never implements lowarc:getContent/requestSave) just does nothing —
+      // like Media Viewer that never implements lowarc:getContent/requestSave) just does nothing.
       // Save is a silent no-op, Save As surfaces the same "couldn't read content" toast
       // requestPluginContent's null timeout already produces for other callers.
       function activeFileEntry() {
@@ -223,7 +223,7 @@
 
       // Drag-to-reorder. See initReorderable() in primitives.js. Only these four strips opt in
       // (data-reorderable, set on each one's own markup); everything else (the top menu bar, a
-      // standalone page's view tabs) is untouched. Safe to call before any of their items exist —
+      // standalone page's view tabs) is untouched. Safe to call before any of their items exist:
       // the listeners are delegated on the container itself, not attached per-item.
       initReorderable(document.getElementById("rail-tabs"), { axis: "y", onReorder: (order) => saveTabOrder("rail-tabs", order) });
       // Each group names the OTHER as its crossContainer, so a file tab can be dragged freely

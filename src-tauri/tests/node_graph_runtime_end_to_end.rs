@@ -97,7 +97,7 @@ fn noop_logger() -> LogFn {
     Arc::new(|_level, _msg| {})
 }
 
-/// Runs to a frame-count breakpoint, returns that frame's captured trace, then stops the run —
+/// Runs to a frame-count breakpoint, returns that frame's captured trace, then stops the run:
 /// same pattern runtime_end_to_end.rs's own breakpoint test already uses.
 fn run_to_frame_and_capture(entry: &std::path::Path, project_dir: &std::path::Path, modules_dir: &std::path::Path, frame_count: u64) -> FrameTrace {
     let stop_flag = Arc::new(AtomicBool::new(false));

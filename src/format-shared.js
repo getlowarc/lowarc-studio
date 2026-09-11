@@ -1,5 +1,5 @@
 // A single small opt-in utility: compact number formatting ("1.4K", "10K", "1M") for anywhere in
-// the IDE — or a plugin's own sandboxed iframe — that has numeric text to keep short. Not a hand-
+// the IDE (or a plugin's own sandboxed iframe), that has numeric text to keep short. Not a hand-
 // rolled formatter: Intl.NumberFormat's own compact notation already does exactly this, verified
 // live (1400 -> "1.4K", 10000 -> "10K", 1000000 -> "1M", 999 -> "999", uppercase K/M/B/T for
 // en-US), so this file is just a thin, memoized wrapper rather than reimplementing the convention.

@@ -30,7 +30,7 @@
         container.setAttribute("role", "tablist");
         container.querySelectorAll("[data-tab-value], .tab-bar-empty").forEach((el) => el.remove());
 
-        // Filtered here, not inside getSlot() itself — hiding a tab/icon is purely about whether
+        // Filtered here, not inside getSlot() itself. Hiding a tab/icon is purely about whether
         // it's SHOWN in this one strip, never about disabling the contribution. Every other
         // consumer of getSlot() (showSlotTab, activateConsoleTab, ensurePluginMounted, the Command
         // Palette, …) still needs to see and reach a hidden contribution exactly as before.
@@ -135,7 +135,7 @@
         // Toggle-close-on-reclick, generic here rather than hand-wired per region, so every tab
         // strip gets it from one place. Capture phase: observes pre-click state
         // before [data-tabs]' own bubble-phase handler (primitives.js's initTabs()) mutates
-        // is-active, and — only once onToggleClose actually handles it — stops that handler from
+        // is-active, and (only once onToggleClose actually handles it), stops that handler from
         // also firing and immediately reopening what this just closed.
         if (onToggleClose) {
           container.addEventListener(
@@ -317,7 +317,7 @@
           }
         }
 
-        // Deliberately NOT mounted here — unlike the sidebar/console, nothing about the Inspector
+        // Deliberately NOT mounted here: unlike the sidebar/console, nothing about the Inspector
         // should exist until something actually asks for it (see showInspector()/openInspector()
         // below). A plugin contributing an inspector panel just sits registered in the slot
         // registry until its first real claim.

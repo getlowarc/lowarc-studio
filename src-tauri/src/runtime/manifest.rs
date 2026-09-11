@@ -138,7 +138,7 @@ pub struct ModuleInfo {
 }
 
 /// Post-order DFS over Requires, seeded by LoadOrder, as each id's RANK in that walk (0 = runs
-/// first) rather than a reordered Vec — for a caller that only has borrowed ModuleInfos to work
+/// first) rather than a reordered Vec: for a caller that only has borrowed ModuleInfos to work
 /// with (process_module::spawn_and_run, which doesn't own the list it was handed, so it can't
 /// consume-and-rebuild it the way order_by_requires below does; takes `&[&ModuleInfo]`, not
 /// `&[ModuleInfo]`, specifically so that caller can pass borrowed references straight through).
@@ -271,7 +271,7 @@ mod tests {
 
     #[test]
     fn a_contract_consumer_runs_after_everything_that_provides_it() {
-        // The provider is not named after the contract and the consumer never names the provider —
+        // The provider is not named after the contract and the consumer never names the provider:
         // that indirection is the entire point, and it's exactly what a naive id-only walk misses.
         // Load order is set against the desired result so only the contract link can produce it.
         let infos = vec![contract_consumer("canvas", 1, "draw-commands"), contract_provider("some-director", 2, "draw-commands")];
@@ -313,7 +313,7 @@ mod tests {
         assert_eq!(bare.store_id(), "vector-canvas");
         assert!(!module.is_contract() && !bare.is_contract());
 
-        // A contract resolves through the same store — contracts are modules — but is read from
+        // A contract resolves through the same store (contracts are modules), but is read from
         // the gathered key rather than from one module's own published state.
         assert_eq!(contract.store_id(), "draw-commands");
         assert!(contract.is_contract());

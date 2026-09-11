@@ -12,7 +12,7 @@
         if (!open) {
           // Closing the split is a layout change, not "discard everything in the second group" —
           // move its files back into group 0 (via moveFileToGroup, so each one's current content
-          // — possibly unsaved — survives the move the same way a single dragged-across tab does)
+          // (possibly unsaved), survives the move the same way a single dragged-across tab does)
           // rather than closing them. moveFileToGroup already does its own per-file
           // renderTabBar/showActiveFile/setActiveGroup; group 1's own tab bar just needs one final
           // pass afterward since every one of its tabs is gone by then.
@@ -102,7 +102,7 @@
         // Every plugin iframe reports its own pointerdowns (see the harness in plugin_assets.rs
         // for why focus alone wasn't enough) purely so the host's overlays can dismiss on a click
         // that lands inside one. No windowToPlugin check: the origin check above already proves it
-        // came from a sandboxed frame, and "close the menus" is not an authority worth gating —
+        // came from a sandboxed frame, and "close the menus" is not an authority worth gating:
         // the worst a forged one can do is close a menu the user was about to click.
         if (data.type === "pointerdown") {
           closeAllOverlays();
@@ -124,7 +124,7 @@
 
         if (data.type === "host") {
           // openFile isn't "about" a file that's already open the way markDirty/requestClose
-          // are, so it doesn't route through windowToFilePaths — any tracked plugin iframe (a
+          // are, so it doesn't route through windowToFilePaths: any tracked plugin iframe (a
           // sidebar panel like the file explorer, not just a viewer) can ask the host to add a
           // path to the open-files list. windowToPlugin is still the trust check: only a real,
           // currently-mounted plugin iframe can trigger it, never an arbitrary postMessage.
@@ -237,7 +237,7 @@
           // error/confirmation already goes through (see primitives.js's toast/notification-
           // history section), tagged with which plugin it came from so the bell's history can
           // attribute it. Not routed through windowToFilePaths/windowToPlugin's file-specific
-          // lookups — any tracked plugin iframe can raise one, not just a file viewer.
+          // lookups: any tracked plugin iframe can raise one, not just a file viewer.
           if (data.action === "notify") {
             const pluginId = windowToPlugin.get(event.source);
             if (pluginId && typeof data.message === "string" && data.message) {

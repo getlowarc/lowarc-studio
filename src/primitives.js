@@ -545,8 +545,8 @@ const notificationHistory = [];
 let notificationAddedListener = null;
 let notificationIdSeq = 0;
 
-// Registers the one listener a page's notification UI cares about (there's only ever one bell) —
-// fires once per new entry, right after it's pushed to history.
+// Registers the one listener a page's notification UI cares about (there's only ever one bell).
+// Fires once per new entry, right after it's pushed to history.
 function onNotification(onAdd) {
   notificationAddedListener = onAdd;
 }
@@ -1295,7 +1295,7 @@ function configureMarkedOnce() {
   const safeHref = (href) => {
     const trimmed = (href || "").trim();
     const scheme = trimmed.match(/^([a-z][a-z0-9+.-]*):/i);
-    if (!scheme) return trimmed; // no scheme at all — a relative path, always safe
+    if (!scheme) return trimmed; // no scheme at all: a relative path, always safe
     return /^https?$/i.test(scheme[1]) ? trimmed : null;
   };
 
@@ -1325,7 +1325,7 @@ function renderMarkdown(text) {
 
 // ---------- Item icon (Modules/Plugins detail header) ----------
 // A generic placeholder: same graceful-degradation shape as plugin-hosting.js's own
-// FALLBACK_RAIL_ICON_SVG — for an item with no declared `icon`, or whose icon fails to load/parse.
+// FALLBACK_RAIL_ICON_SVG: for an item with no declared `icon`, or whose icon fails to load/parse.
 const FALLBACK_ITEM_ICON_SVG = '<svg viewBox="0 0 16 16" fill="none"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5" stroke="currentColor" stroke-width="1.3" /></svg>';
 
 // Fetched as raw text over the generic read_install_text_file command (works for both a module and
@@ -1522,7 +1522,7 @@ function createManagerPage(config) {
       .then((text) => renderChangelogPanel(panels.changelog, text))
       .catch(() => renderChangelogPanel(panels.changelog, null));
 
-    // License is the one CONDITIONAL tab — unlike Overview/Changelog (which always show, with a
+    // License is the one CONDITIONAL tab: unlike Overview/Changelog (which always show, with a
     // fallback, even when their file is missing), a License tab only ever appears at all once its
     // file is confirmed to exist. initTabs()'s own click delegation is bound to `nav` itself
     // (see primitives.js's initTabs), so a tab button appended here after the fact is still fully

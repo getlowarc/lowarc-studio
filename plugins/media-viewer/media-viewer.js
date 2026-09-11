@@ -100,7 +100,7 @@ function parseId3v2AlbumArt(bytes) {
   let offset = 10;
   while (offset + 10 <= tagEnd) {
     const frameId = readAsciiRun(bytes, offset, 4);
-    if (!/^[A-Z0-9]{4}$/.test(frameId)) break; // padding or corruption — nothing more to read
+    if (!/^[A-Z0-9]{4}$/.test(frameId)) break; // padding or corruption: nothing more to read
     // ID3v2.4 frame sizes are syncsafe like the tag header; 2.3 (and earlier 2.2, not handled
     // here — 2.2 uses 3-character frame ids and a different layout entirely) uses a plain
     // big-endian size instead. Getting this wrong misreads every frame after the first.
@@ -113,7 +113,7 @@ function parseId3v2AlbumArt(bytes) {
       const textEncoding = bytes[frameStart];
       const mimeEnd = findStringEnd(bytes, frameStart + 1, 0); // MIME type is always ISO-8859-1/ASCII, regardless of textEncoding
       const mime = readAsciiRun(bytes, frameStart + 1, mimeEnd - (frameStart + 1) - 1) || "image/jpeg";
-      const pictureType = bytes[mimeEnd]; // 3 = "Cover (front)" — not filtered on, first APIC wins
+      const pictureType = bytes[mimeEnd]; // 3 = "Cover (front)": not filtered on, first APIC wins
       void pictureType;
       const descriptionEnd = findStringEnd(bytes, mimeEnd + 1, textEncoding);
       if (descriptionEnd < frameEnd) {
@@ -245,7 +245,7 @@ function applyZoom(doc) {
   // doesn't grow to match, so the scroll container above would have nothing bigger than itself
   // to actually scroll. Real width/height makes an enlarged image genuinely bigger than its
   // viewport, which is what makes the overflow:auto on .media-item (and drag-to-pan below) work
-  // at all. naturalWidth/Height being 0 (image hasn't finished decoding yet) just no-ops here —
+  // at all. naturalWidth/Height being 0 (image hasn't finished decoding yet) just no-ops here:
   // the next zoom click after it loads will apply correctly.
   const w = doc.el.naturalWidth;
   const h = doc.el.naturalHeight;

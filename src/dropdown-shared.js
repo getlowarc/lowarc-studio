@@ -1,6 +1,6 @@
 // A small, single-select dropdown matching the IDE's own look (.dropdown/.dropdown-trigger/
 // .dropdown-menu/.dropdown-option; see primitives-shared.css) but with its own standalone
-// behavior rather than reusing the host's primitives.js — the host's own initDropdowns() also
+// behavior rather than reusing the host's primitives.js: the host's own initDropdowns() also
 // handles multiselect, grouped/searchable menus, and other host-chrome-specific concerns a plugin
 // has no reason to carry just to get a plain single-select dropdown. Two separate, smaller
 // implementations sharing one look, not one implementation trying to serve both.

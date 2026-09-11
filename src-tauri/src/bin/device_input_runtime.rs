@@ -63,8 +63,8 @@ fn poll_keyboard_and_mouse(device_state: &DeviceState) -> Map<String, Value> {
     out
 }
 
-// Every named (non-Unknown) variant, spelled out explicitly rather than attempted generically —
-// gilrs doesn't expose an EnumIter-style "give me every variant" itself, and hand-listing these
+// Every named (non-Unknown) variant, spelled out explicitly rather than attempted generically.
+// Gilrs doesn't expose an EnumIter-style "give me every variant" itself, and hand-listing these
 // once here is simpler and more obviously correct than reaching for a third-party enum-iteration
 // crate for two short, stable lists.
 const GAMEPAD_BUTTONS: [Button; 19] = [

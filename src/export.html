@@ -43,9 +43,9 @@
     </style>
   </head>
   <body>
-    <!-- No titlebar, no page title/close — this page exists only as popup content (see
+    <!-- No titlebar, no page title/close: this page exists only as popup content (see
          contributeIframePopup() in primitives.js); the popup shell supplies title/close chrome.
-         Folder-mode only for now — see export::export_folder's own header in the Rust backend for
+         Folder-mode only for now. See export::export_folder's own header in the Rust backend for
          why that's a real, complete output shape and not a stopgap. Single-file/bundle packaging
          and the icon/target-platform fields are a later addition to this same page, not a
          different page. -->
@@ -83,7 +83,7 @@
       </div>
     </div>
 
-    <!-- showPopup()'s stack (see primitives.js) — a sibling of the page's main content so nothing
+    <!-- showPopup()'s stack (see primitives.js): a sibling of the page's main content so nothing
          can clip it, same placement editor.html uses. -->
     <div class="popup-stack" id="popup-stack"></div>
 

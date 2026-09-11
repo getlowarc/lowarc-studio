@@ -977,7 +977,7 @@ pub fn run() {
       // The installed-copy counterpart to the dev-only copy above: no-ops entirely for a source
       // checkout (AppPaths::dev_root().is_some()), same as ensure_builtin_plugin_binaries() does
       // in reverse. resource_dir() can itself fail on some platforms/configurations; that's not
-      // fatal either, for the same "don't crash the whole app over an asset problem" reasoning —
+      // fatal either, for the same "don't crash the whole app over an asset problem" reasoning:
       // whatever plugin/helper ends up missing surfaces its own error later instead.
       if let Ok(resource_dir) = app.path().resource_dir() {
         if let Err(err) = AppPaths::ensure_installed_copy_resources(&resource_dir) {

@@ -1,4 +1,4 @@
-// The Terminal plugin's backend — unlike every other plugin backend (see file_explorer_backend.rs
+// The Terminal plugin's backend: unlike every other plugin backend (see file_explorer_backend.rs
 // for the invoke-per-call reference), this one is a *session*-mode plugin (plugin.json's
 // "session": true; see plugin_host/protocol.rs and plugin_session.rs). It's spawned once and
 // stays running for as long as the terminal panel is open, not spawned fresh per call: a shell

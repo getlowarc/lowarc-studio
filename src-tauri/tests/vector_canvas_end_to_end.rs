@@ -1,5 +1,5 @@
 // Drives the real vector_canvas_runtime binary through the process-module wire protocol the way the
-// engine does — compile, start, frames, stop — and asserts on what it actually replies.
+// engine does (compile, start, frames, stop), and asserts on what it actually replies.
 //
 // The point is that a drawing module is easy to "verify" by looking at it and hard to verify
 // honestly. These tests don't claim pixels are correct; they pin the things that would silently
@@ -7,7 +7,7 @@
 // that a bad command is survivable, and that what it publishes has the shape a director will read.
 //
 // Where a display exists this opens a real window for a moment. Where one doesn't (a headless CI
-// runner) the module's own no-display path takes over and every assertion below still has to hold —
+// runner) the module's own no-display path takes over and every assertion below still has to hold,
 // which is the property that matters most here, since that's the environment that has broken this
 // project before.
 

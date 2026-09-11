@@ -53,7 +53,7 @@ const DARK_THEME = {
 
 // Same hues as dark (cyan 180°, yellow ~48°) recalibrated for a light ground: pure cyan/yellow are
 // nearly invisible on white, so "cyan"/"yellow" here are what "cyan-dark"/"yellow-dark" were in
-// dark mode — deep enough for real contrast — and *-ink flips to white since the fill is now the
+// dark mode (deep enough for real contrast), and *-ink flips to white since the fill is now the
 // dark end instead of the light end. danger/success are unchanged: their contrast requirement is
 // against their own fill (usually white text), not against the page, so they don't need a second
 // calibration.
@@ -144,7 +144,7 @@ function applyCachedThemeIfAny() {
 // Appearance page): always re-reads current settings rather than assuming nothing changed.
 async function resolveAndApplyTheme() {
   // Outside the real app (e.g. previewing a page through a plain static file server, with no
-  // Tauri runtime injected) there's nowhere to read Settings.themeMode from — fall back to
+  // Tauri runtime injected) there's nowhere to read Settings.themeMode from: fall back to
   // whatever the OS prefers instead of throwing.
   if (!window.__TAURI__) {
     applyThemeColors(systemPrefersDark() ? DARK_THEME : LIGHT_THEME);
@@ -156,7 +156,7 @@ async function resolveAndApplyTheme() {
   try {
     mode = (await invoke("get_settings")).themeMode || "system";
   } catch {
-    // Settings unreadable — fall back to system rather than leaving the cached/default theme.
+    // Settings unreadable: fall back to system rather than leaving the cached/default theme.
   }
 
   const resolvedMode = mode === "system" ? (systemPrefersDark() ? "dark" : "light") : mode;
@@ -174,10 +174,10 @@ async function resolveAndApplyTheme() {
       return;
     }
   } catch {
-    // Presets unreadable — fall through to the system fallback below.
+    // Presets unreadable: fall through to the system fallback below.
   }
 
-  // themeMode pointed at a custom preset that's gone missing (deleted from disk, etc.) — fall back
+  // themeMode pointed at a custom preset that's gone missing (deleted from disk, etc.): fall back
   // to what the OS prefers rather than leaving whatever was cached from a previous session.
   applyThemeColors(systemPrefersDark() ? DARK_THEME : LIGHT_THEME);
 }

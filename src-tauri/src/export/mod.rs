@@ -3,7 +3,7 @@
 // executable (bin/lowarc_runtime.rs; see runtime_source.rs for how that gets located). No
 // packaging trickery: no zip, no appended payload; just a flat, self-contained folder
 // lowarc_runtime reads straight from its own directory. Single-file/bundle packaging is a
-// separate, later addition — it wraps this same staged folder differently per OS, it doesn't
+// separate, later addition. It wraps this same staged folder differently per OS, it doesn't
 // replace the staging this file does.
 //
 // Deliberately excludes: which modules to include isn't a user choice here. export_folder reuses
@@ -66,7 +66,7 @@ pub fn export_folder(options: &ExportOptions, runtime_exe: &Path, log: &dyn Fn(&
     std::fs::copy(runtime_exe, &exe_dest).map_err(|e| vec![format!("Could not copy the runtime: {e}")])?;
 
     // native_module_host is what actually dlopens a native-kind module (see runtime::
-    // native_module — isolation, one disposable helper process per module) — only worth shipping
+    // native_module (isolation, one disposable helper process per module)), only worth shipping
     // alongside an export that has at least one such module, not dead weight in every export.
     // native_module_host_path()'s own "next to the running exe" resolution is exactly why THIS
     // exe's own directory is where it has to land.

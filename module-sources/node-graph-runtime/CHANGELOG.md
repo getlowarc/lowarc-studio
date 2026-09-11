@@ -3,7 +3,7 @@
 All notable changes to the Node Graph Runtime module are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
-## 0.1.0 — 2026-09-03
+## 0.1.0 - 2026-09-03
 
 Initial release.
 

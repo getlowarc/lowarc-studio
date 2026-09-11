@@ -7,7 +7,7 @@ Graph plugin draws and saves, rather than just editing it.
 
 Parses the graph as a simple state machine: each node is a state, each connection an edge. On
 start, picks a start node the same way the Node Graph plugin's own editor UI badges one: a node
-with no incoming connections ("S" badge rule) — so there's exactly one definition of "start"
+with no incoming connections ("S" badge rule), so there's exactly one definition of "start"
 shared between editing and running a graph.
 
 Every frame, publishes where things currently stand:
@@ -16,7 +16,7 @@ Every frame, publishes where things currently stand:
 { "activeNodeId": "n2", "activeNodeLabel": "Chapter 2", "activeNodeFiles": ["ch2.txt"], "choices": ["n3", "n4"] }
 ```
 
-Optionally requires a convention-based `input` role — any module willing to fill it, no hardcoded
+Optionally requires a convention-based `input` role: any module willing to fill it, no hardcoded
 coupling to keyboard/mouse/gamepad specifically (a node graph shouldn't need to know how "advance"
 was actually triggered). Reads `shared.input.advanceTo` to transition, only if the target is
 reachable via a direct outgoing edge from the current node. Auto-advancing through a whole linear

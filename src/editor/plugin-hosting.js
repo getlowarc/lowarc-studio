@@ -102,7 +102,7 @@
 
       // ---------- In-editor managers (host sidebar panels: __module-manager, __plugin-manager) ---
       // A quality-of-life alternative to the standalone Modules/Plugins pages (see file-modules-item/
-      // file-plugins-item below) that never leaves the editor — deliberately separate surfaces, not
+      // file-plugins-item below) that never leaves the editor: deliberately separate surfaces, not
       // one replacing the other (Nolan: "those will be separate things"). Both wrap the exact same
       // Tauri commands the standalone pages already use: nothing new on the backend, just a
       // narrower-sidebar-shaped front end (single-column accordion instead of those pages' wide
@@ -145,7 +145,7 @@
           render();
         }
 
-        // ---------- Enable/disable + remove — shared by the row's own controls and the row's
+        // ---------- Enable/disable + remove: shared by the row's own controls and the row's
         // right-click context menu (showRowContextMenu below), so there's exactly one place each
         // actually happens rather than three copies of the same invoke/load/error-toast dance.
         async function setItemEnabled(item, enabled) {
@@ -314,7 +314,7 @@
           const searchInput = document.createElement("input");
           searchInput.type = "text";
           searchInput.className = "input plugin-manager-search";
-          // Just "Search" — the fuller "Search plugins…"/"Search modules…" got clipped in the
+          // Just "Search": the fuller "Search plugins…"/"Search modules…" got clipped in the
           // sidebar's 240px width now that the search box shares its row with two icon buttons.
           searchInput.placeholder = "Search";
           searchInput.addEventListener("input", () => {
@@ -510,7 +510,7 @@
 
       // ---------- Terminal's "new instance" controls (host chrome, not the plugin's own UI —
       // see the console header comment) ----------
-      // Both just ask whichever session-mode tab is currently active to open another instance —
+      // Both just ask whichever session-mode tab is currently active to open another instance:
       // the plugin itself (Terminal) owns creating the session and adding it to its own sidebar,
       // this is only ever "tell the active session-mode iframe a new-instance request happened".
       function requestNewTerminal(shell) {

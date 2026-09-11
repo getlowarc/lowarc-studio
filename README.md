@@ -22,7 +22,7 @@ cd src-tauri
 cargo run
 ```
 
-That's the whole setup — no `npm install`, no separate frontend build step. The frontend
+That's the whole setup: no `npm install`, no separate frontend build step. The frontend
 (`src/`) is plain HTML/CSS/JS served directly by Tauri (`frontendDist` in `tauri.conf.json`, no
 bundler in front of it), and first launch from a fresh clone takes care of its own bookkeeping
 (`AppPaths::ensure_directories()`/`ensure_builtin_plugin_binaries()` in `app_paths.rs`): it creates
@@ -81,9 +81,9 @@ find) before invoking the platform bundler.
   - `bin/` — extra binary targets built alongside the main app: `lowarc_runtime` (the exported
     runtime), `native_module_host` (isolates a native-kind module in its own process),
     `file_explorer_backend`/`terminal_backend` (the two built-in plugins with their own backends).
-- **`plugins/`** — every built-in plugin, each its own folder (`plugin.json` + assets, optionally a
+- **`plugins/`**: every built-in plugin, each its own folder (`plugin.json` + assets, optionally a
   built backend binary). Tracked as source by default. See `.gitignore`'s own note on this.
-- **`modules/`, `themes/`, `settings.json`, `recent.json`** — per-user runtime state created on
+- **`modules/`, `themes/`, `settings.json`, `recent.json`**: per-user runtime state created on
   first launch (see Getting Started above). Not tracked; entirely disposable.
 
 ## Plugins

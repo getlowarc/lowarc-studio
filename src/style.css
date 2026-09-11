@@ -17,7 +17,7 @@
   /* Brand: cyan is the primary action/interactive color used throughout the primitives (buttons,
      focus rings, links). Yellow is the secondary accent, reserved for selected/active states so
      it never competes with cyan over "what does this control do." The *-dark variants aren't a
-     flat brightness cut — each is nudged toward a neighboring hue (cyan cools toward blue, yellow
+     flat brightness cut: each is nudged toward a neighboring hue (cyan cools toward blue, yellow
      warms toward amber) since a naive darken of a pure primary goes muddy on a near-black page. */
   --cyan: #00ffff;
   --cyan-dark: #0096c8;
@@ -96,7 +96,7 @@ a {
 }
 
 /* Every page that uses .page (Settings, Modules, Plugins) exists only as popup content now (see
-   contributeIframePopup() in primitives.js) — the popup shell (.popup in primitives.css) is the
+   contributeIframePopup() in primitives.js): the popup shell (.popup in primitives.css) is the
    real card: its own background/border/border-radius/box-shadow. .page just fills whatever space
    the iframe gives it, plain, so it doesn't draw a second nested card on top of that one. */
 .page {
@@ -228,7 +228,7 @@ a {
 /* ---------- Scrollbar ---------- */
 /* Global, not scoped to one container: the WebView2 host is Chromium, so ::-webkit-scrollbar is
    what actually renders there; scrollbar-width/scrollbar-color is the standard (Firefox) fallback
-   for the same thin, borderless look. No hover-only reveal — a scrollbar that only appears on
+   for the same thin, borderless look. No hover-only reveal: a scrollbar that only appears on
    hover reads as "is this scrollable at all," which is worse than a visible slim one. */
 
 * {

@@ -3,7 +3,7 @@
 All notable changes to the Monaco Editor plugin are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
-## 0.1.1 — 2026-09-04
+## 0.1.1 - 2026-09-04
 
 ### Added
 
@@ -11,7 +11,7 @@ All notable changes to the Monaco Editor plugin are documented here. Format loos
   something else changes a file on disk out from under the editor: the File Explorer's Draft
   Tool is the first thing to use it, for Revert.
 
-## 0.1.0 — 2026-08-28
+## 0.1.0 - 2026-08-28
 
 Initial release.
 

@@ -172,7 +172,7 @@ struct Gfx {
 
 struct App {
     gfx: Option<Gfx>,
-    /// Set once the "start" phase arrives — the window can't be built before then, since its title
+    /// Set once the "start" phase arrives: the window can't be built before then, since its title
     /// and size come from that phase's settings.
     settings: Option<WindowSettings>,
     /// Latched after a failed attempt so a broken display doesn't get retried on every single pump,
@@ -354,7 +354,7 @@ fn build_window(event_loop: &ActiveEventLoop, settings: &WindowSettings) -> Resu
     Ok(Gfx { window, surface, context, canvas })
 }
 
-/// Concatenates `key`'s array from every provider of `contract`, in the order they appear —
+/// Concatenates `key`'s array from every provider of `contract`, in the order they appear,
 /// which the engine guarantees is run order (see mirror_onto_contracts in process_module.rs).
 ///
 /// This is the gathering half of the contract mechanism, and it's what stops this module being

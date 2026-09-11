@@ -13,7 +13,7 @@
   #container { position: relative; flex: 1; min-height: 0; }
 
   /* One of these per open file, same "several documents, one instance" shape monaco.js/
-     media-viewer.js already use. No toolbar — every action here (add a node, split a wire, delete)
+     media-viewer.js already use. No toolbar: every action here (add a node, split a wire, delete)
      is reachable from a right-click, so the whole viewport stays nothing but the canvas. */
   .ng-doc {
     position: absolute;
@@ -165,7 +165,7 @@
   /* ---------- Badges ---------- */
   /* Small, fixed-size, wordless indicators. See node-graph.js's "Badges" section for what each
      one means. Always the same size regardless of content: "+99" (the widest possible value) has
-     to fit exactly as well as a single "S" does, so a badge never grows to fit more text — the
+     to fit exactly as well as a single "S" does, so a badge never grows to fit more text: the
      count caps out visually instead. Real meaning only ever shows in a tooltip, on hover. */
   .ng-badge {
     position: absolute;
@@ -212,14 +212,14 @@
     height: 100%;
     cursor: pointer;
     /* ".ng-connections" (the enclosing SVG) sets pointer-events:none so empty space between wires
-       never blocks canvas panning — that's an inherited property, so without this override the
+       never blocks canvas panning: that's an inherited property, so without this override the
        badge (real HTML content, via foreignObject) would silently inherit "none" too and never
        receive hover/click at all. */
     pointer-events: auto;
   }
 
   /* Tooltip styling now comes from the shared __lowarc-primitives.css (".tooltip-popup"), wired up
-     via window.lowarc.initTooltips() in node-graph.js — no local copy needed anymore. */
+     via window.lowarc.initTooltips() in node-graph.js: no local copy needed anymore. */
 </style>
 </head>
 <body>

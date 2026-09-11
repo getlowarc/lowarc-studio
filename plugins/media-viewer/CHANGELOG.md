@@ -3,7 +3,7 @@
 All notable changes to the Media Viewer plugin are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
-## 0.2.0 — 2026-09-03
+## 0.2.0 - 2026-09-03
 
 ### Added
 
@@ -14,7 +14,7 @@ All notable changes to the Media Viewer plugin are documented here. Format loose
 
 - `.ogg` moved from the video extension list to the audio one; `.ogv` stays video.
 
-## 0.1.0 — 2026-08-28
+## 0.1.0 - 2026-08-28
 
 Initial release.
 

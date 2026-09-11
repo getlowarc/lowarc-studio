@@ -1,12 +1,12 @@
       // ---------- Header search ----------
       // A real searchbar now, not a button that opens one — types in place, shows matches in the
       // same dropdown popover initSearchbar() already drives everywhere else. Sourced from
-      // buildSearchableSettingsList() (primitives.js) plus this file's own command registry below —
+      // buildSearchableSettingsList() (primitives.js) plus this file's own command registry below:
       // this bar isn't a "settings search," it's the app's one general search entry point; more
       // sources (open files, whatever comes later) fold into the same options list, not a second
       // search UI.
       //
-      // HEADER_SEARCH_CATEGORIES is the fixed, ordered set of result groups this bar knows about —
+      // HEADER_SEARCH_CATEGORIES is the fixed, ordered set of result groups this bar knows about:
       // a category with nothing matching a given query just doesn't render its divider (see
       // initSearchbar's `categories` option), so "results" having no source yet today is invisible,
       // not a placeholder gap. "results" (in-open-file text search) is deliberately not built here
@@ -265,7 +265,7 @@
         list.setAttribute("role", "region");
         list.setAttribute("aria-label", "Notifications");
         renderNotificationList(list);
-        floatingMenuResolve = () => {}; // nothing to resolve — dismissal alone is the only outcome
+        floatingMenuResolve = () => {}; // nothing to resolve. Dismissal alone is the only outcome
 
         unreadNotifications = 0;
         updateBellBadge();

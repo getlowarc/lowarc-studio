@@ -10,7 +10,7 @@ Cross-platform: Windows, macOS, Linux.
 
 ## Why "vector-canvas" and not "canvas"
 
-It's a *vector* renderer — antialiased paths and strokes — not a sprite blitter, and it's one
+It's a *vector* renderer (antialiased paths and strokes), not a sprite blitter, and it's one
 possible surface rather than the only one. A pixel/tile surface or a 3D one should be able to sit
 beside it as a peer instead of being "the other canvas". The command vocabulary below is this
 module's own interface, not an engine-wide drawing protocol.
@@ -110,7 +110,7 @@ Read once, at start:
 
 ## No display available
 
-On a machine with no display at all — a headless CI runner, a locked-down environment — the module
+On a machine with no display at all (a headless CI runner, a locked-down environment), the module
 still speaks the protocol, still replies, and simply never draws. The run continues rather than
 dying on a machine that was never going to show a window. Same promise the `audio` module makes for
 a missing audio device.

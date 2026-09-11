@@ -16,10 +16,10 @@ let selectedIsDir = false;
 const expandedDirs = new Set();
 const treeCache = new Map(); // absolute path -> sorted [{name, isDir}]
 let clipboard = null; // { path, mode: "cut" | "copy" } | null
-let pendingCreate = null; // { dir, isDir } | null — an inline create row is showing
+let pendingCreate = null; // { dir, isDir } | null: an inline create row is showing
 let renamingPath = null; // path whose row is currently an editable input
 let pendingDelete = null; // path awaiting the inline delete confirmation
-let fileStatus = {}; // absolute path -> { dirty, missing, hasErrors } — see broadcastFileStatus() host-side
+let fileStatus = {}; // absolute path -> { dirty, missing, hasErrors }. See broadcastFileStatus() host-side
 
 // This plugin's own configured defaults (Settings > Plugins > File Explorer, see plugin.json's
 // `settings` declaration) — read once at load, before the very first renderTree(), via
@@ -414,7 +414,7 @@ async function commitRename(path, newName) {
     const parent = dirName(path);
     invalidate(parent);
     if (selectedPath === path) selectedPath = joinPath(parent, newName);
-    renderTree(); // renaming changes neither the file/folder count nor total bytes — no refreshTotals()
+    renderTree(); // renaming changes neither the file/folder count nor total bytes: no refreshTotals()
     // Only ever flags the exact renamed path's own open tab, if there is one: a renamed folder
     // doesn't cascade to everything open underneath it (see the host's own comment on this).
     window.lowarc.notifyPathRenamed(path, joinPath(parent, newName));
@@ -431,7 +431,7 @@ async function moveInto(sourcePath, destDir) {
     invalidate(dirName(sourcePath));
     invalidate(destDir);
     expandedDirs.add(destDir);
-    renderTree(); // relocating within the project changes neither total — no refreshTotals()
+    renderTree(); // relocating within the project changes neither total: no refreshTotals()
     window.lowarc.notifyPathRenamed(sourcePath, joinPath(destDir, baseName(sourcePath)));
   } catch (err) {
     showError(String(err));
@@ -662,7 +662,7 @@ document.getElementById("revert-btn").addEventListener("click", () => {
 
 async function doRevertDraft() {
   const id = draftId;
-  // Grab the reverted paths BEFORE clearing diffCounts below — Revert writes straight to disk,
+  // Grab the reverted paths BEFORE clearing diffCounts below. Revert writes straight to disk,
   // bypassing whatever editor already has one of these files open, so each one needs an explicit
   // push (window.lowarc.refreshFile) or it just keeps showing the now-stale edited content.
   const revertedPaths = Object.keys(diffCounts);
@@ -727,7 +727,7 @@ window.lowarc.on("lowarc:fileStatus", (status) => {
   renderTree();
 });
 
-// This iframe's own JS state (draftId, diffCounts) is gone the instant a page refresh happens —
+// This iframe's own JS state (draftId, diffCounts) is gone the instant a page refresh happens,
 // but the backend process and its disk storage aren't, so this is the one thing standing between
 // "just reload the window" and silently losing track of an open Draft. Safe to call unconditionally
 // on every load (a fresh mount included): with nothing open, the backend just replies null and this

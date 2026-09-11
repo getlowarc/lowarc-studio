@@ -1,4 +1,4 @@
-// The actual dlopen for exactly one native-kind module — deliberately its own disposable process,
+// The actual dlopen for exactly one native-kind module: deliberately its own disposable process,
 // spawned by runtime::native_module::NativeLoader, one per module. This is where the isolation
 // lives: whatever the module's native code does (crash, corrupt its own memory, spin forever) can
 // only take this process down, never the long-lived LowArc Studio process that spawned it.

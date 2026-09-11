@@ -54,7 +54,7 @@ to guessing at code it does not parse.
 
 ## The invariant
 
-**A user's code can be written however they like — any language, any format.** They conform to the
+**A user's code can be written however they like: any language, any format.** They conform to the
 framework their chosen modules define, and to nothing else. Everything below is subordinate to this.
 
 Consequences, all of them downstream of that one line:
@@ -122,7 +122,7 @@ This is where the real work belongs. Four things happen:
    Cross-language imports fall out for free.
 4. **Mutate the copy.** Rather than producing a message, an interpreter **rewrites the user's code
    inside the build copy** into a form the modules downstream can work with. The artifact is a file
-   on disk — openable, diffable, cacheable — and it is the speed win: rewritten once at compile, so
+   on disk (openable, diffable, cacheable), and it is the speed win: rewritten once at compile, so
    nothing re-parses it sixty times a second.
 
 Two things travel with the rewrite: a **format** still has to exist (it moved from the wire to the
@@ -171,7 +171,7 @@ answering `ok: false` is dropped from the run.*
 Per tick, in run order:
 
 **a. State in.** The runtime hands each module `{delta, shared}`, filtered to what it `requires`. The
-interpreter is therefore *holding* everything any module published — `input-state` included — before
+interpreter is therefore *holding* everything any module published (`input-state` included) before
 the user's code runs.
 
 **b. The interpreter executes this frame's code.** Not a translation that walked away: control flow
@@ -206,7 +206,7 @@ dev copy is then scrapped.
 
 ## Export — *decided, not implemented*
 
-Identical through stage 4, then packaged instead of run. Same copy, same compile, same artifact —
+Identical through stage 4, then packaged instead of run. Same copy, same compile, same artifact,
 which is what makes "it worked in dev" mean something.
 
 ---

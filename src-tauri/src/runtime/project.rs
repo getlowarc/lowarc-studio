@@ -1,7 +1,7 @@
 // Resolves a project's module PRESET (project.json — "here's what I need", not the modules
 // themselves) against the global module store. Modules live globally (Nolan's call: reuses the
 // existing toggle system's shape, avoids on-disk duplication) and a version/identity conflict
-// among the modules a project actually needs is a hard error, not something silently resolved —
+// among the modules a project actually needs is a hard error, not something silently resolved:
 // the run doesn't happen at all until the user resolves it themselves.
 
 use crate::runtime::manifest::{Dependency, Manifest, ModuleInfo};
@@ -17,7 +17,7 @@ pub struct ProjectPreset {
     /// create_project never sets one (there's no project-configuration UI to set one from yet;
     /// this field exists so dev-run has something to read once that UI does). A blank entry is
     /// checked for on the frontend before start_dev_run is even called, so this stays a plain
-    /// String rather than an Option — "not set" and "empty string" are the same thing here.
+    /// String rather than an Option: "not set" and "empty string" are the same thing here.
     pub entry: String,
 }
 
@@ -74,7 +74,7 @@ pub fn resolve(preset: &ProjectPreset, modules_dir: &Path) -> Result<Vec<ModuleI
         }
 
         match by_id.get(&id) {
-            None if optional => continue, // safe to be absent — see Dependency::optional
+            None if optional => continue, // safe to be absent. See Dependency::optional
             None => {
                 if errored_ids.insert(id.clone()) {
                     errors.push(format!("Module \"{id}\" is required but not installed."));
@@ -127,7 +127,7 @@ pub fn resolve(preset: &ProjectPreset, modules_dir: &Path) -> Result<Vec<ModuleI
 pub(crate) fn scan_store(modules_dir: &Path) -> HashMap<String, Vec<PathBuf>> {
     let mut by_id: HashMap<String, Vec<PathBuf>> = HashMap::new();
     let Ok(entries) = std::fs::read_dir(modules_dir) else {
-        return by_id; // no store yet — every requirement will report as missing, correctly
+        return by_id; // no store yet: every requirement will report as missing, correctly
     };
     for entry in entries.flatten() {
         let folder = entry.path();

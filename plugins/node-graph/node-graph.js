@@ -177,7 +177,7 @@ function bezierPath(p1, p2) {
 }
 
 // ---------- Badges ----------
-// Small, fixed-size, wordless indicators stuck on a node's corners (or a connection's midpoint) —
+// Small, fixed-size, wordless indicators stuck on a node's corners (or a connection's midpoint):
 // how many scripts are attached, what kind of port this node has, how many wires touch each side.
 // No label is ever drawn on the node itself; the actual number/meaning only shows in a tooltip on
 // hover, same reasoning as any icon-only control elsewhere in this app. Controlled by this
@@ -266,7 +266,7 @@ function connectionBadge(doc, lineEl, index) {
   const badge = document.createElementNS("http://www.w3.org/1999/xhtml", "div");
   badge.setAttribute("class", "ng-badge ng-badge-connection");
   badge.textContent = ">";
-  // The badge sits visually on top of the line's own (invisible, wide) hit stroke — without
+  // The badge sits visually on top of the line's own (invisible, wide) hit stroke: without
   // forwarding these, hovering/clicking it would just miss the connection underneath entirely.
   badge.addEventListener("pointerdown", (e) => {
     e.stopPropagation();
@@ -408,7 +408,7 @@ function renderAll(doc) {
   for (const node of doc.graph.nodes) renderNode(doc, node);
   renderConnections(doc);
   // A freshly-opened doc's wrapper isn't necessarily laid out (real size, actually visible) yet at
-  // this exact point — the group/iframe around it can still be settling its own box — so the
+  // this exact point (the group/iframe around it can still be settling its own box), so the
   // socket rects renderConnections just measured may have been zeroed, drawing nothing or garbage.
   // Re-measuring once more after the browser's next paint corrects for that without having to pin
   // down the exact reason the first measurement was too early. Without it, connections stay wrong
@@ -476,7 +476,7 @@ function addNode(doc, x, y) {
 // Inspector, deliberately: there is exactly one place a node's identity gets changed, rather than
 // two editors for the same field.
 
-// Which OTHER nodes this node's input/output currently connects to, by label — for the Inspector's
+// Which OTHER nodes this node's input/output currently connects to, by label: for the Inspector's
 // read-only "Input"/"Output" lists. direction "in" = nodes feeding into this one; "out" = nodes
 // this one feeds into.
 function connectedNodes(doc, nodeId, direction) {
@@ -504,7 +504,7 @@ function openInspectorForNode(doc, node, onlyIfOpen) {
   );
 }
 
-// Scrolls the node's own center point to the middle of the viewport — reads the node element's
+// Scrolls the node's own center point to the middle of the viewport. Reads the node element's
 // REAL layout size (offsetWidth/offsetHeight) rather than guessing, since a node's width isn't
 // fixed (it shrink-wraps to its label).
 function centerViewportOn(doc, node) {
@@ -735,7 +735,7 @@ window.lowarc.on("lowarc:activateFile", (payload) => {
   activePath = payload.path;
   if (doc.graph) {
     renderConnections(doc); // socket positions can only be measured once actually laid out/visible
-    requestAnimationFrame(() => renderConnections(doc)); // safety net — see renderAll()'s comment
+    requestAnimationFrame(() => renderConnections(doc)); // safety net. See renderAll()'s comment
   }
 });
 

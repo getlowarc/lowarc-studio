@@ -2,7 +2,7 @@
 // export folder around the ACTUAL lowarc_runtime binary (env!("CARGO_BIN_EXE_lowarc_runtime") —
 // Cargo builds every workspace binary before running tests and hands its path straight to us, no
 // separate build step needed here), then really RUNS the exported executable and confirms the
-// module inside it actually executed. Not #[ignore]d — unlike the version of this test that
+// module inside it actually executed. Not #[ignore]d: unlike the version of this test that
 // existed before lowarc_runtime became a binary target of this same workspace, there's no
 // external checkout to depend on anymore.
 

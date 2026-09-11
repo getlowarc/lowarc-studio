@@ -74,7 +74,7 @@ fn write_audio_module(modules_dir: &std::path::Path) {
     std::fs::copy(&built_exe, dir.join(file_name)).unwrap();
 }
 
-// Publishes a fixed "play this one file" request every frame — a director's normal, idempotent
+// Publishes a fixed "play this one file" request every frame: a director's normal, idempotent
 // shape (see audio_playback_runtime.rs's own header comment on why re-publishing the same list every frame
 // is expected, not something that should restart anything).
 fn write_director_module(modules_dir: &std::path::Path, tone_path: &std::path::Path) {
@@ -111,7 +111,7 @@ while ($line = [Console]::In.ReadLine()) {{
 }
 
 // Same shape as write_director_module, but requests the handle paused for its first
-// `paused_frames` frames, then unpaused from then on — for proving pause genuinely holds a
+// `paused_frames` frames, then unpaused from then on: for proving pause genuinely holds a
 // sound's position rather than just being a slower way to stop it.
 fn write_pausing_director_module(modules_dir: &std::path::Path, tone_path: &std::path::Path, paused_frames: u32) {
     let dir = modules_dir.join("director");
@@ -159,7 +159,7 @@ fn noop_logger() -> LogFn {
 /// have no real audio output at all, and opening the default device can hang rather than fail
 /// quickly in that case (see audio_playback_runtime.rs's own header comment on why it races this against a
 /// timeout on a background thread). These tests need a genuinely working device to prove anything
-/// real, so they skip — not fail — when one isn't available within a few seconds, same
+/// real, so they skip (not fail) when one isn't available within a few seconds, same
 /// environment-tolerance shape as the `if !cfg!(windows)` guards already used throughout this
 /// suite for platform-specific fixtures.
 fn audio_device_available() -> bool {
@@ -327,7 +327,7 @@ fn pausing_holds_position_and_resuming_continues_it() {
     assert!(result.is_ok(), "expected the run to complete cleanly, got {result:?}");
 }
 
-/// Requests exactly one more step and waits for the resulting frame's trace to land — shared by
+/// Requests exactly one more step and waits for the resulting frame's trace to land: shared by
 /// pausing_holds_position_and_resuming_continues_it's two step-and-observe points.
 fn step_once(step_request: &Arc<AtomicU32>, last_trace: &Arc<Mutex<Option<FrameTrace>>>, previous_frame_index: u64) -> FrameTrace {
     step_request.store(1, Ordering::SeqCst);

@@ -174,7 +174,7 @@ function extractSymbols(path, contents) {
       const kind = typeof pattern.kind === "function" ? pattern.kind(name) : pattern.kind;
       const value = VALUE_KINDS.has(kind) ? extractValue(line) : null;
       symbols.push({ name, kind, line: i + 1, lineText: line, value });
-      break; // first matching pattern per line — a line is exactly one declaration, not several
+      break; // first matching pattern per line: a line is exactly one declaration, not several
     }
   }
   return symbols;

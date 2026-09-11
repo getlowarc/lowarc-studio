@@ -1,9 +1,9 @@
 // The engine. Two entry points share everything below RunContext (the loader trait,
 // ProcessLoader, NativeLoader, the driver): start_run() resolves a project's module PRESET
-// against the GLOBAL module store (project.rs) — what the IDE's own dev-run needs, since nothing
+// against the GLOBAL module store (project.rs): what the IDE's own dev-run needs, since nothing
 // has resolved anything yet at that point. run_from_launch_dir() instead reads an ALREADY-resolved
 // launch.json (what export::export_folder wrote; see its own module comment) and runs exactly
-// the modules it names, in the folder they were staged into — what bin/lowarc_runtime.rs (the
+// the modules it names, in the folder they were staged into: what bin/lowarc_runtime.rs (the
 // exported, standalone runtime) needs, since export already did the resolving once, at export
 // time, and re-resolving against a "global store" that doesn't exist in a shipped folder would be
 // both wrong and impossible.

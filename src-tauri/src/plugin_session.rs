@@ -93,7 +93,7 @@ impl SessionRegistry {
         Ok(())
     }
 
-    /// Fire-and-forget, matching window.lowarc.session.send() on the caller's side — there's no
+    /// Fire-and-forget, matching window.lowarc.session.send() on the caller's side: there's no
     /// reply to a raw stdin write, only whatever the session eventually emits as output. Errors if
     /// session_id doesn't exist OR belongs to a different plugin_id: the two are reported the same
     /// way ("no running session"), since a plugin has no legitimate reason to distinguish "that
@@ -125,7 +125,7 @@ impl SessionRegistry {
         }
     }
 
-    /// Called once, on app exit — without this, every session process (a real shell) would be
+    /// Called once, on app exit: without this, every session process (a real shell) would be
     /// orphaned rather than closed when the window closes.
     pub fn stop_all(&self) {
         for (_, mut session) in self.sessions.lock().drain() {

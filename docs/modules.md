@@ -24,7 +24,7 @@ That has consequences nobody chose:
 - A module can only take the job by being *named* the job. `node-graph-runtime` cannot drive
   `vector-canvas` no matter what it publishes, because it publishes under `node-graph-runtime`.
 - Nothing anywhere says what a director is supposed to publish. `vector-canvas` expects
-  `shared.director.draw` — an ordered list of immediate-mode draw ops. `audio-playback` expects
+  `shared.director.draw`: an ordered list of immediate-mode draw ops. `audio-playback` expects
   `shared.director.play`: a declarative list of what should be sounding right now. Different
   shapes, different philosophies, same key, and each one documented only in its own consumer's
   header comment.
@@ -38,7 +38,7 @@ shape, and it's the part to fix.
 
 The vocabulary of draw commands that `vector-canvas` understands becomes a real, installable,
 versioned thing with a name and a document. `vector-canvas` doesn't implement "whatever the module
-called director happens to send" — it declares that it **consumes** that contract. Anything that
+called director happens to send". It declares that it **consumes** that contract. Anything that
 declares it **provides** the same contract can drive it, whatever that thing is called.
 
 This is the smallest change that gets order without restriction:
@@ -86,7 +86,7 @@ one of them being elected to speak for the others.
 
 Worth naming the alternative that was considered and rejected: having the canvas expose a mutable
 buffer that other modules write into directly. It reads as the same idea, but it would need a new
-write channel in the protocol — today a module can only publish under its own id — and it brings
+write channel in the protocol (today a module can only publish under its own id), and it brings
 questions gathering doesn't have: who owns the buffer, when is it cleared, what happens on a partial
 write, and what order two writers land in. Gathering gets the same result with no new machinery.
 

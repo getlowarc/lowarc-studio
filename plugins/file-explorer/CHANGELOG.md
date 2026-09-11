@@ -3,7 +3,7 @@
 All notable changes to the File Explorer plugin are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
-## 0.2.0 — 2026-09-04
+## 0.2.0 - 2026-09-04
 
 ### Added
 
@@ -12,7 +12,7 @@ All notable changes to the File Explorer plugin are documented here. Format loos
   Revert restores everything to how it was when the Draft opened; Commit just stops tracking.
   New "Draft Tool" setting to show/hide it.
 
-## 0.1.0 — 2026-08-28
+## 0.1.0 - 2026-08-28
 
 Initial release.
 

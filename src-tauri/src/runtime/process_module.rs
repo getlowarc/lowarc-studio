@@ -60,11 +60,11 @@ impl ProcessDescriptor {
 }
 
 pub struct ProcessModule {
-    /// The manifest's display name — for humans reading logs (`[{name}] ...`), never for matching
+    /// The manifest's display name: for humans reading logs (`[{name}] ...`), never for matching
     /// anything a caller configured. See `id` below for the field breakpoints/traces actually key
     /// on; the two are deliberately kept separate rather than reusing one field for both jobs.
     pub name: String,
-    /// The manifest's stable id — the same string a project's project.json "requires" names this
+    /// The manifest's stable id: the same string a project's project.json "requires" names this
     /// module by, and the only sensible thing for a breakpoint's "module" field or a FrameTrace to
     /// key on. A display name is decorative and not even guaranteed unique; the id is what a user
     /// actually knows and controls.
@@ -489,7 +489,7 @@ impl RuntimeLoader for ProcessLoader {
         let mut descriptors = Vec::new();
         for info in &load_order {
             if info.manifest.is_contract() {
-                continue; // a definition, not something to run — see Manifest::kind
+                continue; // a definition, not something to run. See Manifest::kind
             }
             match ProcessDescriptor::read(&info.folder) {
                 Some(desc) => descriptors.push((info, desc)),

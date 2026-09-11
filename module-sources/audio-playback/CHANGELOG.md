@@ -3,20 +3,20 @@
 All notable changes to the Audio Playback module are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
-## 0.3.0 — 2026-09-09
+## 0.3.0 - 2026-09-09
 
 ### Changed
 
 - Consumes the `audio-cues` contract instead of a module named `director`, gathering every provider's cue list in run order.
 
-## 0.2.1 — 2026-09-08
+## 0.2.1 - 2026-09-08
 
 ### Added
 
 - Reports a degraded start when no audio output device is available, so a run with no sound says
   why instead of silently playing nothing.
 
-## 0.2.0 — 2026-09-07
+## 0.2.0 - 2026-09-07
 
 ### Changed
 
@@ -24,7 +24,7 @@ All notable changes to the Audio Playback module are documented here. Format loo
   sound files and does not capture or synthesize, and the old name claimed the whole category.
   A project requiring `audio` must update its `project.json`.
 
-## 0.1.1 — 2026-09-03
+## 0.1.1 - 2026-09-03
 
 ### Fixed
 
@@ -33,7 +33,7 @@ All notable changes to the Audio Playback module are documented here. Format loo
   run, since modules start sequentially. Opening the device is now raced against a 3-second
   timeout; a device that never opens in time is treated the same as no device at all.
 
-## 0.1.0 — 2026-09-03
+## 0.1.0 - 2026-09-03
 
 Initial release.
 

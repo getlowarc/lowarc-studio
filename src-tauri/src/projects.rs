@@ -86,7 +86,7 @@ fn add_recent(recents_file: &Path, path: &Path) -> std::io::Result<()> {
     write_entries(recents_file, &entries)
 }
 
-/// Sets (or clears) a recent project's pinned flag. Errors if the path isn't in the recents list —
+/// Sets (or clears) a recent project's pinned flag. Errors if the path isn't in the recents list:
 /// same "visible error, not a silent no-op" rule as everywhere else here.
 pub fn set_recent_pinned(path: &Path, pinned: bool) -> Result<(), String> {
     set_recent_pinned_in(&AppPaths::recent_projects_file(), path, pinned)

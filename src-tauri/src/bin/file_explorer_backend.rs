@@ -1,7 +1,7 @@
 // The file-explorer plugin's backend: a standalone binary, invoked fresh per call, same wire
 // protocol as any other plugin (see plugin_host/protocol.rs): one JSON line in on stdin
 // (`{"method":..,"params":..}`), one JSON line out on stdout (`{"ok":bool,"result"?:..,
-// "error"?:string}`). Deliberately self-contained — no dependency on lowarc_studio_lib — a real
+// "error"?:string}`). Deliberately self-contained (no dependency on lowarc_studio_lib), a real
 // third-party plugin author has no access to the host's internals either, and this binary is
 // meant to double as the reference example for "here's what a compiled plugin backend looks
 // like."
@@ -21,7 +21,7 @@
 // lowarc:beforeSave, see write_text_file in lib.rs) and, the first time a tracked path changes
 // after a Draft opens, keeps that path's previous content in this binary's own scratch storage.
 // Revert restores every captured path; Commit just forgets them (current disk content was already
-// correct). Storage is entirely this binary's own concern — the host doesn't know the path, just
+// correct). Storage is entirely this binary's own concern: the host doesn't know the path, just
 // wipes it once on every launch (see lib.rs's setup()) so "session-only" is a real guarantee
 // rather than "OS temp-dir cleanup eventually happens." One folder per open Draft:
 //   <temp_dir>/lowarc-offshoot/<draft_id>/manifest.json   — { "<real path>": {"index":0,"existed":true} }
@@ -35,7 +35,7 @@ use std::path::{Path, PathBuf};
 fn main() {
     let mut line = String::new();
     if std::io::stdin().read_line(&mut line).unwrap_or(0) == 0 {
-        return; // EOF before any request — nothing to do
+        return; // EOF before any request: nothing to do
     }
 
     let reply = match serde_json::from_str::<Value>(line.trim()) {
@@ -274,7 +274,7 @@ struct DraftManifestEntry {
 
 type DraftManifest = HashMap<String, DraftManifestEntry>;
 
-/// Every Draft's own scratch storage — this binary's sole concern, the host only ever wipes the
+/// Every Draft's own scratch storage: this binary's sole concern, the host only ever wipes the
 /// whole thing wholesale on launch (see lib.rs). Not configurable, not read from `params`: a fixed,
 /// well-known location under the OS temp dir.
 fn draft_scratch_root() -> PathBuf {

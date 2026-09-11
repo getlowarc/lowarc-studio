@@ -35,7 +35,7 @@
         document.getElementById("run-menu-restart").disabled = !isRunning;
       }
 
-      // The Run menu's "Edit Run Config…" — the one place a project's entry file and required
+      // The Run menu's "Edit Run Config…": the one place a project's entry file and required
       // modules are edited. Resolves true if it saved.
       function editRunConfig() {
         return showPopup("run-config", { projectPath });
@@ -72,7 +72,7 @@
             variant: "error",
             message: preset.entry ? `Entry file "${preset.entry}" is missing — check the run config.` : "This project has no entry file set.",
           });
-          if (!(await editRunConfig())) return; // cancelled — nothing changed, so nothing to retry
+          if (!(await editRunConfig())) return; // cancelled: nothing changed, so nothing to retry
           try {
             preset = await invoke("get_project_preset", { projectDir: projectPath });
           } catch (err) {
@@ -160,7 +160,7 @@
       });
 
       // Never fired during a normal free-running loop (see spawn_and_run's on_frame gate in
-      // process_module.rs) — only while paused, stepping, or right as a breakpoint fires — so this
+      // process_module.rs) (only while paused, stepping, or right as a breakpoint fires), so this
       // is safe to relay unthrottled; it's already rare by construction, not something that needs
       // debouncing here too.
       window.__TAURI__.event.listen("dev-run-frame", (event) => {
@@ -285,7 +285,7 @@
       // Applies a saved order to whatever's already in the DOM — called once per renderTabStrip()
       // call (see there), whether that strip is built once and never re-rendered (the rail, the
       // console tabs) or rebuilt on every change (the file tab bars, whose contribution order
-      // otherwise reverts to plain open-order — natural registry insertion order — on the very
+      // otherwise reverts to plain open-order (natural registry insertion order) on the very
       // next status change after a drag). anchorEl, if given, is a trailing non-item child items
       // must stay before (the console's tabs-spacer, ahead of its own "+"/"..." controls) —
       // container.insertBefore(el, null) already behaves like appendChild, so omitting it for the

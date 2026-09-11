@@ -31,7 +31,7 @@ pub enum LogLevel {
 pub type LogFn = Arc<dyn Fn(LogLevel, &str) + Send + Sync>;
 
 /// A pause condition, evaluated purely against the wire-protocol traffic every module already
-/// produces (log lines, frame requests/replies) — deliberately nothing here assumes any
+/// produces (log lines, frame requests/replies): deliberately nothing here assumes any
 /// module-internal concept like a source line or a call stack, since a module can be anything (a
 /// compiled binary, a script, a native library) and the engine has no way to know which, or care.
 /// `module: None` where present means "any module", not "no module".
@@ -54,7 +54,7 @@ pub enum Breakpoint {
 /// One module's request/reply for one frame, captured for the debugger — see
 /// `process_module::ProcessModule::frame`, the one place this is actually produced. `id` is the
 /// manifest's stable id (what a project's own project.json names this module by), deliberately
-/// NOT its decorative display `name` — a breakpoint's `module` field has to match something the
+/// NOT its decorative display `name`: a breakpoint's `module` field has to match something the
 /// user actually knows and controls, and only the id qualifies (a display name can even collide
 /// between modules; the id can't).
 #[derive(Debug, Clone, Serialize)]

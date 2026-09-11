@@ -10,7 +10,7 @@
       // VS Code's own editor does. The iframe does now outlive its files (see
       // unmountFileFromGroup), but that is about not paying to rebuild an editor, not about how
       // view state survives; the save/restore would be needed either way.
-      // Unlike VS Code, a file isn't shared across groups here — there's no way to share a model
+      // Unlike VS Code, a file isn't shared across groups here: there's no way to share a model
       // between two separate sandboxed iframes (two different JS realms) to split, so a path can
       // only be open in ONE group at a time; opening an already-open file just activates it
       // wherever it already is, and moving it to the other group asks the source instance for its
@@ -31,7 +31,7 @@
       // could share one iframe.
       const windowToFilePaths = new Map();
       // "${groupId}:${pluginId}" -> the one iframe currently mounted for that plugin in that group,
-      // if any — what openFile()/moveFileToGroup() check before deciding whether to reuse an
+      // if any: what openFile()/moveFileToGroup() check before deciding whether to reuse an
       // already-mounted multi-document viewer or create a fresh one.
       const groupViewerIframes = new Map();
       function viewerIframeKey(groupId, pluginId) {
@@ -252,7 +252,7 @@
               icon.className = "file-tab-icon file-icon " + window.lowarcIconClass(file.title);
               tab.insertBefore(icon, tab.firstChild);
             }
-            // Stopped from bubbling to the tab bar's own contextmenu listener below — without
+            // Stopped from bubbling to the tab bar's own contextmenu listener below: without
             // this, right-clicking a tab would show BOTH menus' worth of confusion (the container
             // listener firing right after this one resolves).
             tab.addEventListener("contextmenu", (e) => {
@@ -280,7 +280,7 @@
       // iframe -> Promise<void>, resolved once that iframe is actually ready to receive messages
       // (its own script has run far enough to register a lowarc:openFile listener). A second file
       // opened into an already-mounted-but-still-loading instance has to wait on this before
-      // posting — without it, a message sent between iframe creation and the listener existing is
+      // posting: without it, a message sent between iframe creation and the listener existing is
       // simply gone (postMessage doesn't queue for a future listener), the same failure shape the
       // very first ensurePluginMounted() bug this session turned out to be.
       const viewerIframeReady = new Map();
@@ -331,7 +331,7 @@
           groupViewerIframes.set(key, iframe);
 
           const ready = new Promise((resolve) => {
-            // The viewer's own iframe has no filesystem access (sandboxed, connect-src 'none') —
+            // The viewer's own iframe has no filesystem access (sandboxed, connect-src 'none'):
             // the host already read the file, so it pushes the content in once the iframe's own
             // script has had a chance to call lowarc.on("lowarc:openFile", ...) and start listening.
             iframe.addEventListener("load", () => {
@@ -369,7 +369,7 @@
       }
 
       // Re-shown on every active-file switch (see showActiveFile below) and every setDiffStatus
-      // push (split-view.js's own "host" action handler) — deliberately not tracking "is a Draft
+      // push (split-view.js's own "host" action handler): deliberately not tracking "is a Draft
       // even open" separately, since an untracked/unchanged active file and "no Draft open" both
       // just mean "nothing to show" either way, the same no-op either path already is.
       function updateStatusBarDiff() {
@@ -642,7 +642,7 @@
           return;
         }
 
-        // Opens into whichever group was last interacted with, unless opts.openInSplit forced it —
+        // Opens into whichever group was last interacted with, unless opts.openInSplit forced it:
         // there's no OTHER per-open group picker, matching the toolbar-level (not per-tab) split
         // button this pairs with.
         const groupId = targetGroupId;

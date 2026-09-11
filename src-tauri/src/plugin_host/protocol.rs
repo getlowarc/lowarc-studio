@@ -79,7 +79,7 @@ pub struct PluginDescriptor {
     pub settings: Vec<PluginSettingField>,
     /// Commands this plugin wants exposed in the app's Command Palette: the plugin-declared half
     /// of that registry; host-owned menu items are the other half, auto-discovered from the menu
-    /// bar's own DOM rather than declared anywhere (see buildHostMenuCommands() in editor.html) —
+    /// bar's own DOM rather than declared anywhere (see buildHostMenuCommands() in editor.html):
     /// a sandboxed plugin has no equivalent to introspect, so it has to say so itself. Selecting one
     /// posts a `lowarc:runCommand` emit (payload `{commandId}`) into this plugin's own iframe if
     /// it's currently mounted; if it isn't, the palette can't run it yet (no auto-mount today) and
@@ -105,7 +105,7 @@ pub struct PluginSettingField {
     /// the user (label is).
     pub key: String,
     pub label: String,
-    /// "text" | "checkbox" | "select" — anything else falls back to "text" on the frontend (see
+    /// "text" | "checkbox" | "select": anything else falls back to "text" on the frontend (see
     /// settings.html's renderer), so an unrecognized value degrades gracefully rather than hiding
     /// the field entirely.
     #[serde(rename = "type", default = "default_setting_field_type")]
@@ -128,7 +128,7 @@ fn default_setting_field_type() -> String {
     "text".to_string()
 }
 
-/// What a plugin declares up front, read fresh on every call (cheap — plugin.json is tiny) — the
+/// What a plugin declares up front, read fresh on every call (cheap (plugin.json is tiny)), the
 /// only source of truth for what a plugin provides, now that there's no running process left to
 /// confirm anything live.
 #[derive(Debug, Default, Deserialize, Serialize, Clone)]
@@ -144,7 +144,7 @@ pub struct Contributes {
 pub struct PanelContribution {
     pub id: String,
     pub title: String,
-    /// "sidebar" | "inspector" — console isn't a value here since it can hold multiple tabs at
+    /// "sidebar" | "inspector". Console isn't a value here since it can hold multiple tabs at
     /// once (see `console_tabs` below), and there's no "viewport" location any more: an open
     /// file's viewer is picked by extension via the sibling `viewers` list instead, since the
     /// viewport now holds one iframe per open file rather than a single permanent plugin.

@@ -47,7 +47,7 @@
         const menu = document.getElementById(id);
         const trigger = document.getElementById(`${id}-trigger`);
 
-        // Static markup, so the roles are applied here rather than hand-repeated on every item —
+        // Static markup, so the roles are applied here rather than hand-repeated on every item:
         // the same ARIA shape openMenuOverlay's dynamically-built menus use (menuitem/menuitemcheckbox/
         // separator), just applied once at setup instead of per render since this content never changes.
         const list = menu.querySelector(".menu-dropdown-list");
@@ -124,7 +124,7 @@
       // Low-level: positions the shared #floating-menu-list at `anchor` ({x, y} in viewport
       // coordinates, the corner it tries to open from, below-right by default) and shows the
       // overlay. Callers fill the list's content
-      // themselves first — shared by openMenuOverlay (action-menu items) and the notification
+      // themselves first: shared by openMenuOverlay (action-menu items) and the notification
       // bell's read-only history panel below, since the actual position/clamp/show mechanics are
       // identical for both; only what's inside, and what happens on close, differs.
       function showFloatingOverlay(anchor) {

@@ -17,7 +17,7 @@ use std::process::{Child, Command, Stdio};
 
 /// Resolves `command` against `folder`: an exact local file first, then (Windows only) the same
 /// name with `.exe` appended, then falls back to treating it as a bare command to resolve on
-/// PATH — for a manifest that names a real system command (`"node"`, `"python"`) rather than a
+/// PATH: for a manifest that names a real system command (`"node"`, `"python"`) rather than a
 /// file that ships alongside the plugin/module itself.
 pub fn resolve_command(folder: &Path, command: &str) -> PathBuf {
     let local = folder.join(command);
