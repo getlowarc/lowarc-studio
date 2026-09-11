@@ -12,12 +12,13 @@
 //
 // Genuinely new versus Bootstrap: inter-module communication. Every "frame" request now carries
 // a `"shared"` object, and every "frame" reply MAY carry a `"publish"` object — see
-// spawn_and_run's own comment below for the full design (the short version: a module publishes
-// under its own id, into a namespace only modules that actually `requires` it can see, and the
-// existing requires-ordering already guarantees a producer's frame runs before a consumer's in
-// the same tick). Native modules get this for free too — native_module_host.rs speaks this exact
-// same JSON wire protocol, translating "shared"/"publish" across the C ABI on its own side (see
-// that file's PublishFn).
+// spawn_and_run's own comment below for the full design. The short version: a module publishes
+// under its own id AND under every contract it declares it provides, into a namespace only modules
+// that actually `requires` one of those can see, and the existing requires-ordering already
+// guarantees a producer's frame runs before a consumer's in the same tick. Native modules get this
+// for free too, since native_module_host.rs speaks this exact same JSON wire protocol and routes
+// through this same spawn_and_run, translating "shared"/"publish" across the C ABI on its own side
+// (see that file's PublishFn).
 
 use parking_lot::Mutex;
 use serde::Deserialize;
@@ -68,11 +69,15 @@ pub struct ProcessModule {
     /// key on. A display name is decorative and not even guaranteed unique; the id is what a user
     /// actually knows and controls.
     pub id: String,
-    /// This module's own manifest.json requires, as plain ids — the same list that already
-    /// decides load order (see manifest::order_by_requires) doing double duty as the shared-state
-    /// visibility rule: this module's frame() only ever sees OTHER modules' published state for
-    /// ids in this list, never a module it never declared depending on. No separate permission
-    /// concept to introduce; requiring something already means "I depend on it existing."
+    /// What this module's manifest.json requires, as the keys those requirements resolve to: a
+    /// module id for a plain requirement, a contract id for a contract one (see Dependency's
+    /// store_id). Either way it is a key in the shared map, which is what lets the filter below
+    /// treat both kinds identically.
+    ///
+    /// The same list already decides load order (see manifest::order_by_requires), doing double
+    /// duty as the shared-state visibility rule: this module's frame() only ever sees published
+    /// state for keys in this list, never something it never declared depending on. No separate
+    /// permission concept to introduce; requiring something already means "I depend on it."
     requires: Vec<String>,
     /// Contracts this module declares it provides. Whatever it publishes is mirrored under each of
     /// these alongside its own id, which is what lets a consumer read a ROLE without knowing which

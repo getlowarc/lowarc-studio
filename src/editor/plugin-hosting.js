@@ -51,9 +51,11 @@
           // So a freshly-mounted panel (the file explorer, most importantly) gets the current
           // dirty/error/missing snapshot right away instead of waiting for the next change.
           iframe.addEventListener("load", () => broadcastFileStatus());
-          // Same cross-iframe click reasoning as the viewer iframes' own focus listener (see
-          // mountFileInGroup) — a click landing inside this panel never bubbles up to this
-          // document, so any open menu/dropdown would otherwise stay stuck open.
+          // A click landing inside this panel never bubbles up to this document, so any open
+          // menu or dropdown would otherwise stay stuck open. The listener that actually covers
+          // that is the harness reporting its own pointerdowns (see plugin_assets.rs and the
+          // "pointerdown" branch in split-view.js), which fires whatever the focus state already
+          // was. This one stays because it costs nothing and still fires first on the common path.
           iframe.addEventListener("focus", () => closeAllOverlays());
         }
         return entry.iframe;

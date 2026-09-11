@@ -755,11 +755,13 @@
         display: block;
       }
 
-      /* Same slot/show-hide convention as .plugin-panel-frame — the per-tab wrapper showSlotTab()
-         creates for every "sidebar"/"inspector"/"console" contribution, host or plugin alike (see
-         primitives.js's contribute()/getSlot() and renderTabStrip/showSlotTab below). Flex column,
-         not block, so a host panel's toolbar-above-a-list layout works; a plugin's plain iframe
-         just becomes that column's sole child and fills it the same way. */
+      /* Same slot/show-hide convention as a .plugin-panel-frame in a SIDEBAR or console slot, which
+         still hides with display:none. (Viewer frames in the center viewport no longer do; see the
+         rule above for why an editor needs layout even while hidden.) The per-tab wrapper
+         showSlotTab() creates for every "sidebar"/"inspector"/"console" contribution, host or
+         plugin alike (see primitives.js's contribute()/getSlot() and renderTabStrip/showSlotTab
+         below). Flex column, not block, so a host panel's toolbar-above-a-list layout works; a
+         plugin's plain iframe just becomes that column's sole child and fills it the same way. */
       .host-panel-frame {
         width: 100%;
         height: 100%;

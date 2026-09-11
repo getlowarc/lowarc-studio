@@ -1000,15 +1000,17 @@ pub fn run() {
         }
       }
 
-      // Offshoot's own scratch storage (see offshoot_backend.rs) is deliberately session-only —
-      // wiping it once here, on every launch, is what actually makes "gone once the app closes"
-      // true rather than aspirational (an unclean exit — a crash, a forced kill — would otherwise
-      // leave it sitting in the OS temp dir indefinitely). Non-fatal: a locked/missing folder here
-      // just means offshoot_backend starts a fresh draft from a not-quite-empty folder, no worse
-      // than any other stale-temp-file situation. This is the ONE place host code references
-      // Offshoot by name — deliberately just cleanup, not a real dependency; the actual capture/
-      // revert/commit logic lives entirely in offshoot_backend, self-contained same as every other
-      // plugin backend.
+      // The Draft Tool's scratch storage (written by file_explorer_backend.rs) is deliberately
+      // session-only. Wiping it once here, on every launch, is what actually makes "gone once the
+      // app closes" true rather than aspirational, since an unclean exit such as a crash or a
+      // forced kill would otherwise leave it sitting in the OS temp dir indefinitely. Non-fatal: a
+      // locked or missing folder here just means the backend starts a fresh draft from a
+      // not-quite-empty folder, no worse than any other stale-temp-file situation.
+      //
+      // This is the ONE place host code references that storage by name, and deliberately only to
+      // clean it up rather than as a real dependency. The actual capture, revert and commit logic
+      // lives entirely in file_explorer_backend, self-contained the same as every other plugin
+      // backend.
       let _ = std::fs::remove_dir_all(std::env::temp_dir().join("lowarc-offshoot"));
 
       Ok(())

@@ -1,9 +1,13 @@
-// A process module providing a real 2D drawing surface — the thing that makes a LowArc run stop
-// being headless. Opens a window, owns an OpenGL context, and draws whatever a project's own
-// game-logic module tells it to, read every frame from the same GENERIC convention dependency
-// named "director" that audio_playback_runtime.rs already uses. It doesn't know or care what fills
-// that role — a node graph, a hand-written module, a Node.js script — only that something published
-// a list of draw commands under that id.
+// A process module providing a real 2D drawing surface, the thing that makes a LowArc run stop
+// being headless. Opens a window, owns an OpenGL context, and draws whatever the project's own
+// modules tell it to, read every frame from the optional "draw-commands" contract whose
+// specification ships beside this module in module-sources/draw-commands.
+//
+// Any number of modules may provide that contract and this one gathers: every provider's command
+// list is concatenated in run order. Nothing is elected to speak for the rest, so a world module,
+// a UI layer and a debug overlay each simply draw. Since a provider always runs before its
+// consumers, run order is z-order, and a module that requires the one it annotates draws on top of
+// it without anyone arranging that. This module has no idea what any of them are.
 //
 // Named "vector-canvas", not "canvas", deliberately. It is a VECTOR renderer (antialiased paths and
 // strokes, via femtovg), not a sprite blitter, and it is one possible surface rather than the only
@@ -16,11 +20,12 @@
 // more arm in draw_command()'s match, mapping a JSON object onto a femtovg call. Rasterization,
 // antialiasing and glyph shaping are already solved by that crate.
 //
-// Inbound (shared.director.draw, read every frame): a list of {"op": ...} commands executed IN
-// ORDER, which is also the draw order. Unlike audio's declarative "what should be playing" list,
-// drawing is immediate-mode by nature — a frame draws exactly what it was handed, and a frame
-// handed nothing draws nothing. Images and fonts are the exception and ARE cached by path, since
-// decoding a PNG or parsing a TTF every frame would be the obvious performance trap here.
+// Inbound (shared["draw-commands"], read every frame): an array with one entry per provider, each
+// tagged with the id it came from and carrying a "draw" list of {"op": ...} commands. Those are
+// executed IN ORDER, which is also the draw order. Unlike audio's declarative "what should be
+// playing" list, drawing is immediate-mode by nature: a frame draws exactly what it was handed,
+// and a frame handed nothing draws nothing. Images and fonts are the exception and ARE cached by
+// path, since decoding a PNG or parsing a TTF every frame would be the obvious performance trap.
 //
 // Outbound (published every frame): window size, plus mouse/keyboard/focus state. Input is here
 // because this module owns the window, so it's the only thing that can report a pointer position in

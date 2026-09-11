@@ -53,8 +53,9 @@ pub struct PluginDescriptor {
     pub description: Option<String>,
     /// Purely descriptive, shown in the Plugins manage page's detail header.
     pub website: Option<String>,
-    /// Path to an SVG/PNG within this plugin's own folder — a general "this is the plugin" icon,
-    /// distinct from a panel's own `rail_icon` (sidebar-slot-specific, plugins.rs's Contributes).
+    /// Path to an SVG/PNG within this plugin's own folder: a general "this is the plugin" icon,
+    /// distinct from a panel's own `rail_icon`, which is sidebar-slot-specific (see Contributes
+    /// below in this file).
     /// Read the same way (see loadRailIconSvg in plugin-hosting.js); absent falls back to a
     /// generic placeholder on the frontend.
     pub icon: Option<String>,

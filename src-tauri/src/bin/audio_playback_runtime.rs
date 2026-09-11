@@ -1,22 +1,23 @@
 // A process module providing real audio playback. Reads a declarative "what should be playing"
-// list every frame from an optional, GENERIC convention dependency named "director" — any
-// project's own game-logic module (whatever it's actually built as) can fill that role just by
-// being installed with that id, same pattern as node_graph_runtime's optional "input" dependency.
-// This module doesn't know or care whether "director" happens to be node-graph-runtime, a
-// hand-written module, or anything else — same reasoning input stays ignorant of node graphs.
+// list every frame from the optional "audio-cues" contract, whose specification ships beside this
+// module in module-sources/audio-cues. Any number of modules may provide that contract, and this
+// one gathers: every provider's list is concatenated in run order, so several modules can ask for
+// sound at once without one of them being elected to speak for the others. This module has no idea
+// what any of them are.
 //
-// Inbound (shared.director.play, read every frame): a list of
+// Inbound (shared["audio-cues"], read every frame): an array with one entry per provider, each
+// tagged with the id it came from and carrying a "play" list of
 // {"handle", "file", "volume" (0.0-1.0, default 1.0), "loop" (default false), "paused" (default
-// false)} — "this is what should be playing right now", not a one-shot command queue. Reconciled
-// each frame: a handle newly present starts playing; a handle no longer present stops (from
-// scratch — pausing is what "paused": true is for, not omission); an existing handle's volume and
-// paused state can both change live without restarting it or losing its position. This
-// declarative shape is idempotent by construction — a director re-publishing the same list every
+// false)}. That list is "this is what should be playing right now", not a one-shot command queue.
+// Reconciled each frame: a handle newly present starts playing; a handle no longer present stops
+// from scratch (pausing is what "paused": true is for, not omission); an existing handle's volume
+// and paused state can both change live without restarting it or losing its position. The
+// declarative shape is idempotent by construction, so a provider re-publishing the same list every
 // frame (the normal case, since publish() carries no memory of what it said last time) never
 // restarts anything already playing.
 //
-// Outbound (published every frame): {"playing": [handles...], "justFinished": [handles...]} — the
-// latter is how a director learns a one-shot (non-looping) sound reached its natural end, without
+// Outbound (published every frame): {"playing": [handles...], "justFinished": [handles...]}. The
+// latter is how a provider learns a one-shot (non-looping) sound reached its natural end, without
 // needing any other way to poll for it.
 //
 // `file` is resolved relative to the PROJECT root, captured from the "compile" phase's own

@@ -7,7 +7,9 @@
       // tabs inside one iframe — the host never needs to know a plugin has "instances," only which
       // path is currently active. Per-file scroll position/undo history survive a tab switch
       // because the PLUGIN itself saves/restores view state around each activateFile, the same way
-      // VS Code's own editor does — not because the DOM node never went away.
+      // VS Code's own editor does. The iframe does now outlive its files (see
+      // unmountFileFromGroup), but that is about not paying to rebuild an editor, not about how
+      // view state survives; the save/restore would be needed either way.
       // Unlike VS Code, a file isn't shared across groups here — there's no way to share a model
       // between two separate sandboxed iframes (two different JS realms) to split — so a path can
       // only be open in ONE group at a time; opening an already-open file just activates it
@@ -324,10 +326,14 @@
           // messages over its lifetime, not something baked into how it was loaded.
           iframe.src = await pluginAssetUrl(viewer.pluginId, viewer.viewer.entry);
           // A click inside a sandboxed iframe never bubbles to the parent document, so the
-          // mousedown-based group-activation listener above can't see it — this is the
+          // mousedown-based group-activation listener above cannot see it. This is the
           // supplementary signal for "the user is now working in this group" once its content
-          // actually takes focus (Monaco, e.g., calls focus() on the editor surface). Also closes
-          // any open menu/dropdown/floating-menu for the same reason — see closeAllOverlays().
+          // actually takes focus (Monaco, for instance, calls focus() on the editor surface).
+          //
+          // It closes the overlays too, but it is no longer what that depends on: focus only fires
+          // on the transition, so clicking back into an already-focused iframe fires nothing. The
+          // harness reporting its own pointerdowns is what actually covers that case (see
+          // plugin_assets.rs and the "pointerdown" branch in split-view.js).
           iframe.addEventListener("focus", () => {
             setActiveGroup(groupId);
             closeAllOverlays();
