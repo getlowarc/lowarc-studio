@@ -5,7 +5,7 @@
 // reachable). A regex can't tell a real declaration from one that's inside a string or a comment,
 // and it can't see scope: this is genuinely best-effort, not exhaustive, and every result should
 // be read that way. Every language not explicitly listed below falls back to GENERIC_PATTERNS, a
-// handful of common declaration keywords across many C-like/scripting languages — better than
+// handful of common declaration keywords across many C-like/scripting languages: better than
 // nothing, not a promise of coverage.
 
 // Short words, not single letters: a bare "V" read as a chevron/checkmark glyph at this size in
@@ -71,7 +71,7 @@ const PATTERNS_BY_EXT = {
   ".sql": [{ re: /^\s*(?:CREATE\s+(?:OR\s+REPLACE\s+)?)?(?:TABLE|VIEW|FUNCTION|PROCEDURE)\s+([A-Za-z_][\w.]*)/i, kind: "class" }],
   ".css": [{ re: /^\s*(--[\w-]+)\s*:/, kind: "variable" }],
   ".scss": [{ re: /^\s*(\$[\w-]+)\s*:/, kind: "variable" }],
-  // @media/@import/etc. are at-rules, not variables — excluded so they don't show up as if they
+  // @media/@import/etc. are at-rules, not variables: excluded so they don't show up as if they
   // were declarations.
   ".less": [{ re: /^\s*(@(?!media|import|charset|font-face|keyframes|supports|page|namespace|document)[\w-]+)\s*:/, kind: "variable" }],
   ".json": [{ re: /^\s*"([^"]+)"\s*:/, kind: "property" }],
@@ -144,7 +144,7 @@ function extractValue(line) {
   return { type: "string", value: raw.slice(1, -1), quote: raw[0], start, end };
 }
 
-// Rebuilds one line with a new literal spliced into the exact span extractValue found — start/end
+// Rebuilds one line with a new literal spliced into the exact span extractValue found: start/end
 // are recorded from the line's ORIGINAL text and stay valid as long as this is the first edit
 // made to that particular line since the last real refresh (see commitEdit in the rendering
 // section below, which keeps a symbol's own cached lineText/value in sync after every edit so a
@@ -241,7 +241,7 @@ function buildControl(symbol) {
     input.value = symbol.value.value;
     input.addEventListener("change", () => commitEdit(symbol, input.value));
   }
-  // Commit on Enter too, not just on blur (the native "change" event) — matches how every other
+  // Commit on Enter too, not just on blur (the native "change" event): matches how every other
   // inline-edit field in this app behaves (see explorer.js's rename/create inputs).
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") input.blur();
@@ -304,7 +304,7 @@ function render(path, symbols) {
     }
 
     if (expanded) {
-      // The control takes the SAME trailing slot the kind label normally occupies — inline, on
+      // The control takes the SAME trailing slot the kind label normally occupies: inline, on
       // this one row, not a second row underneath it (that's what made this feel cramped before).
       const controlEl = document.createElement("span");
       controlEl.className = "outline-control";

@@ -12,7 +12,7 @@
 // compiled); replied to immediately so the shared lifecycle doesn't need to know which kind of
 // module it's talking to.
 //
-// "shared" crosses the C ABI the same way "settings" already does at start() — serialized to a
+// "shared" crosses the C ABI the same way "settings" already does at start(): serialized to a
 // JSON string, handed across as a plain `*const c_char`. "publish" goes the other way via a
 // callback (PublishFn), the same shape request_stop already is: the module calls it zero or more
 // times during frame() with a JSON *object* string, and whatever it passed gets merged (by key,
@@ -46,7 +46,7 @@ fn stdout_lock() -> &'static Mutex<()> {
     LOCK.get_or_init(|| Mutex::new(()))
 }
 
-/// What this frame's publish() calls have accumulated so far — cleared right before each frame()
+/// What this frame's publish() calls have accumulated so far: cleared right before each frame()
 /// call, read back out (and included in the reply) right after it returns. A module's own
 /// request_stop() callback can already fire from a thread it created itself (see stdout_lock's
 /// comment); publish() is documented as frame()-only (called synchronously, from the same thread

@@ -753,7 +753,7 @@ fn list_installed_plugins() -> Vec<PluginListItem> {
 /// Backs the Modules/Plugins manage pages' Overview and Changelog tabs and their optional `icon`.
 /// one generic "read a file out of an already-installed item's own folder" command instead of
 /// three narrower ones. `folder` is whatever `ModuleListItem.folder`/`PluginListItem.folder`
-/// already handed the frontend. Returns None (not an error) for anything missing/unreadable — see
+/// already handed the frontend. Returns None (not an error) for anything missing/unreadable. See
 /// installs::read_install_text_file's own doc comment for the containment checks this relies on.
 #[tauri::command]
 fn read_install_text_file(folder: String, rel_path: String) -> Option<String> {
@@ -762,7 +762,7 @@ fn read_install_text_file(folder: String, rel_path: String) -> Option<String> {
 
 /// Relays a call from a plugin's own webview content (see plugin_assets.rs's injected harness
 /// and editor.html's message-relay listener) into a fresh invocation of that plugin's backend,
-/// and surfaces its reply. This is the only path a plugin's UI has back to its own backend — it
+/// and surfaces its reply. This is the only path a plugin's UI has back to its own backend: it
 /// never gets a real Tauri capability of its own. A reply carrying an "emit" field gets relayed on
 /// to the plugin's own mounted panels. It rides along on a reply rather than needing anything to
 /// persist between calls, which is what makes it work with one invoke per call.
@@ -856,8 +856,8 @@ fn set_plugin_enabled(id: String, enabled: bool) -> Result<(), String> {
     settings::save(&settings)
 }
 
-/// A plugin's own currently-saved values for whatever it declared in plugin.json's `settings` —
-/// see window.lowarc.getSettings() in plugin_assets.rs, the harness call this backs. Empty map for
+/// A plugin's own currently-saved values for whatever it declared in plugin.json's `settings`.
+/// See window.lowarc.getSettings() in plugin_assets.rs, the harness call this backs. Empty map for
 /// a plugin with no saved values yet (including one that's never declared any settings at all);
 /// the schema itself lives in plugin.json, not here, so there's nothing to validate a key against
 /// on this side: a plugin only ever asks for its own values back, never another plugin's.
@@ -867,7 +867,7 @@ fn get_plugin_settings(id: String) -> std::collections::HashMap<String, String> 
 }
 
 /// Sets one (id, key) -> value in Settings.plugin_settings, leaving every other plugin's, and
-/// this plugin's own other fields' — values untouched. Called from the Settings UI, not from a
+/// this plugin's own other fields': values untouched. Called from the Settings UI, not from a
 /// plugin itself (a plugin only ever reads its own settings, never writes them for itself).
 /// Emits "plugin-setting-changed" so an already-mounted instance of that plugin can pick the new
 /// value up live instead of needing a refresh. See split-view.js's relay of it to
@@ -1004,7 +1004,7 @@ pub fn run() {
     .expect("error while building tauri application")
     .run(|app_handle, event| {
       // Without this, a session-mode plugin's process (a real shell, for Terminal) would be
-      // orphaned rather than closed when the app quits — invoke-per-call plugins have no
+      // orphaned rather than closed when the app quits: invoke-per-call plugins have no
       // equivalent problem since nothing outlives a single call in the first place.
       if let tauri::RunEvent::Exit = event {
         app_handle.state::<plugin_session::SessionRegistry>().stop_all();

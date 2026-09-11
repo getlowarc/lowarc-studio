@@ -25,7 +25,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 /// Resolves `project_dir`'s module preset against `modules_dir`, picks the runtime loader that
-/// can handle the resolved set, and runs `entry_file` through it. Blocking — call this on its own
+/// can handle the resolved set, and runs `entry_file` through it. Blocking: call this on its own
 /// thread, not the Tauri main thread. Returns once the run ends, for any reason: the loader's own
 /// completion, `stop_flag` being set (a module's own request, or an external Stop), or an error.
 #[allow(clippy::too_many_arguments)]
@@ -61,7 +61,7 @@ pub fn start_run(
 /// runtime) reads, and the only thing export::export_folder writes describing HOW to run what it
 /// staged. Shared here (not a private struct in export/mod.rs, not a raw json!() macro either) so
 /// the writer and the one real reader can't drift out of sync on a key name. `modules` is already
-/// the fully-resolved list (export-time output, not a preset to re-resolve) — paths relative to
+/// the fully-resolved list (export-time output, not a preset to re-resolve): paths relative to
 /// this same file's own directory, same convention `source` already uses.
 #[derive(Debug, Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]

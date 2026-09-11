@@ -7,7 +7,7 @@
 //
 // These build their own module store rather than using the machine's: AppPaths::modules() resolves
 // to the repo's own /modules/ in a source checkout, which is developer state that varies between
-// machines and would make these tests depend on it. LOWARC_MODULES_DIR overrides it — see
+// machines and would make these tests depend on it. LOWARC_MODULES_DIR overrides it. See
 // AppPaths::modules.
 
 use std::path::{Path, PathBuf};
@@ -140,7 +140,7 @@ fn help_and_version_work_without_a_project() {
     assert!(version.status.success(), "--version should exit 0");
     assert!(String::from_utf8_lossy(&version.stdout).contains(env!("CARGO_PKG_VERSION")));
 
-    // A bare invocation is a usage error, not a silent success — otherwise `lowarc` alone in a
+    // A bare invocation is a usage error, not a silent success: otherwise `lowarc` alone in a
     // script looks like it did something.
     let bare = Command::new(cli_bin()).output().unwrap();
     assert!(!bare.status.success(), "no arguments should be a usage error");

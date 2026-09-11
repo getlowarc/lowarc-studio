@@ -8,7 +8,7 @@
       const { openUrl } = window.__TAURI__.opener;
 
       // Plugin panel/viewer content is hosted on a real loopback HTTP origin, not a Tauri custom
-      // URI scheme — on Windows/WebView2, a sub-frame (iframe) navigation to a custom scheme
+      // URI scheme: on Windows/WebView2, a sub-frame (iframe) navigation to a custom scheme
       // silently never loads at all (confirmed directly: the Rust-side handler was never even
       // invoked). A plain http://127.0.0.1:<port> origin has none of that baggage. The port is
       // ephemeral (OS-assigned at app startup), fetched once here and cached.
@@ -94,7 +94,7 @@
       // ---------- Floating menu (shared overlay; see .floating-menu in primitives.css) ----------
       // A menu rendered here is a sibling of every panel and every iframe (see the HTML above,
       // right after .shell closes), so nothing can clip it and it isn't bound to any one trigger's
-      // local DOM position the way .menu-dropdown-list is — it's positioned and clamped to the real
+      // local DOM position the way .menu-dropdown-list is: it's positioned and clamped to the real
       // window on every open instead. Anything that opens near a window edge uses this: the rail's
       // account and settings flyouts, and the console's session menu. A plugin's own content can ask
       // for one too, via window.lowarc.showMenu (see the "showMenu" branch in the listener below).
@@ -113,7 +113,7 @@
       // mountPanelIframe/mountFileInGroup below) whenever focus moves INTO a plugin iframe, since a
       // click that lands inside a sandboxed iframe never bubbles up to this document at all and so
       // never reaches any of these overlays' own individual document-click listeners. Without this,
-      // clicking into Monaco (or any other plugin) while a menu was open left it stuck open —
+      // clicking into Monaco (or any other plugin) while a menu was open left it stuck open:
       // reported live, not theoretical.
       function closeAllOverlays() {
         closeAllMenus();
@@ -279,7 +279,7 @@
             const picked = await openDialog({ title: "Choose the project's entry file", defaultPath: projectPath });
             if (!picked) return;
             try {
-              // Converted but NOT saved — project.json is only written by the Save button below.
+              // Converted but NOT saved: project.json is only written by the Save button below.
               entry = await invoke("project_relative_entry", { projectDir: projectPath, absoluteEntryPath: picked });
               entryValue.value = entry;
             } catch (err) {

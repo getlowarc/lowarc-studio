@@ -18,7 +18,7 @@ projects built on LowArc, and a repro command you can paste into a bug report.
 | `--entry <path>` | Entry file, relative to the project directory. Overrides `project.json`'s own `entry`. |
 | `--fps <n>` | Target frames per second. Default 60. |
 
-`--entry` exists because a freshly created project has no entry at all — `create_project` writes
+`--entry` exists because a freshly created project has no entry at all: `create_project` writes
 `{"requires":[]}`, and Studio fills the rest in through a file picker that a terminal has no
 equivalent of. Without the flag such a project would be unrunnable from the command line.
 
@@ -34,7 +34,7 @@ that failed to start. This is the part CI depends on, so it is covered by tests 
 ## What a run prints
 
 Log lines from the modules themselves, in the same `[Info] message` form the exported runtime uses.
-**A healthy run is often silent** — modules only log when they have something to say, so no output
+**A healthy run is often silent**: modules only log when they have something to say, so no output
 is normal rather than a sign that nothing happened.
 
 ## How a run ends

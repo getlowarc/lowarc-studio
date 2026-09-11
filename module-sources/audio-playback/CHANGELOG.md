@@ -29,7 +29,7 @@ All notable changes to the Audio Playback module are documented here. Format loo
 ### Fixed
 
 - On an environment with no real audio device (confirmed live on a CI runner), opening the
-  default output device could hang indefinitely instead of failing quickly — freezing the whole
+  default output device could hang indefinitely instead of failing quickly: freezing the whole
   run, since modules start sequentially. Opening the device is now raced against a 3-second
   timeout; a device that never opens in time is treated the same as no device at all.
 
@@ -40,7 +40,7 @@ Initial release.
 ### Added
 
 - Real cross-platform audio playback (rodio/cpal), broad format support via Symphonia.
-- Declarative per-frame playback list (`shared.director.play`), reconciled idempotently — live
+- Declarative per-frame playback list (`shared.director.play`), reconciled idempotently: live
   volume/pause changes, gapless looping, `justFinished` reporting.
 - Optional `director` role dependency. Works with any module willing to fill it, no hardcoded
   coupling.

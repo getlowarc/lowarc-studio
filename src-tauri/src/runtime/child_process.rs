@@ -50,7 +50,7 @@ pub fn spawn_piped(exe: PathBuf, args: &[String], folder: &Path) -> std::io::Res
 }
 
 /// Maps a `{"log":{"severity":"error"|"warn"|"warning"|...}}` notification's severity string to
-/// this app's own LogLevel — case-insensitive, defaulting to Info for anything unrecognized
+/// this app's own LogLevel: case-insensitive, defaulting to Info for anything unrecognized
 /// (including a plugin/module that never sends one at all).
 pub fn parse_log_severity(severity: &str) -> LogLevel {
     match severity.to_ascii_lowercase().as_str() {
@@ -60,7 +60,7 @@ pub fn parse_log_severity(severity: &str) -> LogLevel {
     }
 }
 
-/// A spawned process's stderr goes straight into a log line/error message — capped so one runaway
+/// A spawned process's stderr goes straight into a log line/error message: capped so one runaway
 /// process spamming stderr cannot flood the log with a single giant line. One shared constant even
 /// though the two callers truncate slightly different things, one whole accumulated stderr buffer
 /// for an error message and one line at a time as it streams in: same budget, same reasoning, worth

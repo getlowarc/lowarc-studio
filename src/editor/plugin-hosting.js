@@ -109,7 +109,7 @@
       // two-pane list+detail layout, which needs more width than the sidebar's 240px default has).
       // One factory instead of two near-duplicate blocks, since a module manager and a plugin
       // manager are the same shape apart from which commands they call and which extra fields a
-      // row shows — config.extraFields(item) is the only part that actually differs between them.
+      // row shows: config.extraFields(item) is the only part that actually differs between them.
       function createManagerPanel(config) {
         const CHEVRON_SVG = '<svg viewBox="0 0 10 10" fill="none"><path d="M3 1l4 4-4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
         // Settings.tabOrder key: same persisted-order mechanism the rail/console/file tab strips
@@ -201,7 +201,7 @@
           }
           for (const item of shown) listEl.appendChild(renderRow(item));
           // Each row's own toggle carries a fresh data-tooltip element every render (typing in the
-          // search box re-renders the list on every keystroke) — initTooltips() is idempotent per
+          // search box re-renders the list on every keystroke): initTooltips() is idempotent per
           // element (dataset.tooltipInit guard), so re-running it here is cheap and keeps every
           // current row's tooltip actually wired up, not just the first render's.
           initTooltips();
@@ -486,7 +486,7 @@
       // click event to hand it).
       // Manually re-toggling is-active here is redundant on the click path (primitives.js's
       // initTabs() already did it, since #console-tabs is a [data-tabs] container) but necessary on
-      // the programmatic one — cheap enough either way not to bother with two separate functions.
+      // the programmatic one: cheap enough either way not to bother with two separate functions.
       function activateConsoleTab(key) {
         document.querySelectorAll("#console-tabs .console-tab").forEach((t) => {
           t.classList.remove("is-active");
@@ -502,7 +502,7 @@
         showSlotTab("console", "console-body", key);
 
         // The new-terminal controls only make sense while a session-mode tab (Terminal) is
-        // active — "__run" has no pluginPanels entry at all, so it falls through to hidden too.
+        // active: "__run" has no pluginPanels entry at all, so it falls through to hidden too.
         const entry = key !== "__run" ? pluginPanels.get(key) : null;
         document.getElementById("console-session-controls").style.display = entry && entry.session ? "flex" : "none";
         document.getElementById("console-clear-run").style.display = key === "__run" ? "flex" : "none";

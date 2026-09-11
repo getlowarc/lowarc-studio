@@ -109,7 +109,7 @@
   .row-marker.chevron svg { width: 14px; height: 14px; }
   .row-marker svg { width: 100%; height: 100%; }
   /* Seti glyphs render at their own font-size (icons.css sets 150% of the surrounding font-size,
-     tuned for a full-size file tab, not this compact a row) — scaling it back down here keeps file
+     tuned for a full-size file tab, not this compact a row): scaling it back down here keeps file
      rows the same visual size as the chevron above rather than dwarfing it. */
   .row-marker .file-icon { font-size: 20px; }
 
@@ -129,7 +129,7 @@
     font: inherit;
   }
 
-  /* No "+"/"-" glyphs — color alone (green added, red removed) plus lowarcFormatCompact() keeps
+  /* No "+"/"-" glyphs: color alone (green added, red removed) plus lowarcFormatCompact() keeps
      even a big diff fitting the sidebar's width. Only shown while a Draft is open. */
   .row-diff { flex: none; display: flex; gap: 6px; font-size: 11px; font-variant-numeric: tabular-nums; margin-left: auto; }
   .row-diff-added { color: var(--success); }
@@ -170,7 +170,7 @@
     justify-content: center;
   }
   /* .input already sets width:100% (primitives-shared.css), but a <textarea>'s native resize
-     handle drags an explicit inline pixel width regardless of that — vertical-only keeps the
+     handle drags an explicit inline pixel width regardless of that: vertical-only keeps the
      description box's width pinned to the sidebar, letting only its height grow. */
   #draft-description-input {
     resize: vertical;

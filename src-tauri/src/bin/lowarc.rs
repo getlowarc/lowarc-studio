@@ -1,4 +1,4 @@
-// The headless CLI — running a LowArc project without Studio.
+// The headless CLI: running a LowArc project without Studio.
 //
 // Three unrelated things need a project to be runnable without clicking a button: automated
 // testing of a game, CI for projects built on LowArc, and a repro command you can paste into a bug
@@ -135,7 +135,7 @@ fn run(args: RunArgs) -> ! {
     }
 
     // Per-module settings aren't sourced from anywhere yet, the same gap Studio's own dev-run has.
-    // DebugHooks::disabled() because there is no debugger attached to a terminal — that is exactly
+    // DebugHooks::disabled() because there is no debugger attached to a terminal. That is exactly
     // what dev_run_host exists for.
     let result = runtime::start_run(
         &entry,

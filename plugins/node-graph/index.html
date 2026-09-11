@@ -34,7 +34,7 @@
     position: relative;
     width: 3000px;
     height: 2000px;
-    /* A faint dot grid — purely a spatial reference, same idea every node-editor-style tool uses
+    /* A faint dot grid: purely a spatial reference, same idea every node-editor-style tool uses
        so empty space still reads as "a surface", not a void. */
     background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
     background-size: 24px 24px;
@@ -85,7 +85,7 @@
     pointer-events: none;
   }
 
-  /* Deliberately NOT overflow:hidden here — that would also clip the badges, which are meant to
+  /* Deliberately NOT overflow:hidden here. That would also clip the badges, which are meant to
      stick out past this box's own edges (see ".ng-badge" below). Truncation for a long label lives
      on ".ng-node-label" instead, scoped to just the text. */
   .ng-node {

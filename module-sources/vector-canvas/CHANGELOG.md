@@ -30,7 +30,7 @@ Initial release: the first module that gives a LowArc run a window.
   (optionally rounded), `ellipse`, `circle`, `line`, `path`, `image`, `text`, the `push`/`pop`/
   `translate`/`rotate`/`scale` transform stack, and `camera`.
 - Images and fonts resolved relative to the project root and cached by path.
-- Window input published every frame — pointer position in both canvas and window coordinates,
+- Window input published every frame: pointer position in both canvas and window coordinates,
   buttons, wheel delta, held physical keys, and focus. The canvas owns the window, so it is the
   only thing that can report a pointer position in the space a caller is drawing in.
 - Closing the window ends the run, via the same `requestStop` any module can send.

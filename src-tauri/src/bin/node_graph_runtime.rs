@@ -4,7 +4,7 @@
 // writes to consume its own graphs"; this is that module). Interprets the graph as a simple state
 // machine: the project's entry file IS the .lan graph, handed to this module's own compile() phase
 // as sourceCode the same way any other module's entry file would be. start() enters the initial
-// node (see pick_start_node); every frame() publishes exactly where the graph currently stands —
+// node (see pick_start_node); every frame() publishes exactly where the graph currently stands:
 // {"activeNodeId", "activeNodeLabel", "activeNodeFiles", "choices"} — for any OTHER module to react
 // to however makes sense for it (an audio module playing something in a node's own files list, a
 // dialogue module rendering one, ...). This module only ever tracks POSITION in the graph; it never
@@ -17,7 +17,7 @@
 // having a sequence at all. Instead this module declares (in its own manifest.json) a fixed,
 // conventional, OPTIONAL dependency on a module with id "input" (optional so a project that never
 // installs one doesn't fail to run at all; see manifest::Dependency's own doc comment on why that
-// distinction exists), and looks at shared.input.advanceTo (a node id) every frame — present and
+// distinction exists), and looks at shared.input.advanceTo (a node id) every frame: present and
 // directly reachable from the current node, it moves there; otherwise it stays exactly where it
 // is. No "input" module ships with this one (a real one — a player pressing a key, a timer, a
 // dialogue choice UI — is a separate, later piece of work in its own right); until a project
@@ -60,7 +60,7 @@ struct LanGraph {
 
 struct Graph {
     nodes: HashMap<String, LanNode>,
-    /// node id -> ids directly reachable from it, in declared (connections array) order — fan-out
+    /// node id -> ids directly reachable from it, in declared (connections array) order: fan-out
     /// is legitimate (a node's single output socket can carry several wires, see the .lan format's
     /// own comment on that), so this is a Vec, not a single Option<String>.
     outgoing: HashMap<String, Vec<String>>,
@@ -82,7 +82,7 @@ fn parse_graph(source: &str) -> Result<Graph, String> {
     let mut outgoing: HashMap<String, Vec<String>> = HashMap::new();
     for c in &parsed.connections {
         // A connection naming a node that doesn't exist (a hand-edited or corrupted file) is
-        // simply not a real edge — silently dropped here rather than failing the whole graph over
+        // simply not a real edge: silently dropped here rather than failing the whole graph over
         // one bad entry, same "tolerant of missing ids" spirit as manifest::order_by_requires.
         if nodes.contains_key(&c.from) && nodes.contains_key(&c.to) {
             outgoing.entry(c.from.clone()).or_default().push(c.to.clone());
@@ -91,8 +91,8 @@ fn parse_graph(source: &str) -> Result<Graph, String> {
     Ok(Graph { nodes, outgoing, order })
 }
 
-/// The exact same rule the IDE's own "S" (Start) badge uses (see node-graph.js's renderBadges) —
-/// !hasInput && hasOutput once Bridge is ruled out — reused here rather than inventing a second,
+/// The exact same rule the IDE's own "S" (Start) badge uses (see node-graph.js's renderBadges):
+/// !hasInput && hasOutput once Bridge is ruled out: reused here rather than inventing a second,
 /// parallel definition of "where a graph starts." The first node satisfying it wins if more than
 /// one does (deterministic, not an error — an author declaring several start-eligible nodes hasn't
 /// done anything invalid, this module just has to pick one). Falls back to the first node overall

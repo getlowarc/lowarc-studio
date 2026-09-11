@@ -106,7 +106,7 @@ impl Default for WindowSettings {
 
 /// Inactive by default, so an unconfigured canvas behaves the way a 2D surface is normally expected
 /// to: (0,0) is the top-left pixel and one unit is one pixel. A "camera" command opts into a
-/// centred, scalable view instead — world point (x,y) at the middle of the window, scaled by zoom.
+/// centred, scalable view instead: world point (x,y) at the middle of the window, scaled by zoom.
 #[derive(Debug, Clone, Copy)]
 struct Camera {
     x: f32,
@@ -122,7 +122,7 @@ impl Default for Camera {
 }
 
 impl Camera {
-    /// The inverse of what apply() does to the canvas — used to report the pointer in the same
+    /// The inverse of what apply() does to the canvas: used to report the pointer in the same
     /// space the caller is drawing in, which is the whole reason this module publishes input.
     fn to_canvas(self, wx: f32, wy: f32, width: f32, height: f32) -> (f32, f32) {
         if !self.active || self.zoom == 0.0 {
@@ -224,7 +224,7 @@ impl App {
                 self.init_failed = false;
             }
             // These report the CAUSE only. That the module is running without a window is announced
-            // once, by the degraded marker on its start reply — saying it here too would be the same
+            // once, by the degraded marker on its start reply: saying it here too would be the same
             // news twice, from a less useful place.
             Ok(Err(e)) => log("warn", &format!("vector-canvas: window creation failed — {e}")),
             // The panic's own message has already gone to stderr, which the host relays.
@@ -304,7 +304,7 @@ impl ApplicationHandler for App {
 }
 
 /// All the glutin/winit bootstrapping in one place. On Windows (WGL) the window attributes MUST go
-/// through DisplayBuilder rather than being created separately — glutin-winit's own docs are
+/// through DisplayBuilder rather than being created separately: glutin-winit's own docs are
 /// explicit that modern OpenGL is otherwise unavailable, which is why this builds the window and
 /// the GL config together rather than in two steps.
 fn build_window(event_loop: &ActiveEventLoop, settings: &WindowSettings) -> Result<Gfx, String> {
@@ -469,7 +469,7 @@ fn draw_command(app: &mut App, cmd: &Value, width: f32, height: f32) {
         }
         "image" => {
             let Some(file) = cmd.get("file").and_then(|v| v.as_str()) else { return };
-            // Cached by path — decoding the file every frame is the trap this exists to avoid.
+            // Cached by path: decoding the file every frame is the trap this exists to avoid.
             let id = match images.get(file) {
                 Some(id) => *id,
                 None => {

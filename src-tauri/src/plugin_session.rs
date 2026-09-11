@@ -2,7 +2,7 @@
 // to plugin_host::protocol::invoke's spawn-fresh-per-call model. A session is spawned once (on
 // demand, see start()) and stays running, with its stdout read continuously on a background
 // thread and re-fired as a "plugin-emit" Tauri event (lowarc:sessionOutput) — the exact same
-// relay-into-iframe path invoke_plugin's own "emit" field already rides, in editor.html — rather
+// relay-into-iframe path invoke_plugin's own "emit" field already rides, in editor.html: rather
 // than inventing a second delivery mechanism. The wire format on that stdout is entirely the
 // plugin's own business (see terminal_backend.rs for Terminal's), not something this file
 // interprets; it only knows how to read JSON lines and forward them.
@@ -110,7 +110,7 @@ impl SessionRegistry {
         session.stdin.write_all(line.as_bytes()).and_then(|_| session.stdin.flush()).map_err(|e| format!("failed to write to session: {e}"))
     }
 
-    /// Same ownership check as send() — stopping a session_id that exists but belongs to a
+    /// Same ownership check as send(): stopping a session_id that exists but belongs to a
     /// different plugin_id is a silent no-op, matching how stopping a session_id that doesn't exist
     /// at all was already handled (this function never returned an error to begin with).
     pub fn stop(&self, plugin_id: &str, session_id: &str) {

@@ -5,7 +5,7 @@
 //
 // Dev-checkout detection mirrors AppPaths.FindDevRoot exactly: walk up from wherever the running
 // exe actually is, looking for a marker file that exists in a source checkout but never ships in
-// a built app. AppPaths used the solution file (lowarc.slnx); this uses rust-toolchain.toml — it
+// a built app. AppPaths used the solution file (lowarc.slnx); this uses rust-toolchain.toml: it
 // exists at this repo's root for the same "pin the toolchain" reason described in that file, and
 // like the .slnx, it's dev-tooling that a Tauri build output never carries.
 
@@ -60,7 +60,7 @@ impl AppPaths {
     }
 
     /// LOWARC_MODULES_DIR overrides where modules are resolved from. Added for bin/lowarc.rs's own
-    /// end-to-end tests, which have to build a store of their own — resolving against the real one
+    /// end-to-end tests, which have to build a store of their own: resolving against the real one
     /// would make them depend on whatever the developer happens to have installed, and pass or fail
     /// per machine. It is genuinely useful beyond that (running a project against a different module
     /// set without disturbing the installed one), which is why it is a documented override rather
@@ -84,7 +84,7 @@ impl AppPaths {
         Self::user_data().join("recent.json")
     }
     /// One JSON file per user-saved custom color theme, named after the preset. Built-in Light/
-    /// Dark aren't here — they ship baked into the frontend, since every install always has them.
+    /// Dark aren't here: they ship baked into the frontend, since every install always has them.
     pub fn themes() -> PathBuf {
         Self::user_data().join("themes")
     }
@@ -206,7 +206,7 @@ fn unpack_installed_resources(resource_dir: &Path, plugins_dest: &Path, helpers_
     Ok(())
 }
 
-/// std has no recursive directory copy — needed here for the plugins/ tree (Monaco's vendored
+/// std has no recursive directory copy: needed here for the plugins/ tree (Monaco's vendored
 /// bundle alone is hundreds of files across nested language/asset folders).
 fn copy_dir_all(src: &Path, dest: &Path) -> std::io::Result<()> {
     std::fs::create_dir_all(dest)?;
@@ -224,14 +224,14 @@ fn copy_dir_all(src: &Path, dest: &Path) -> std::io::Result<()> {
 
 const BUILTIN_PLUGIN_BACKENDS: &[(&str, &str)] = &[("file-explorer", "file_explorer_backend"), ("terminal", "terminal_backend")];
 
-/// True if `dest` doesn't exist yet, or `src` was modified more recently than it — split out from
+/// True if `dest` doesn't exist yet, or `src` was modified more recently than it: split out from
 /// ensure_builtin_plugin_binaries() so it's directly testable with real temp files rather than
 /// needing to fake AppPaths' own exe-location walk.
 fn needs_copy(src: &Path, dest: &Path) -> std::io::Result<bool> {
     let src_modified = std::fs::metadata(src)?.modified()?;
     match std::fs::metadata(dest).and_then(|m| m.modified()) {
         Ok(dest_modified) => Ok(src_modified > dest_modified),
-        Err(_) => Ok(true), // dest missing (or its mtime unreadable) — copy unconditionally
+        Err(_) => Ok(true), // dest missing (or its mtime unreadable): copy unconditionally
     }
 }
 

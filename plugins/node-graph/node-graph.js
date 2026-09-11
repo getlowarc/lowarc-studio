@@ -1,5 +1,5 @@
-// Multi-document, same "one instance, several open files" shape Monaco/media-viewer already use —
-// see monaco.js's own header comment for the reasoning.
+// Multi-document, same "one instance, several open files" shape Monaco/media-viewer already use.
+// See monaco.js's own header comment for the reasoning.
 //
 // File format (.lan — "LowArc Node", plain JSON, schema locked 2026-08-29):
 //   { lowarcNodeGraph: 1,
@@ -13,7 +13,7 @@
 // later task, and belongs to whichever module a project writes to consume its own graphs.
 //
 // A node's label/files/hasInput/hasOutput are edited through the Inspector (see inspector.js),
-// not on the canvas — clicking a node (without dragging it) asks the host to open it there. The
+// not on the canvas: clicking a node (without dragging it) asks the host to open it there. The
 // canvas and the Inspector are two separate iframes of this same plugin; edits made in the
 // Inspector reach this file via window.lowarc.broadcastToSelf (lowarc:nodeEdit/lowarc:createNode),
 // since there's no other channel for one plugin's iframe to reach another.
@@ -183,11 +183,11 @@ function bezierPath(p1, p2) {
 // hover, same reasoning as any icon-only control elsewhere in this app. Controlled by this
 // plugin's own "Show badges" setting (see plugin.json).
 
-// Tooltips are the shared window.lowarc.initTooltips()/data-tooltip primitive (see __lowarc.js) —
+// Tooltips are the shared window.lowarc.initTooltips()/data-tooltip primitive (see __lowarc.js):
 // badges just set el.dataset.tooltip and the render passes below call initTooltips() once their
 // batch of badges exists.
 
-// A badge's visible size never changes with its content — "+99" (its widest possible value) has
+// A badge's visible size never changes with its content: "+99" (its widest possible value) has
 // to fit exactly as well as a single "S" does, so counts cap out visually rather than ever
 // growing the oval to fit a fourth digit.
 function capCount(n) {
@@ -287,7 +287,7 @@ function connectionBadge(doc, lineEl, index) {
 }
 
 // Connection badges depend on data (which nodes' labels, how many wires) that changes independent
-// of any single node being rebuilt, so this re-derives every node's badges from scratch — cheap
+// of any single node being rebuilt, so this re-derives every node's badges from scratch: cheap
 // enough at any graph size this format is meant for, and simpler than tracking exactly which two
 // nodes a given connection change touched.
 function refreshAllBadges(doc) {
@@ -348,7 +348,7 @@ function updateConnectedDots(doc) {
   }
 }
 
-// The hit area (".ng-socket") spans the node's full height at that edge — much easier to grab
+// The hit area (".ng-socket") spans the node's full height at that edge: much easier to grab
 // than the small visual dot alone would be, while the dot itself stays a small circle centered
 // in it, so nothing looks different from before.
 function renderSocket(doc, node, isOutput) {
@@ -392,7 +392,7 @@ function renderNode(doc, node) {
 }
 
 // Re-renders one node in place (used after the Inspector changes something that affects layout —
-// label, files, hasInput/hasOutput) — simpler and less error-prone than patching the DOM
+// label, files, hasInput/hasOutput): simpler and less error-prone than patching the DOM
 // incrementally for an edit that isn't on the hot path.
 function rebuildNode(doc, node) {
   const wasSelected = doc.selectedNode === node.id;
@@ -516,7 +516,7 @@ function centerViewportOn(doc, node) {
   doc.viewportEl.scrollTop = centerY - doc.viewportEl.clientHeight / 2;
 }
 
-// Jumping to a node from the Inspector's Input/Output list — select it, pan it into view, and
+// Jumping to a node from the Inspector's Input/Output list: select it, pan it into view, and
 // (re)point the Inspector at it. Unlike a plain click on the canvas, this always forces the
 // Inspector open: the request can only originate from inside the Inspector in the first place, so
 // it's already open by definition.
@@ -583,7 +583,7 @@ function beginNodeDrag(doc, node, el, e) {
     window.removeEventListener("pointerup", onUp);
     if (moved) {
       graphChanged(doc);
-      openInspectorForNode(doc, node, true); // onlyIfOpen — refocus, don't force the panel open
+      openInspectorForNode(doc, node, true); // onlyIfOpen: refocus, don't force the panel open
     } else {
       openInspectorForNode(doc, node);
     }
@@ -748,7 +748,7 @@ window.lowarc.on("lowarc:closeFile", (payload) => {
 });
 
 // The host's one HOST-initiated request (see requestPluginContent() in editor.html, used when
-// moving a file to the other editor group) — replies with this instance's actual current graph
+// moving a file to the other editor group): replies with this instance's actual current graph
 // for that path, unsaved edits included, same contract Monaco's own lowarc:getContent uses.
 window.lowarc.on("lowarc:getContent", (payload) => {
   if (!payload) return;
@@ -772,7 +772,7 @@ window.lowarc.on("lowarc:nodeEdit", (payload) => {
   graphChanged(doc);
 });
 
-// A connected-node row in the Inspector's Input/Output list was clicked — jump the canvas to it.
+// A connected-node row in the Inspector's Input/Output list was clicked: jump the canvas to it.
 window.lowarc.on("lowarc:focusNode", (payload) => {
   if (!payload || typeof payload.path !== "string" || typeof payload.nodeId !== "string") return;
   const doc = docForPath(payload.path);

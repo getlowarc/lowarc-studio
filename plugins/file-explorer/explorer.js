@@ -22,7 +22,7 @@ let pendingDelete = null; // path awaiting the inline delete confirmation
 let fileStatus = {}; // absolute path -> { dirty, missing, hasErrors }. See broadcastFileStatus() host-side
 
 // This plugin's own configured defaults (Settings > Plugins > File Explorer, see plugin.json's
-// `settings` declaration) — read once at load, before the very first renderTree(), via
+// `settings` declaration): read once at load, before the very first renderTree(), via
 // window.lowarc.getSettings(). Like every setting read this way, a change made while this panel
 // is already open takes effect on its next mount (reload), not live.
 let configuredShowHidden = false;
@@ -30,7 +30,7 @@ let configuredFoldersFirst = true;
 let configuredDraftTool = true;
 
 // ---------- Draft Tool state ----------
-// A lightweight, disk-based backward snapshot for the CURRENT session only — bolted onto the
+// A lightweight, disk-based backward snapshot for the CURRENT session only: bolted onto the
 // explorer rather than a separate plugin (see file_explorer_backend.rs's own header for how it
 // actually works). draftId is null when no Draft is open; diffCounts only ever has entries while
 // one is.
@@ -139,7 +139,7 @@ function createInlineInput(initialValue, onCommit) {
   return input;
 }
 
-// One wrapper per row, not `depth` separate children of `.row` directly — `.row` uses flex `gap`
+// One wrapper per row, not `depth` separate children of `.row` directly: `.row` uses flex `gap`
 // to space out its real children (chevron/icon/name), which would just as happily shove the guide
 // lines apart from each other too and break the illusion of one continuous line per ancestor.
 // Wrapping them keeps `.row`'s gap out of it; the guides pack flush against each other inside.
@@ -221,7 +221,7 @@ function createRow({ path, label, isDir, depth }) {
   }
   row.appendChild(nameEl);
 
-  // Right-side status dot, mirroring the tab bar's own status colors — errors take priority over
+  // Right-side status dot, mirroring the tab bar's own status colors: errors take priority over
   // a plain unsaved edit, since a file can be both at once and "it doesn't even parse" is the
   // more urgent fact. Only ever shown for files, never folders (fileStatus is keyed by open file
   // paths, which folders never are), and not while the row is showing a rename input in its place.
@@ -362,7 +362,7 @@ function formatBytes(bytes) {
   return `${value.toFixed(value < 10 ? 1 : 0)} ${units[unit]}`;
 }
 
-// Whole-project totals, not just what's currently expanded — recomputed after every mutation
+// Whole-project totals, not just what's currently expanded: recomputed after every mutation
 // (create/rename/move/copy/delete/refresh) rather than tracked incrementally, since the backend
 // already has to walk the tree to answer any of those and a stale total would be worse than a
 // briefly-blank one.
@@ -385,7 +385,7 @@ function onRowClick(path, isDir) {
     if (expandedDirs.has(path)) expandedDirs.delete(path);
     else expandedDirs.add(path);
   } else {
-    // The open-files list is host-owned, not this plugin's — clicking a file just asks the host
+    // The open-files list is host-owned, not this plugin's: clicking a file just asks the host
     // to add it (or activate it, if already open) rather than this plugin rendering anything
     // itself. Same list the tab bar renders from and Monaco will read from.
     window.lowarc.openFile(path);
@@ -453,7 +453,7 @@ async function pasteInto(destDir) {
   expandedDirs.add(destDir);
   if (wasCut) clipboard = null;
   renderTree();
-  // A paste is either a move (no total change) or a copy (adds files/bytes) — refreshing
+  // A paste is either a move (no total change) or a copy (adds files/bytes): refreshing
   // unconditionally is simpler than threading that distinction through, and cheap either way.
   refreshTotals();
   // A copy leaves the original in place: only a cut (move) actually displaces the source path.
@@ -475,7 +475,7 @@ async function deleteConfirmed(path) {
 }
 
 // ---------- Context menu ----------
-// Rendered by the HOST, not this iframe — window.lowarc.showMenu() asks editor.html to open the
+// Rendered by the HOST, not this iframe: window.lowarc.showMenu() asks editor.html to open the
 // shared .floating-menu overlay at this iframe's (x, y) plus wherever the host has this panel
 // mounted, and resolves to whichever item's value was picked, or null if dismissed. Building the
 // menu in this document instead does not work: position:fixed cannot escape a sandboxed iframe's
@@ -644,7 +644,7 @@ document.getElementById("open-draft-btn").addEventListener("click", async () => 
   renderTree();
 });
 
-// A lightweight inline confirm, same reasoning as beginDelete's own banner — Revert discards real
+// A lightweight inline confirm, same reasoning as beginDelete's own banner: Revert discards real
 // edits, that's worth one extra click to avoid an accidental loss.
 document.getElementById("revert-btn").addEventListener("click", () => {
   const btn = document.getElementById("revert-btn");

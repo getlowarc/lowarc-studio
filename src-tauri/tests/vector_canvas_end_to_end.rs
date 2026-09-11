@@ -64,7 +64,7 @@ impl Module {
     }
 
     /// Reads until an actual reply arrives, skipping the `{"log":...}` and `{"requestStop":...}`
-    /// notifications a module may emit unprompted at any time — exactly what the engine's own
+    /// notifications a module may emit unprompted at any time: exactly what the engine's own
     /// stdout reader does with them.
     fn reply(&mut self) -> Value {
         loop {

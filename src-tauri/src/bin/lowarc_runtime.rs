@@ -1,10 +1,10 @@
 // The exported, standalone runtime: this binary IS what "Export" produces (export::export_folder
 // copies it in, renamed to the project's own name, right alongside launch.json/modules/source).
 // Reads launch.json from its own directory and runs exactly what it names, through the same
-// RuntimeLoader machinery (ProcessLoader/NativeLoader) the IDE's own dev-run uses — see
+// RuntimeLoader machinery (ProcessLoader/NativeLoader) the IDE's own dev-run uses. See
 // runtime::run_from_launch_dir's own comment. Genuinely the same engine, not a reimplementation of
 // it: this is a different, minimal front door onto the exact same runtime module, with no IDE, no
-// window, no UI of its own at all — read launch.json, run it, exit.
+// window, no UI of its own at all: read launch.json, run it, exit.
 //
 // No OS signal handling (Ctrl+C, window-close) yet: a module's own requestStop is the only way a
 // run currently ends early. Worth adding before this is more than a first pass.

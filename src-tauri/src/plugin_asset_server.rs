@@ -49,10 +49,10 @@ fn respond(request: tiny_http::Request, status: u16, content_type: &str, body: V
 // cacheable is what a plain `respond()` skips (a 404, or content computed fresh per-request like
 // __lowarc-theme.css): everything a plugin actually renders with is genuinely static for the
 // life of one running app, and Monaco alone is dozens of separate chunk files an iframe re-fetches
-// in full on every single mount otherwise — reopening a file, or opening a second instance for
+// in full on every single mount otherwise: reopening a file, or opening a second instance for
 // split view, was paying that same multi-second cost again with nothing to show for it. Kept
 // short (not the usual immutable-forever a content-hashed bundle would get) specifically because
-// this app's own plugins (Monaco's own harness aside) are actively edited during development —
+// this app's own plugins (Monaco's own harness aside) are actively edited during development:
 // unhashed filenames mean a stale cache would otherwise hide a just-saved change for however long
 // the lifetime is; a minute is enough to absorb rapid reopens/split-toggles in one sitting without
 // meaningfully getting in the way of an edit-reload loop.
@@ -112,7 +112,7 @@ fn handle(request: tiny_http::Request) {
         respond_cacheable(request, 200, "text/javascript", SHARED_ICONS_JS.as_bytes().to_vec(), true);
         return;
     }
-    // "seti.woff", not "__lowarc-icons.woff" — icons.css references it by its real vendored
+    // "seti.woff", not "__lowarc-icons.woff": icons.css references it by its real vendored
     // filename (see that file's own comment for why), so this is the relative path a plugin
     // iframe's browser actually requests after loading __lowarc-icons.css at .../<plugin_id>/.
     if rel_path == "seti.woff" {

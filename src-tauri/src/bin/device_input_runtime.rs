@@ -9,19 +9,19 @@
 // interpretation" split node_graph_runtime already draws around what a node's files mean.
 //
 // Deliberately does NOT cover graphics-tablet/stylus input. That's not a scope cut of
-// convenience — pen/tablet input is architecturally different from keyboard/mouse/gamepad: on
+// convenience: pen/tablet input is architecturally different from keyboard/mouse/gamepad: on
 // Windows it's delivered through the RealTimeStylus COM API tied to a real window, and on Wayland
 // the tablet-v2 protocol is inherently surface-scoped (Wayland has no concept of "global" input
 // outside a window at all, by design — the same reason it doesn't have global keyboard/mouse
 // hooks either, see below). Every tablet crate surveyed for this (octotablet, in particular) needs
 // a real raw_window_handle to attach to. This module, like every other process module in this
-// engine, is a headless background process with no window of its own — supporting tablets for
+// engine, is a headless background process with no window of its own: supporting tablets for
 // real would mean this module (or a sibling one) owning an actual OS window, which is a
 // meaningfully different, bigger piece of work than what's here, not a small addition to it.
 //
 // Platform coverage, honestly: keyboard/mouse polling (device_query) works on Windows, macOS, and
 // Linux/X11 specifically: NOT Linux/Wayland, for the same "no global input outside a window"
-// reason as tablets above. Gamepad polling (gilrs) covers Windows, macOS, Linux/BSD, and Wasm —
+// reason as tablets above. Gamepad polling (gilrs) covers Windows, macOS, Linux/BSD, and Wasm:
 // broader, since gamepads are read through a dedicated HID/joystick subsystem on every platform
 // rather than through the windowing server itself.
 //
@@ -93,7 +93,7 @@ const GAMEPAD_AXES: [Axis; 8] =
 
 fn poll_gamepads(gilrs: &mut Gilrs) -> Vec<Value> {
     // gilrs's is_pressed()/value() reflect whatever its internal state was last updated to by
-    // processing queued events — draining them here (state-updating is automatic per event,
+    // processing queued events: draining them here (state-updating is automatic per event,
     // per Gilrs's own docs) is what keeps that state current going into this frame's read below,
     // same "pump events, then query state" shape gilrs's own game-loop example uses.
     while gilrs.next_event().is_some() {}

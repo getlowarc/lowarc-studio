@@ -2,7 +2,7 @@
 // well-behaved plugin replies (and any log line it sends before its reply is captured), a plugin
 // that never replies times out instead of hanging the host, a plugin that exits early reports an
 // error promptly, and concurrent invocations of the same plugin stay correctly isolated from each
-// other — trivially true now, since each call gets its own process, but worth confirming directly
+// other: trivially true now, since each call gets its own process, but worth confirming directly
 // rather than by luck.
 
 use lowarc_studio_lib::plugin_host::protocol::{self, LogFn, PluginDescriptor};

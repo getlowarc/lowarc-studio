@@ -1,6 +1,6 @@
 // List/install/remove for the two things a user installs into LowArc Studio: modules (game-side,
 // see runtime::project) and plugins (editor-side, see plugin_host). Kept separate from both of
-// those — they stay focused on resolving a project's requires and on starting/talking to running
+// those: they stay focused on resolving a project's requires and on starting/talking to running
 // plugin processes respectively: this is purely the "what's on disk, and manage it" concern
 // behind the Modules/Plugins pages. "Disabled" is state this module doesn't own (it's persisted in
 // Settings): every function here just takes the current disabled-id set as a parameter, same
@@ -45,7 +45,7 @@ pub struct PluginListItem {
     pub icon: Option<String>,
     /// What this plugin declares it provides. See plugin_host::protocol::Contributes. The
     /// editor shell builds rail icons/console tabs from this directly. Plugins are invoked per
-    /// call, not kept running, so there's no separate "is it actually running" status any more —
+    /// call, not kept running, so there's no separate "is it actually running" status any more:
     /// `disabled` is the only state that matters.
     pub contributes: Contributes,
     /// This plugin's own declared settings schema, if any. See PluginSettingField. Rendering the
@@ -145,7 +145,7 @@ pub fn install_module(modules_dir: &Path, source_dir: &Path, on_progress: &mut d
 
 /// Validates `source_dir` has a readable plugin.json, refuses if a plugin folder with the same
 /// name is already installed (a plugin's id IS its folder name; see protocol.rs), then copies it
-/// in. Returns the installed plugin's id. `on_progress`: see install_module's own note — this is
+/// in. Returns the installed plugin's id. `on_progress`: see install_module's own note. This is
 /// the one that actually matters in practice, since a real plugin (Monaco's vendored ~24MB, say)
 /// is nowhere near instant to copy.
 pub fn install_plugin(plugins_dir: &Path, source_dir: &Path, on_progress: &mut dyn FnMut(u64, u64)) -> Result<String, String> {

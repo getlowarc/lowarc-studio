@@ -1,4 +1,4 @@
-// User-saved custom color themes. The built-in Light and Dark presets aren't here — they're
+// User-saved custom color themes. The built-in Light and Dark presets aren't here: they're
 // baked into the frontend (theme.js) since every install always has them; this module only
 // handles presets a user creates themselves in the Appearance page, each one a JSON file under
 // AppPaths::themes().
@@ -102,7 +102,7 @@ fn preset_path(dir: &Path, name: &str) -> PathBuf {
 // commands (get_settings, list_theme_presets) a sandboxed plugin has no access to: this is the
 // server-side equivalent, computed fresh per request so a freshly-mounted/reloaded plugin panel
 // always reflects whatever's currently active. Values below are copied verbatim from theme.js's own
-// DARK_THEME/LIGHT_THEME constants — kept as functions, not `const`, since ThemeColors' fields are
+// DARK_THEME/LIGHT_THEME constants: kept as functions, not `const`, since ThemeColors' fields are
 // owned Strings, not const-evaluable &'static str.
 
 fn dark_theme() -> ThemeColors {
@@ -149,7 +149,7 @@ fn light_theme() -> ThemeColors {
 
 enum Resolved {
     /// "system" (or a themeMode pointing at a since-deleted preset, matching theme.js's own
-    /// fallback for that case) — reacts live to the OS's own light/dark preference via a CSS media
+    /// fallback for that case): reacts live to the OS's own light/dark preference via a CSS media
     /// query, so no Rust-side "what does the OS currently prefer" lookup is needed at all, unlike
     /// theme.js's own JS-side matchMedia listener.
     FollowSystem,
@@ -310,7 +310,7 @@ mod tests {
 
     #[test]
     fn a_theme_mode_naming_no_real_preset_falls_back_to_system() {
-        // Doesn't touch the real themes directory — "definitely-not-a-real-preset-name" can't
+        // Doesn't touch the real themes directory: "definitely-not-a-real-preset-name" can't
         // collide with anything list_presets() might actually find on this machine, so this stays
         // deterministic without needing an injectable themes dir just for this one case.
         assert_eq!(resolved_css("definitely-not-a-real-preset-name"), resolved_css("system"));

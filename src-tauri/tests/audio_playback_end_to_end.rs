@@ -55,7 +55,7 @@ fn write_test_tone(path: &std::path::Path) {
 }
 
 // The contract itself, installed into the store: a manifest and nothing else. It exists here to
-// prove the runtime treats a definition as a definition — it resolves, it takes part in ordering,
+// prove the runtime treats a definition as a definition. It resolves, it takes part in ordering,
 // and it is never spawned despite having no process.json, which without the explicit skip in
 // ProcessLoader would have made can_handle() answer "no loader recognises this project."
 fn write_contract_module(modules_dir: &std::path::Path, id: &str) {
@@ -260,7 +260,7 @@ fn pausing_holds_position_and_resuming_continues_it() {
     write_test_tone(&tone_path);
     write_audio_module(&modules_dir);
     write_contract_module(&modules_dir, "audio-cues");
-    // Paused for its first 3 frames — at a real ~30fps free-running pace that's ~100ms of actual
+    // Paused for its first 3 frames: at a real ~30fps free-running pace that's ~100ms of actual
     // elapsed wall-clock time, comfortably past the 0.1s tone's own natural length. If "paused"
     // didn't genuinely hold consumption, this alone would already show it as finished.
     let paused_frames = 3;
@@ -315,7 +315,7 @@ fn pausing_holds_position_and_resuming_continues_it() {
 
     // The engine stays paused (no more automatic ticks) while this real sleep happens: same
     // "audio plays via its own background thread regardless of engine ticking" reasoning as the
-    // other test above — long enough for the now-resumed 0.1s tone to genuinely reach its end.
+    // other test above: long enough for the now-resumed 0.1s tone to genuinely reach its end.
     std::thread::sleep(Duration::from_millis(500));
     let finished_trace = step_once(&step_request, &last_trace, resumed_trace.frame_index);
     let published = finished_trace.modules.iter().find(|m| m.id == "audio-playback").and_then(|m| m.reply.get("publish")).cloned().unwrap();

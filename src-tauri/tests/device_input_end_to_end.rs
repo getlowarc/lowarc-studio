@@ -2,8 +2,8 @@
 // publishes real hardware state: not just that it type-checks in isolation. Asserts on SHAPE
 // (the right fields, the right JSON types) rather than exact values, since actual keyboard/mouse/
 // gamepad state isn't something a test can control or predict; a manual smoke test (piping the
-// wire protocol straight into the built exe) is what actually confirmed live values come back —
-// see this module's own header comment for that story. Same debugger-frame-trace observation
+// wire protocol straight into the built exe) is what actually confirmed live values come back.
+// See this module's own header comment for that story. Same debugger-frame-trace observation
 // technique as node_graph_runtime_end_to_end.rs.
 
 use lowarc_studio_lib::runtime;

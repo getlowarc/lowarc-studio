@@ -1,5 +1,5 @@
       // ---------- Header search ----------
-      // A real searchbar now, not a button that opens one — types in place, shows matches in the
+      // A real searchbar now, not a button that opens one: types in place, shows matches in the
       // same dropdown popover initSearchbar() already drives everywhere else. Sourced from
       // buildSearchableSettingsList() (primitives.js) plus this file's own command registry below:
       // this bar isn't a "settings search," it's the app's one general search entry point; more
@@ -44,7 +44,7 @@
         return commands;
       }
 
-      // The other half — plugin-declared. A sandboxed plugin's content can't be introspected the
+      // The other half: plugin-declared. A sandboxed plugin's content can't be introspected the
       // way the host's own menu bar can, so it has to say what it offers itself, via plugin.json's
       // `commands` array (same shape/spirit as `settings`; see PluginCommand in protocol.rs).
       async function buildPluginCommands() {
@@ -119,11 +119,11 @@
         iframe.contentWindow.postMessage({ type: "emit", event: "lowarc:runCommand", payload: { commandId } }, "*");
       }
 
-      // The live array backing the Command Palette / Settings section of the header search — kept
+      // The live array backing the Command Palette / Settings section of the header search: kept
       // as ONE array object, mutated in place (push/splice, never reassigned), because initSearchbar
       // (primitives.js) closes over whatever array it's handed at init time with no way to hand it
       // a fresh one later. Each entry carries `value` (identical to `id`) purely because that's the
-      // field name initSearchbar's own rendering reads — letting `options` below just BE this same
+      // field name initSearchbar's own rendering reads: letting `options` below just BE this same
       // array, instead of a separate .map()'d copy that would silently stop tracking it.
       const commandCenterEntries = [];
 

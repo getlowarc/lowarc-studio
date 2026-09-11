@@ -74,7 +74,7 @@
       }
 
       // Tracks which group new files open into and which group's tab bar gets the "active" shade
-      // (see .editor-group.is-active-group in the CSS above) — updated on any real interaction
+      // (see .editor-group.is-active-group in the CSS above): updated on any real interaction
       // with a group: clicking one of its tabs (via the per-group tab-change listener below),
       // clicking anywhere else in its chrome (this listener), or a viewer iframe inside it
       // receiving focus (see the iframe "focus" listener in openFile()).
@@ -244,7 +244,7 @@
             tab.setAttribute("aria-selected", String(isActiveFile));
             tab.classList.add(file.missing ? "status-missing" : file.dirty ? "status-dirty" : "status-clean");
             // Same per-language glyph the file explorer shows (window.lowarcIconClass, vendored
-            // vendor/seti-icons/) — inserted first so it sits before the label, same reading order
+            // vendor/seti-icons/): inserted first so it sits before the label, same reading order
             // as the explorer's own rows. Guarded the same way explorer.js guards it: if the icon
             // assets somehow aren't loaded, the tab just has no icon rather than an error.
             if (typeof window.lowarcIconClass === "function") {
@@ -288,7 +288,7 @@
       // Gets-or-creates the one iframe for (groupId, viewer.pluginId), pushes this path's content
       // into it, and resolves once it's genuinely ready: either immediately (an already-mounted
       // instance already has a load-complete script running) or after a freshly-created iframe's
-      // own load event fires. Doesn't touch openFiles/contribute/groupActiveFilePath/rendering —
+      // own load event fires. Doesn't touch openFiles/contribute/groupActiveFilePath/rendering:
       // callers (openFile, moveFileToGroup) own that, since what happens around a mount differs
       // between "brand new file" and "moved from the other group."
       function mountFileInGroup(path, contents, viewer, groupId) {
@@ -433,13 +433,13 @@
       }
 
       // Called before the app window actually closes (see initWindowControls's beforeClose param
-      // in primitives.js) — unsaved open files and an open Draft with real tracked changes both
+      // in primitives.js): unsaved open files and an open Draft with real tracked changes both
       // represent real work that'd otherwise be silently lost, so this is the one gate standing
       // between "click the X" (or Alt+F4) and losing either. Resolves true to let the close
       // proceed, false to cancel it. draftDiffCounts having any entries at all is exactly "a Draft
       // is open with something actually captured": an open-but-untouched Draft has nothing to
       // lose by closing, same reasoning it shows no diff anywhere else either. A Draft itself has
-      // no "save" — Commit/Revert are its only resolutions, and both live in the sidebar, not here.
+      // no "save": Commit/Revert are its only resolutions, and both live in the sidebar, not here.
       async function confirmAppClose() {
         const dirtyFiles = Array.from(openFiles.values()).filter((f) => f.dirty);
         const draftHasChanges = Object.keys(draftDiffCounts).length > 0;
@@ -476,7 +476,7 @@
           file.iframe.classList.add("is-active");
           file.iframe.contentWindow.postMessage({ type: "emit", event: "lowarc:activateFile", payload: { path } }, "*");
         }
-        // Only actually matters for the group the user is currently focused on —
+        // Only actually matters for the group the user is currently focused on:
         // updateInspectorForActiveFile re-derives from activeGroupId itself, so calling it here
         // even when `groupId` is the OTHER (unfocused) group's own file switch is harmless, just
         // a no-op recompute of the same answer as before: same reasoning updateStatusBarDiff's
@@ -488,7 +488,7 @@
       }
 
       // Only for switching TO an already-rendered tab (a re-open, or right after openFile() has
-      // just rendered a new one) — clicks the real DOM element so it goes through the exact same
+      // just rendered a new one): clicks the real DOM element so it goes through the exact same
       // primitive-delegated path a user's own click would, rather than a second way to activate.
       function activateFile(path) {
         const file = openFiles.get(path);
@@ -497,7 +497,7 @@
         if (tab) tab.click();
       }
 
-      // Closing isn't a primitive-mediated user click on a tab — it's host logic deciding what
+      // Closing isn't a primitive-mediated user click on a tab: it's host logic deciding what
       // the next active tab should be, so this sets groupActiveFilePath directly rather than
       // simulating a click on whatever's chosen. Async because a dirty file gates on the popup
       // below: every caller (the close button, requestClose) already treats this as fire-and-
@@ -660,7 +660,7 @@
         activateFile(path);
       }
 
-      // window.lowarc.refreshFile()'s host half — some plugin (the Draft Tool's Revert, so far)
+      // window.lowarc.refreshFile()'s host half: some plugin (the Draft Tool's Revert, so far)
       // just changed `path`'s content on disk directly, bypassing whatever editor has it open. A
       // no-op if it isn't currently open anywhere (nothing to refresh). Unlike openFile(), this
       // pushes a DIFFERENT event — lowarc:openFile is a deliberate no-op for an already-open path

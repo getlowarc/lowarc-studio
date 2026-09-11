@@ -68,7 +68,7 @@ fn add_recent(recents_file: &Path, path: &Path) -> std::io::Result<()> {
     entries.retain(|e| e.path != canon);
     entries.insert(0, StoredEntry { path: canon, pinned: was_pinned });
 
-    // Cap unpinned entries only — pinned entries never get evicted regardless of how old they are.
+    // Cap unpinned entries only: pinned entries never get evicted regardless of how old they are.
     let unpinned_count = entries.iter().filter(|e| !e.pinned).count();
     if unpinned_count > RECENTS_CAP {
         let mut to_drop = unpinned_count - RECENTS_CAP;
@@ -100,7 +100,7 @@ fn set_recent_pinned_in(recents_file: &Path, path: &Path, pinned: bool) -> Resul
     write_entries(recents_file, &entries).map_err(|e| e.to_string())
 }
 
-/// Removes a project from recents entirely (the Delete action) — pinned or not.
+/// Removes a project from recents entirely (the Delete action): pinned or not.
 pub fn remove_recent(path: &Path) -> Result<(), String> {
     remove_recent_in(&AppPaths::recent_projects_file(), path)
 }
@@ -130,7 +130,7 @@ fn create_project_in(recents_file: &Path, parent_dir: &Path, name: &str) -> Resu
     }
     // Same reasoning as export::sanitize_name and AppPaths::is_valid_component_id's other
     // callers: name is about to be joined onto parent_dir, so it can't be allowed to contain a
-    // path separator or a bare "."/".." — otherwise a typed name could land the new project
+    // path separator or a bare "."/"..": otherwise a typed name could land the new project
     // folder somewhere other than inside parent_dir. Rejected outright rather than silently
     // stripped (unlike sanitize_name's auto-derived export folder name) since this is a user
     // directly naming their own project in a dialog that already has a place to show the error.
@@ -171,7 +171,7 @@ mod tests {
 
     // These tests go through create_project_in/open_project_in/etc. (not the public wrappers) so
     // each test writes to its own temp recents file instead of the real
-    // AppPaths::recent_projects_file() — that file is the dev app's actual recents list (in a
+    // AppPaths::recent_projects_file(). That file is the dev app's actual recents list (in a
     // source checkout, user_data() is the repo root), so a test suite writing through the public
     // API would leave fake project entries in a real running LowArc Studio window. Each test uses
     // its own uniquely-named temp dir so they don't collide when run in parallel.

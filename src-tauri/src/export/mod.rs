@@ -111,7 +111,7 @@ fn copy_project_source(project_dir: &Path, target_dir: &Path) -> std::io::Result
     Ok(())
 }
 
-/// The store folder's own name, not the module's id — matches how the store is actually laid out
+/// The store folder's own name, not the module's id: matches how the store is actually laid out
 /// (scan_store groups by id, but a folder can be named anything) and keeps launch.json's `modules`
 /// entries readable, same spirit as the id being for identity and the folder name being for
 /// on-disk location.

@@ -52,7 +52,7 @@ while ($line = [Console]::In.ReadLine()) {
     .unwrap();
 }
 
-// requires producer — logs whatever it sees at shared.producer.value each frame, and requests
+// requires producer: logs whatever it sees at shared.producer.value each frame, and requests
 // stop once that value reaches 3. The log line is the actual proof: it can only ever contain a
 // real number here if the value genuinely round-tripped from the producer's own publish, through
 // the host's shared map, back down to this module's own frame request.
@@ -101,7 +101,7 @@ while ($line = [Console]::In.ReadLine()) {
     .unwrap();
 }
 
-// Does NOT require producer — dumps the raw shared object it received into its own log every
+// Does NOT require producer: dumps the raw shared object it received into its own log every
 // frame, so the test can assert producer's namespace never appears in it. Requests its own stop
 // after a few frames so the test doesn't depend on anything external to end it.
 fn write_bystander(modules_dir: &std::path::Path) {
@@ -164,7 +164,7 @@ fn collecting_logger() -> (LogFn, Arc<Mutex<Vec<String>>>) {
 #[test]
 fn a_module_sees_its_dependency_publish_within_the_same_frame() {
     if !cfg!(windows) {
-        return; // fixtures are PowerShell scripts — matches how the other e2e tests are scoped
+        return; // fixtures are PowerShell scripts: matches how the other e2e tests are scoped
     }
 
     let modules_dir = temp_dir("producer_consumer_modules");

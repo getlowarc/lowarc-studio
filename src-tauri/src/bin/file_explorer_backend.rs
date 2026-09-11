@@ -17,7 +17,7 @@
 // ---------- Draft Tool: a lightweight, disk-based backward snapshot for the CURRENT session ----
 // Bolted onto the file explorer (not a separate plugin — Nolan: "it will just be bolted on to the
 // normal functionality") since browsing files and reviewing what changed in them are the same
-// surface. Never stops a save from happening — it just watches for one (via the host's generic
+// surface. Never stops a save from happening: it just watches for one (via the host's generic
 // lowarc:beforeSave, see write_text_file in lib.rs) and, the first time a tracked path changes
 // after a Draft opens, keeps that path's previous content in this binary's own scratch storage.
 // Revert restores every captured path; Commit just forgets them (current disk content was already
@@ -118,7 +118,7 @@ fn validate_existing(root: &Path, path: &str) -> Result<PathBuf, String> {
     Ok(canonical)
 }
 
-/// A path that must NOT exist yet (a create/rename/move target) — canonicalizes the parent
+/// A path that must NOT exist yet (a create/rename/move target): canonicalizes the parent
 /// instead, since canonicalize itself requires the path to already be on disk.
 fn validate_new(root: &Path, path: &str) -> Result<PathBuf, String> {
     let candidate = Path::new(path);
@@ -229,9 +229,9 @@ fn delete_entry(root: &Path, path: &str) -> Result<Value, String> {
     Ok(Value::Null)
 }
 
-/// Whole-project totals for the footer — folders/files/bytes under `root`, recursively. Symlinks
+/// Whole-project totals for the footer: folders/files/bytes under `root`, recursively. Symlinks
 /// are skipped rather than followed (DirEntry::file_type() reports a symlink's own type, which is
-/// neither is_dir() nor is_file(), so they simply don't match either branch below) — walking into
+/// neither is_dir() nor is_file(), so they simply don't match either branch below): walking into
 /// one could cycle back on itself, and a symlink's "real" size belongs to whatever it points at,
 /// not to this project.
 fn count_tree(root: &Path) -> Result<Value, String> {
@@ -267,7 +267,7 @@ fn walk_count(dir: &Path, totals: &mut Totals) -> std::io::Result<()> {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 struct DraftManifestEntry {
     index: usize,
-    /// False for a path that didn't exist before this Draft's first-seen change to it — revert
+    /// False for a path that didn't exist before this Draft's first-seen change to it: revert
     /// deletes the file in that case, rather than overwriting it with empty content.
     existed: bool,
 }
@@ -320,7 +320,7 @@ fn active_draft_path() -> PathBuf {
     draft_scratch_root().join("active.json")
 }
 
-/// Idempotent — opening the same draft_id twice (a double-click, a retry) just leaves any already-
+/// Idempotent: opening the same draft_id twice (a double-click, a retry) just leaves any already-
 /// captured baselines in place rather than losing them (though it DOES refresh the remembered
 /// label/description, in case those were edited on a retry).
 fn open_draft(draft_id: &str, label: &str, description: &str) -> Result<Value, String> {
@@ -335,7 +335,7 @@ fn open_draft(draft_id: &str, label: &str, description: &str) -> Result<Value, S
     Ok(Value::Null)
 }
 
-/// The frontend's own "did I lose track of an open Draft?" check, called once on page load —
+/// The frontend's own "did I lose track of an open Draft?" check, called once on page load:
 /// covers exactly the gap a webview refresh leaves (see ActiveDraft's own doc comment). None (not
 /// an error) whenever nothing's tracked, which is the ordinary case outside a mid-Draft refresh.
 fn get_active_draft() -> Result<Value, String> {
@@ -420,7 +420,7 @@ fn commit(draft_id: &str) -> Result<Value, String> {
 
 fn discard_draft(draft_id: &str) -> Result<Value, String> {
     let _ = std::fs::remove_dir_all(draft_dir(draft_id));
-    // Only clear the "resume after refresh" pointer if it was actually pointing at THIS draft —
+    // Only clear the "resume after refresh" pointer if it was actually pointing at THIS draft:
     // defensive more than load-bearing (only one Draft is ever open at a time in this UI today),
     // but a stale unrelated pointer shouldn't be silently erased just because some other draft_id
     // got cleaned up.

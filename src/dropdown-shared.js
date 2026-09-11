@@ -5,7 +5,7 @@
 // has no reason to carry just to get a plain single-select dropdown. Two separate, smaller
 // implementations sharing one look, not one implementation trying to serve both.
 //
-// createLowarcDropdown(options, value, onChange) builds and returns the whole element — options
+// createLowarcDropdown(options, value, onChange) builds and returns the whole element: options
 // is [{value, label}], value is the currently-selected one's value, onChange(newValue) fires
 // whenever a different option is picked (never called for re-picking the same one).
 function createLowarcDropdown(options, value, onChange) {
@@ -59,7 +59,7 @@ function createLowarcDropdown(options, value, onChange) {
     e.stopPropagation();
     root.dataset.open = root.dataset.open === "true" ? "false" : "true";
   });
-  // Closing on any outside click, same convention the host's own dropdowns use — menu's own
+  // Closing on any outside click, same convention the host's own dropdowns use: menu's own
   // click already stops propagation above so picking an option doesn't immediately reopen/close
   // through this same listener.
   document.addEventListener("click", () => {

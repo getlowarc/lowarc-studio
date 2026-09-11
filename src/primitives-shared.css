@@ -1,4 +1,4 @@
-/* LowArc Studio's genuinely reusable component primitives — buttons, text inputs, checkboxes, a
+/* LowArc Studio's genuinely reusable component primitives: buttons, text inputs, checkboxes, a
    progress bar, and the settings-row layout. Depends on the tokens defined in style.css's :root;
    load style.css first.
 
@@ -17,7 +17,7 @@
    out for the opposite reason: a plugin linking just this CSS with no way to wire the behavior
    would get either buttons that visibly do nothing, or a tooltip that never appears: that's now
    solved by the harness call instead of by leaving the CSS out. .tooltip-popup's max-width/wrapping
-   below is ALSO not a byte-for-byte copy of the host's own rule for that reason — see
+   below is ALSO not a byte-for-byte copy of the host's own rule for that reason. See
    window.lowarc.initTooltips()'s own comment in plugin_assets.rs. primitives.css itself stays host-only
    for the same reason at a larger scale: it's packed with chrome-specific classes (.rail, .tab-bar,
    .console-tabs, .manage-list, ...) that assume the host's own DOM structure and JS-driven
@@ -145,7 +145,7 @@
   filter: brightness(var(--btn-hover-brightness));
 }
 /* Ink, not --fg: pressing swaps the fill to cyan-dark, and --fg is the color for text on the PAGE,
-   which on a light theme is near-black — near-black on dark teal. Ink is defined as "what sits on a
+   which on a light theme is near-black: near-black on dark teal. Ink is defined as "what sits on a
    cyan fill" and is correct against both cyan and cyan-dark in either theme, so the label also stops
    changing color mid-press. */
 .btn-main:active:not(:disabled) {
@@ -155,7 +155,7 @@
   filter: none;
 }
 
-/* Ink for the same reason .btn-main:active uses it — this is a cyan fill, and --fg is the color for
+/* Ink for the same reason .btn-main:active uses it. This is a cyan fill, and --fg is the color for
    text on the PAGE, which on a light theme is near-black sitting on dark teal. */
 .btn-sub {
   background: var(--cyan-dark);
@@ -219,7 +219,7 @@
   filter: brightness(0.85);
 }
 
-/* Not one of the standard "always pick one of these six" types — reserved for state-driven
+/* Not one of the standard "always pick one of these six" types: reserved for state-driven
    controls that turn yellow while something's in a caution/in-progress state (e.g. the editor's
    Pause button while a run is active), not a general-purpose color choice. */
 .btn-warning {
@@ -274,7 +274,7 @@
 .btn-ghost-info:active:not(:disabled) {
   background: var(--border);
 }
-/* The "currently toggled on" look (e.g. the console's maximize button while maximized) — reuses
+/* The "currently toggled on" look (e.g. the console's maximize button while maximized): reuses
    the app's one accent color for "this is active" everywhere else (the rail's selected item, a
    file tab's active underline), deliberately NOT the hover-tint color, since "active" and "what
    this button does on hover" are two different signals. */
@@ -592,7 +592,7 @@
 }
 
 /* ---------- Progress bar ---------- */
-/* No fixed width of its own — sizes to whatever a caller sets (inline style, a wrapper, a flex
+/* No fixed width of its own: sizes to whatever a caller sets (inline style, a wrapper, a flex
    item's own basis), so one primitive covers a full-width bar or a small footer indicator alike.
    Fill width and color are both driven from JS (see setProgress() in primitives.js): color isn't a
    fixed danger/warning/success. It travels red->yellow->green as the fraction climbs, since this
@@ -623,8 +623,8 @@
 }
 
 /* ---------- Setting row ---------- */
-/* One repeatable shape for "a single configurable value" — control on the left, label+description
-   on the right, full width — used for every settings surface that isn't Appearance (General,
+/* One repeatable shape for "a single configurable value": control on the left, label+description
+   on the right, full width: used for every settings surface that isn't Appearance (General,
    Plugins, and the search view all render off this SAME primitive; see renderSettingRow() in
    primitives.js). The point is exactly that it's boring and uniform: no page hand-builds its own
    field markup any more, so a plugin's declared setting and a core one look identical. */

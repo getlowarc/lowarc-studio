@@ -9,7 +9,7 @@ The manifest itself is small and clear. What's obscure is what `requires` *means
 currently means three different things at once:
 
 - **this module must exist**: the resolver fails or skips without it
-- **run me after it** — `order_by_requires` sorts the run by this list
+- **run me after it**: `order_by_requires` sorts the run by this list
 - **let me read what it publishes** — `ProcessModule::frame` filters the run-wide `shared` map down
   to exactly the ids in this list
 
@@ -48,7 +48,7 @@ This is the smallest change that gets order without restriction:
   business, not the runtime's.
 
 So authors keep every degree of freedom they have now. What they gain is a place where the
-agreement is written down, versioned, and shipped — instead of a comment in someone's `.rs` file.
+agreement is written down, versioned, and shipped, instead of a comment in someone's `.rs` file.
 
 ## Contracts
 
@@ -94,7 +94,7 @@ A contract ships a `README.md` the same way every module does, and that README *
 specification. Its version is what consumers pin against.
 
 A contract defines nothing about who is allowed to author it. **A surface owns its own drawing
-vocabulary** — `vector-canvas` ships the `draw-commands` contract beside itself, rather than
+vocabulary**: `vector-canvas` ships the `draw-commands` contract beside itself, rather than
 complying with a neutral engine-wide drawing spec. That is already the position this codebase
 took: `vector_canvas_runtime.rs` says outright that its command vocabulary "is this module's own
 interface, not an engine-wide drawing protocol; a different surface module is free to speak
@@ -145,9 +145,9 @@ should stay that way.
 
 Two addressing modes, both live at once:
 
-- `shared["<module-id>"]` — unchanged. A module always publishes under its own id, and anything that
+- `shared["<module-id>"]`: unchanged. A module always publishes under its own id, and anything that
   `requires` that specific module reads it there.
-- `shared["<contract-id>"]` — new. The engine aliases each contract a module provides onto that same
+- `shared["<contract-id>"]`: new. The engine aliases each contract a module provides onto that same
   published object.
 
 A contract key holds an **ordered array**, one entry per provider that published this tick, each
@@ -179,7 +179,7 @@ a module that provides `draw-commands`, or `audio-cues`, or both, or neither if 
 else entirely.
 
 That also settles the p5.js question. p5 fuses two jobs: the drawing API, and the host your sketch
-runs inside. LowArc splits them. `vector-canvas` is the first half only — femtovg, whose API is
+runs inside. LowArc splits them. `vector-canvas` is the first half only: femtovg, whose API is
 modelled on HTML5 Canvas, which is the same drawing model p5 wraps. A p5-shaped module here is a
 **director**: something that runs a user's code and emits draw ops, with `vector-canvas` behind it.
 That's a coherent thing for someone to build, and after this change they can build it without
@@ -252,7 +252,7 @@ Deliberately additive: nothing has to change at once.
 2. `shared` gains contract aliases alongside the existing per-module-id keys. Nothing that reads by
    module id breaks.
 3. The three contracts above get written as real contract modules, with their READMEs as the
-   specifications — including writing down the draw-op vocabulary and the audio cue shape, which
+   specifications, including writing down the draw-op vocabulary and the audio cue shape, which
    have never been written down anywhere but their consumers' header comments.
 4. `vector-canvas` and `audio-playback` switch from `requires: director` to
    `requires: { contract: ... }`. This is the point where "the module named director" stops being a

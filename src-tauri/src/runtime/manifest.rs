@@ -14,7 +14,7 @@ pub struct Dependency {
     /// the explicit spelling is the one to prefer in anything newly written.
     #[serde(alias = "module")]
     pub id: String,
-    /// A CONTRACT this depends on, instead of a specific module — "I read whatever provides this,"
+    /// A CONTRACT this depends on, instead of a specific module: "I read whatever provides this,"
     /// where a plain id means "I depend on this exact implementation." Contracts are themselves
     /// modules (kind: "contract"), so this resolves through the same store and the same version
     /// check; what differs is that the consumer then reads the published state of every module
@@ -77,7 +77,7 @@ pub struct Manifest {
     /// process, so the runtime never spawns it and it never publishes anything of its own. Any
     /// other value (or none) means an ordinary module.
     pub kind: Option<String>,
-    /// Purely descriptive — shown in the Modules manage page, never read by resolve()'s
+    /// Purely descriptive: shown in the Modules manage page, never read by resolve()'s
     /// dependency-closure logic (Dependency.version is the thing that's actually checked, and
     /// isn't even satisfied yet; see resolve()'s own note on that gap).
     pub version: Option<String>,
@@ -114,7 +114,7 @@ impl Manifest {
         serde_json::from_str(&text).ok()
     }
 
-    /// A definition rather than an implementation — resolved and version-checked, never run.
+    /// A definition rather than an implementation: resolved and version-checked, never run.
     pub fn is_contract(&self) -> bool {
         self.kind.as_deref() == Some("contract")
     }
@@ -124,7 +124,7 @@ impl Manifest {
     }
 }
 
-/// Which of `infos` provide `contract`, in the order given — callers pass an already-ranked list,
+/// Which of `infos` provide `contract`, in the order given: callers pass an already-ranked list,
 /// so the result is in run order, which is what makes a gathered contract's array meaningful
 /// (draw order is list order, so run order is z-order).
 pub fn providers_of<'a>(infos: &[&'a ModuleInfo], contract: &str) -> Vec<&'a ModuleInfo> {

@@ -2,7 +2,7 @@
 
 :root {
   /* Which way a button moves on hover. Set for real by theme.js from the active theme's own
-     background — dark themes brighten, light themes darken, so a filled button's content always
+     background: dark themes brighten, light themes darken, so a filled button's content always
      moves AWAY from its surface rather than into it. These are the dark-theme defaults, and matter
      only for the instant before theme.js runs. */
   --btn-hover-brightness: 1.1;
@@ -33,7 +33,7 @@
      color reads one way, it doesn't need a lighter/darker self to pair with. Green's hue sits at
      150° specifically to keep clear water between it and cyan's 180° — too close and a success
      accent next to an idle cyan control gets hard to tell apart at a glance. Info sits on the other
-     side of cyan, at ~215°, for the same reason — distinct from both cyan (the app's own primary/
+     side of cyan, at ~215°, for the same reason: distinct from both cyan (the app's own primary/
      active accent) and success. */
   --danger: #ff3b30;
   --success: #00e676;
@@ -171,7 +171,7 @@ a {
 }
 
 /* Only on pages whose titlebar has no menu bar to otherwise identify the app (index/settings/
-   modules/plugins) — editor.html has its own File/Edit/View/Run/Help row and skips this. */
+   modules/plugins): editor.html has its own File/Edit/View/Run/Help row and skips this. */
 .titlebar-brand-text {
   font-size: 12px;
   font-weight: 600;

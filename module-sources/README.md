@@ -8,7 +8,7 @@ the "tracked by default" carve-out plugins get, since a module's real source liv
 
 Each subfolder here is a real, installable module source: `manifest.json`, `process.json`,
 `README.md`, `CHANGELOG.md`. The compiled binary itself is Cargo build output (see the matching
-`src-tauri/src/bin/<name>.rs`) and is never checked in here — copy it alongside this folder's files
+`src-tauri/src/bin/<name>.rs`) and is never checked in here: copy it alongside this folder's files
 when installing locally for testing, the same way `AppPaths::ensure_builtin_plugin_binaries()` does
 for built-in plugins.
 
@@ -56,7 +56,7 @@ A contract key in `shared` holds an ordered array, one entry per provider, tagge
 A module's `start` reply may carry a `degraded` reason beside its `ok`:
 
 ```json
-{ "ok": true, "degraded": "no audio output device is available — nothing will play" }
+{ "ok": true, "degraded": "no audio output device is available, so nothing will play" }
 ```
 
 That means "I started, and I will keep answering, but something I needed isn't here." The engine

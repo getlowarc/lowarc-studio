@@ -11,7 +11,7 @@
 // instead of a process-wide global: this crate can run more than one session in its lifetime.
 //
 // Genuinely new versus Bootstrap: inter-module communication. Every "frame" request now carries
-// a `"shared"` object, and every "frame" reply MAY carry a `"publish"` object — see
+// a `"shared"` object, and every "frame" reply MAY carry a `"publish"` object. See
 // spawn_and_run's own comment below for the full design. The short version: a module publishes
 // under its own id AND under every contract it declares it provides, into a namespace only modules
 // that actually `requires` one of those can see, and the existing requires-ordering already
@@ -195,7 +195,7 @@ impl ProcessModule {
         true
     }
 
-    /// Returns the raw request/reply pair and how long the round-trip took — `spawn_and_run` needs
+    /// Returns the raw request/reply pair and how long the round-trip took: `spawn_and_run` needs
     /// all three to build this tick's `FrameModuleTrace` and to evaluate ModuleError/JsonMatch
     /// breakpoints against the reply. A module that doesn't want frames, or is already dead,
     /// contributes nothing to the trace rather than a fabricated empty one.
@@ -376,7 +376,7 @@ pub fn spawn_and_run(descriptors: Vec<(&ModuleInfo, ProcessDescriptor)>, ctx: &R
         return Err("Every module failed to start.".into());
     }
 
-    // A ModuleStart breakpoint pauses before the very first frame — setting pause_flag here, right
+    // A ModuleStart breakpoint pauses before the very first frame: setting pause_flag here, right
     // after start and before driver::run's loop ever begins, is all that's needed: the loop checks
     // the flag before its first tick the same as any other, so "paused from frame zero" falls out
     // of the existing gate for free rather than needing a special case.

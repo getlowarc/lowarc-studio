@@ -15,7 +15,7 @@
          decorations:false, so this row doubles as the OS caption bar too: app icon and menu on
          the left, transport controls + panel toggles on the right, then the minimize/maximize/
          close buttons, with a draggable strip in between. "Sidebar" = the Rail (icon strip) + the
-         left panel together. "Tab Bar" = the center panel's own local header — file tabs only now
+         left panel together. "Tab Bar" = the center panel's own local header: file tabs only now
          that transport/toggles live in the Menu Bar. Rail/left panel/right panel run the full
          height (Menu Bar down to status bar); the console sits only under the center column. Panel
          sizes are CSS vars so JS can drive both dragging and open/close without rewriting the
@@ -98,13 +98,13 @@
         flex: 1;
       }
 
-      /* A button, not a real input — VS Code's Command Center isn't typable in place either, it
+      /* A button, not a real input: VS Code's Command Center isn't typable in place either, it
          opens a separate overlay. Flanked by two flex:1 drag regions so it centers in whatever
          room is left between the menu and the right-side controls, and empty space on either
          side of it stays draggable. No explicit height — .menu-bar's own align-items:stretch
          fills the full row height, matching every other control in this bar instead of sitting
          inset like a smaller inline widget would. */
-      /* A real .searchbar (primitives.css), not a button that opens something else — sized into
+      /* A real .searchbar (primitives.css), not a button that opens something else: sized into
          the same slot the old look-alike button sat in, just with a usable min-width instead of
          one that could shrink to icon-only (an actual text input can't collapse to nothing the
          way a button's label could). */
@@ -169,7 +169,7 @@
       }
 
       /* Every current .menu-bar-icon is a "change the IDE's own layout" control (split/console/
-         inspector toggles) — info-blue on hover, same semantic the console header's .btn-ghost-info
+         inspector toggles): info-blue on hover, same semantic the console header's .btn-ghost-info
          buttons use. .is-active (currently toggled open) reuses the app's one accent color for
          "this is on" everywhere else, deliberately not the hover color. See the .btn-ghost-*
          primitives in primitives.css for the fuller reasoning. */
@@ -215,7 +215,7 @@
       }
 
       /* All three current .rail-item buttons (bell/account/settings) open a floating panel of some
-         kind — yellow on hover, the "opens a menu" semantic. (No .is-active rule here any more:
+         kind: yellow on hover, the "opens a menu" semantic. (No .is-active rule here any more:
          that was left over from before the panel-switching rail icons moved to the shared
          .sidebar-tab primitive (see renderTabStrip's "sidebar" slot below), and nothing has
          toggled .is-active on a .rail-item since.) */
@@ -238,7 +238,7 @@
 
       /* ---------- Notification bell panel ---------- */
       /* Renders inside the same shared #floating-menu-list every action menu uses (see
-         showFloatingOverlay) — wider and taller than that default, since this is a scrollable
+         showFloatingOverlay): wider and taller than that default, since this is a scrollable
          history list, not a handful of one-line action buttons. */
       .notif-panel-list {
         width: 300px;
@@ -318,7 +318,7 @@
         color: var(--fg-dim);
       }
 
-      /* Same visual language as .notif-panel-clear's own hover (muted -> danger-tinted on hover) —
+      /* Same visual language as .notif-panel-clear's own hover (muted -> danger-tinted on hover):
          hidden until the row is hovered so the list doesn't read as a wall of X's at rest. */
       .notif-row-dismiss {
         all: unset;
@@ -358,7 +358,7 @@
       #rail-tabs .sidebar-tab {
         padding: 7px;
         border-radius: 0 4px 4px 0;
-        /* The shared primitive has no justify-content — fine where there's a text label to keep
+        /* The shared primitive has no justify-content: fine where there's a text label to keep
            left-aligned (Modules/Plugins, the in-editor managers), but a rail icon has nothing else
            in the row to anchor to, so centering it here (icon-only usage, scoped the same way as
            the padding/radius above) is what actually centers it in the rail's own width. Padding
@@ -461,7 +461,7 @@
       }
 
       /* ---------- Center panel (Tab Bar + viewport, optionally split into two groups) ---------- */
-      /* Brightest of the panels — it's the focus. One background on the wrapper so every group's
+      /* Brightest of the panels: it's the focus. One background on the wrapper so every group's
          Tab Bar and viewport read as one continuous surface instead of needing the shade set per
          group. .center-panel itself is now just a flex row hosting one or two .editor-group
          columns (each the old .center-panel content verbatim) plus the divider between them: the
@@ -492,7 +492,7 @@
         display: flex;
       }
 
-      /* The subtle cue for "new files open here" — otherwise nothing on screen distinguishes which
+      /* The subtle cue for "new files open here": otherwise nothing on screen distinguishes which
          of the two groups is the active drop target once both exist. */
       .editor-group.is-active-group .tab-bar {
         background: var(--bg-hover);
@@ -543,7 +543,7 @@
          substitute rather than reaching for a click handler on something semantically wrong.
          Status (clean/dirty/missing) is shown as the underline's color, the same "line, not a
          dot" language as the header-tab/console-tab primitives' active-state underline. Unlike
-         those two, a clean tab's line only shows when it's also the active one — matching
+         those two, a clean tab's line only shows when it's also the active one: matching
          header-tab/console-tab's own rule that an unselected tab shows no line at all, transparent
          at rest (Nolan: "tabs, sidebar or header, shouldn't have that border line if they aren't
          selected... if it is not blue and not selected, don't show a line"). Dirty/missing are
@@ -600,7 +600,7 @@
         align-items: center;
         justify-content: center;
       }
-      /* Same reasoning as the file explorer's own row-marker sizing — icons.css's default 150% is
+      /* Same reasoning as the file explorer's own row-marker sizing: icons.css's default 150% is
          tuned for a bigger surface than a compact tab. */
       .file-tab-icon.file-icon {
         font-size: 20px;
@@ -658,7 +658,7 @@
          still 5.0 against 7.7px glyphs at 197ms, corrected at 5129ms.
          visibility:hidden keeps the box (so measurements are real) without painting it, and the
          absolute positioning is what lets several frames share the viewport without stacking now
-         that they are no longer taken out of flow. Scoped to this viewport deliberately — sidebar
+         that they are no longer taken out of flow. Scoped to this viewport deliberately: sidebar
          and console panels sit in flex columns where a laid-out hidden frame WOULD take up space,
          and nothing in them has a font to measure. */
       .center-viewport > .plugin-panel-frame {
@@ -673,7 +673,7 @@
       }
 
       /* ---------- Console ---------- */
-      /* Same darker shade as the left/right panels — console, sidebar, and inspector are all
+      /* Same darker shade as the left/right panels: console, sidebar, and inspector are all
          "supporting" surfaces around the bright center focus. */
       .console-panel {
         grid-area: console;
@@ -936,7 +936,7 @@
       }
 
       /* Just the Remove button now: the enable/disable toggle moved up into the row header itself
-         (see .plugin-manager-row-toggle) — right-aligned rather than the old space-between (which
+         (see .plugin-manager-row-toggle): right-aligned rather than the old space-between (which
          existed to spread a checkbox label and this button apart; with one action left, flex-end
          reads better than a lone button stranded at the left edge). */
       .plugin-manager-row-actions {
@@ -962,7 +962,7 @@
         overflow: auto;
       }
 
-      /* The one console tab that isn't plugin-contributed — dev-run and plugin log output. Always
+      /* The one console tab that isn't plugin-contributed: dev-run and plugin log output. Always
          present, since it's core functionality rather than something a plugin supplies (see the
          "__run" contribute("console", ...) call, order:-10 so it always sorts first). Its own
          is-active never toggles again once set. See showSlotTab()'s per-tab .host-panel-frame
@@ -1005,7 +1005,7 @@
         flex: 1;
       }
 
-      /* The Draft Tool's per-file diff, for whichever file is currently active — pushed by the
+      /* The Draft Tool's per-file diff, for whichever file is currently active: pushed by the
          File Explorer plugin (window.lowarc.setDiffStatus, see plugin_assets.rs) whenever its own
          diffCounts changes, and re-shown whenever the active file changes (see showActiveFile in
          tabs-inspector.js). Hidden entirely when the active file has no tracked diff, same
@@ -1244,7 +1244,7 @@
         <div class="console-tabs" id="console-tabs" data-tabs data-reorderable>
           <div class="console-tabs-spacer"></div>
 
-          <!-- Only shown while a "session": true plugin's tab (Terminal) is active — see
+          <!-- Only shown while a "session": true plugin's tab (Terminal) is active. See
                activateConsoleTab(). New instance (default shell) and "new instance with a specific
                shell" are two different actions, not one dropdown-with-a-default, since the common
                case (default shell) should be a single click, not open-menu-then-pick. -->

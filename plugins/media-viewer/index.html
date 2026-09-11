@@ -10,7 +10,7 @@
   html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; }
   body { display: flex; flex-direction: column; }
 
-  /* Only shown while the active file is an image — video's own native controls already cover
+  /* Only shown while the active file is an image: video's own native controls already cover
      play/pause/seek/volume, nothing here applies to it. */
   .toolbar {
     display: none;
@@ -25,7 +25,7 @@
 
   #container { position: relative; flex: 1; min-height: 0; }
 
-  /* One of these per open file, same "several documents, one instance" shape monaco.js uses —
+  /* One of these per open file, same "several documents, one instance" shape monaco.js uses:
      kept in the DOM and toggled via .is-active rather than added/removed on every tab switch, so
      a video doesn't restart and an image doesn't re-decode each time. Also the scroll container
      for a zoomed-in image. Overflow lives here, not on #container, so each file keeps its own
@@ -97,7 +97,7 @@
     max-width: 480px;
     flex: none;
   }
-  /* Fit-to-window (the default) — scaled down to the viewport via object-fit, never larger than
+  /* Fit-to-window (the default): scaled down to the viewport via object-fit, never larger than
      its own natural size (no "width/height: auto" upscale past 100% here on purpose, matching
      how an image viewer conventionally treats "fit"). A zoomed-in image gets explicit pixel
      width/height from JS instead (see media-viewer.js's applyZoom) and none of this applies:

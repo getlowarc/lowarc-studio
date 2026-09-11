@@ -1,4 +1,4 @@
-// Startup screen — new/open project, recents, and links out to the other top-level pages.
+// Startup screen: new/open project, recents, and links out to the other top-level pages.
 // Talks to the Rust side purely through the commands registered in lib.rs. Load order matters:
 // primitives.js must load before this file since it defines showPopup/contributeIframePopup/
 // showToast/reportError, all used below.
@@ -120,7 +120,7 @@ function buildRecentItem(project, isPinned) {
     menuList.appendChild(pinItem);
   }
 
-  // Disabled — dev-run isn't wired up anywhere in the app yet (same as the editor's own Run
+  // Disabled: dev-run isn't wired up anywhere in the app yet (same as the editor's own Run
   // controls), this is just a placeholder for where a quick-run action will go.
   const runItem = document.createElement("button");
   runItem.type = "button";

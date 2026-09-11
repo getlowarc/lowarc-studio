@@ -11,7 +11,7 @@ const DELETE_SVG = '<svg viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l
 let breakpoints = [];
 let paused = false;
 // The frame a "generic" paused state (from lowarc:devRunState, no frame attached) can fall back
-// to showing — set whenever a real frame trace arrives, cleared whenever the run ends.
+// to showing: set whenever a real frame trace arrives, cleared whenever the run ends.
 let lastFrameIndex = null;
 
 const traceLog = document.getElementById("trace-log");
@@ -198,7 +198,7 @@ document.getElementById("step-btn").addEventListener("click", () => {
   window.lowarc.debug.step(count);
 });
 
-// Every frame trace that reaches a plugin implies the run is currently paused — free-running ticks
+// Every frame trace that reaches a plugin implies the run is currently paused: free-running ticks
 // are never relayed at all (see spawn_and_run's own on_frame gate), so receiving one at all IS the
 // "you're paused" signal, not just its content.
 window.lowarc.on("lowarc:devRunFrame", (trace) => {
@@ -208,7 +208,7 @@ window.lowarc.on("lowarc:devRunFrame", (trace) => {
   appendFrame(trace);
 });
 
-// The authoritative running/paused signal — pushed by the host on every actual state change,
+// The authoritative running/paused signal: pushed by the host on every actual state change,
 // regardless of what caused it (this plugin's own buttons, the toolbar's Pause button, or Run
 // itself starting). A "paused" here with no frame trace yet (e.g. paused via the toolbar, never
 // stepped) falls back to the last frame this plugin actually saw, rather than showing nothing.

@@ -64,7 +64,7 @@ Without a `camera` command the canvas behaves the way a 2D surface is normally e
 is the top-left pixel and one unit is one pixel.
 
 `file` and `font` paths resolve relative to the **project root**, so a director can say
-`"art/player.png"` without knowing where the project lives. Both are **cached by path** — decoding a
+`"art/player.png"` without knowing where the project lives. Both are **cached by path**: decoding a
 PNG or parsing a TTF every frame would be the obvious performance trap here.
 
 ### What it publishes

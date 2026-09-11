@@ -15,7 +15,7 @@ Three things can change independently, and they are **not** three update systems
 | 3. Preferences | `settings.json`, projects, recents | Migration, not updating |
 
 The thing that makes this tractable: **the machinery for layer 2 is app code**, not plugin code.
-`install_plugin`, `install_module`, `AppPaths`, the manager UI — all compiled into the binary. So
+`install_plugin`, `install_module`, `AppPaths`, the manager UI: all compiled into the binary. So
 "update the plugin update system" is just "update the app." There is no circular dependency to
 design around.
 
@@ -46,7 +46,7 @@ The mechanism can't strand you, because it lives in the app and the app updater 
 **manifest format** can.
 
 If a shipped version reads format A and a later release switches to format B, every client on the
-old version is stranded — in precisely the component that would otherwise have rescued them.
+old version is stranded, in precisely the component that would otherwise have rescued them.
 
 Two rules, nearly free now and expensive to retrofit:
 
@@ -108,14 +108,14 @@ and launch the app afterwards: not just build it.
 
 ## What's left, and what it depends on
 
-### 1. Generate the signing key — yours to create and hold
+### 1. Generate the signing key: yours to create and hold
 
 ```bash
 cargo tauri signer generate -w ~/.tauri/lowarc-studio.key
 ```
 
 This is the security root of the entire feature: **anyone holding the private key can push arbitrary
-code to every user.** Deliberately not generated here — it's a long-lived credential that should be
+code to every user.** Deliberately not generated here. It's a long-lived credential that should be
 created by you and never pass through anything else.
 
 - Private key → repository secret `TAURI_SIGNING_PRIVATE_KEY` (plus
@@ -219,7 +219,7 @@ Deliberately not built yet. It can't be verified against a live endpoint, and an
 looks right while checking the wrong place is the classic failure here. Small once the plumbing is
 proven.
 
-### 5. Restart safety — do not skip
+### 5. Restart safety: do not skip
 
 Applying an update restarts the app. It **must** route through `confirmAppClose()`, which already
 guards unsaved files and an open Draft. A dev-run in flight also needs stopping cleanly, since

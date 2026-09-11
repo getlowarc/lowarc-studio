@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <!-- Proof case for the shared plugin stylesheets (see plugin_assets.rs's SHARED_STYLE_CSS/
-     SHARED_PRIMITIVES_CSS) — buttons, inputs, and form labels below are the app's own .btn/.input/
+     SHARED_PRIMITIVES_CSS): buttons, inputs, and form labels below are the app's own .btn/.input/
      .field classes, not hand-rolled here. Only what's genuinely specific to this plugin (the trace
      log, the status indicator, the breakpoint list rows, the sidebar layout) stays custom below. -->
 <link rel="stylesheet" href="__lowarc.css" />
@@ -30,7 +30,7 @@
   }
   /* The app never uses a native number-spinner anywhere else (its own numeric fields use a custom
      .numeric-input/.numeric-steppers widget instead — host-JS-driven, so not something this
-     plugin can reuse via CSS alone) — hiding the arrows here instead of leaving them unstyled
+     plugin can reuse via CSS alone): hiding the arrows here instead of leaving them unstyled
      keeps this consistent with that, at the cost of losing the click-to-step affordance (typing
      and the keyboard up/down arrows still work). */
   .step-count-input { width: 46px; padding: 4px 6px; -moz-appearance: textfield; }

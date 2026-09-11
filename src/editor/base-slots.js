@@ -98,7 +98,7 @@
             close.type = "button";
             close.className = "btn btn-icon-only btn-xs btn-ghost-danger file-tab-close";
             close.setAttribute("aria-label", `Close ${contribution.label}`);
-            // Visually hidden except on hover/active (see .file-tab-close in editor.html's CSS) —
+            // Visually hidden except on hover/active (see .file-tab-close in editor.html's CSS):
             // out of the Tab order entirely rather than a focusable target a keyboard user could
             // land on without being able to see it. Still a real, mouse-clickable button; Delete/
             // Backspace on the focused tab itself (see the keydown handler above) is the keyboard
@@ -227,11 +227,11 @@
         });
       }
 
-      // Bound to the whole #rail nav, not just #rail-tabs — #rail-tabs is only as tall as its own
+      // Bound to the whole #rail nav, not just #rail-tabs: #rail-tabs is only as tall as its own
       // icons (its own spacer, .rail-spacer, is a SIBLING outside it, unlike the console's own
       // spacer which lives INSIDE #console-tabs and so already made that whole row clickable). A
       // right-click below the last icon, or with every icon currently hidden, would otherwise hit
-      // #rail with nothing listening — exactly the case this menu most needs to be reachable from.
+      // #rail with nothing listening: exactly the case this menu most needs to be reachable from.
       document.getElementById("rail").addEventListener("contextmenu", (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -324,7 +324,7 @@
 
         // Built once, here, from everything contribute("sidebar", ...) registered above (both
         // managers, registered earlier at top-level script scope, plus whatever this loop just
-        // added) — applySavedOrder's drag-order pass happens inside renderTabStrip itself, so it
+        // added): applySavedOrder's drag-order pass happens inside renderTabStrip itself, so it
         // only needs applying once, now that every icon that could be in it actually exists.
         renderRailTabs();
 
@@ -334,7 +334,7 @@
         renderConsoleTabs();
 
         // "__run" (Run) needs its one-time mount(), which reparents the static #console-run-panel
-        // out of console-body and into its own wrapper — to happen right now, unconditionally, not
+        // out of console-body and into its own wrapper: to happen right now, unconditionally, not
         // just whenever a user happens to click the Run tab first. Until that reparenting happens,
         // #console-run-panel's own permanently-baked-in "is-active" class (see its static HTML)
         // makes it render on its own regardless of any other tab's wrapper: a same-height phantom
@@ -357,7 +357,7 @@
         }
 
         // Whether or not that restore succeeded (the saved key might belong to a plugin that's no
-        // longer installed), PANELS.sidebar.open can still be stale — it's restored from settings
+        // longer installed), PANELS.sidebar.open can still be stale: it's restored from settings
         // independently of whether any rail tab ended up active. A panel claiming "open" with no
         // active tab behind it is a blank strip that looks broken, the same failure shape as the
         // console-maximize/xterm bugs already fixed this session. Force it shut if that's the state.

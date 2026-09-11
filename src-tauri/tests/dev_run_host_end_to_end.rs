@@ -1,4 +1,4 @@
-// Drives the real dev_run_host binary the way Studio does — spawn it on a launch.json, read its
+// Drives the real dev_run_host binary the way Studio does: spawn it on a launch.json, read its
 // stdout, write commands to its stdin, and proves the protocol both directions actually works.
 //
 // This is the load-bearing safety property of moving dev-run out of Studio's process: if the
@@ -92,7 +92,7 @@ while ($line = [Console]::In.ReadLine()) {
     .unwrap();
 }
 
-/// Absolute paths in `modules`/`source`, exactly as lib.rs's write_dev_run_launch builds them —
+/// Absolute paths in `modules`/`source`, exactly as lib.rs's write_dev_run_launch builds them:
 /// run_from_launch_dir joins each against the launch dir, and joining an absolute path yields it
 /// unchanged, which is what lets dev-run reuse the export-shaped LaunchConfig with no staging.
 fn write_launch(run_dir: &Path, module_dir: &Path, entry: &Path) {
@@ -139,7 +139,7 @@ fn studio_can_drive_a_run_in_its_own_process_and_stop_it() {
 
         if value.get("log").is_some() {
             saw_log = true;
-            // The module never stops itself — proving the stop COMMAND is what ends this run, not
+            // The module never stops itself: proving the stop COMMAND is what ends this run, not
             // the module reaching some natural end of its own.
             if !sent_stop {
                 sent_stop = true;

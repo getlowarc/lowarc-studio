@@ -25,7 +25,7 @@ sound or losing its position; changing the file or loop flag restarts it fresh. 
 its natural end.
 
 A platform or environment with no real audio output device at all (a locked-down or headless CI
-runner, say) doesn't fail the whole module — `playing`/`justFinished` just stay empty every frame,
+runner, say) doesn't fail the whole module: `playing`/`justFinished` just stay empty every frame,
 the same graceful-degradation shape `input`'s own unavailable-gamepad-backend case uses. Opening
 the device is raced against a 3-second timeout so a device-less environment can't hang the whole
 run waiting on it.

@@ -1,4 +1,4 @@
-// Studio's own app-level preferences — distinct from the per-module `settings` Value threaded
+// Studio's own app-level preferences: distinct from the per-module `settings` Value threaded
 // through runtime/ (that's opaque config handed to game modules at dev-run start, not this).
 // One field so far: the dev-run target FPS.
 
@@ -19,12 +19,12 @@ pub struct Settings {
     #[serde(default = "default_theme_mode")]
     pub theme_mode: String,
     /// The editor's sidebar/inspector/console open-vs-closed + size, global across every project
-    /// (not per-project) — restored on open so the shell looks the same as it did at last close.
+    /// (not per-project): restored on open so the shell looks the same as it did at last close.
     #[serde(default)]
     pub editor_panels: PanelLayout,
     /// Ids of installed modules/plugins that are disabled without being uninstalled. A module's id
     /// comes from its manifest.json; a plugin's id is its folder name (see installs.rs). Presence
-    /// in these lists is the only place "disabled" exists — install_all/scan_store etc. don't know
+    /// in these lists is the only place "disabled" exists: install_all/scan_store etc. don't know
     /// about it, callers cross-reference it themselves (see plugin_host::start_all's `disabled`
     /// param, and lib.rs's list_installed_* commands).
     #[serde(default)]
@@ -50,14 +50,14 @@ pub struct Settings {
     #[serde(default)]
     pub tab_order: HashMap<String, Vec<String>>,
     /// One consistent per-region persisted shape for the Base system's slot registry (see
-    /// primitives.js's contribute()/getSlot()) — open/size/active-key/drag-order in one struct,
+    /// primitives.js's contribute()/getSlot()): open/size/active-key/drag-order in one struct,
     /// keyed by region id ("sidebar", "inspector", "console", "center", ...). Not yet consumed by
     /// any region; editor_panels/tab_order stay authoritative until each region actually migrates
     /// onto the registry, at which point this replaces both for that region.
     #[serde(default)]
     pub regions: HashMap<String, RegionState>,
     /// Ids hidden from one Base-system strip's own display, right-click-toggled per item (see
-    /// editor.html's openSlotVisibilityMenu) — keyed by slot name ("sidebar", "console"), valued by
+    /// editor.html's openSlotVisibilityMenu): keyed by slot name ("sidebar", "console"), valued by
     /// the ids hidden in it. Purely a display filter: a hidden contribution is otherwise completely
     /// unaffected (still enabled, still reachable through the Command Palette, its panel/tab just
     /// doesn't show a button in that one strip). Scoped to sidebar/console only for now, not every

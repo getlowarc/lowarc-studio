@@ -10,7 +10,7 @@
         applySplitRatio();
 
         if (!open) {
-          // Closing the split is a layout change, not "discard everything in the second group" —
+          // Closing the split is a layout change, not "discard everything in the second group":
           // move its files back into group 0 (via moveFileToGroup, so each one's current content
           // (possibly unsaved), survives the move the same way a single dragged-across tab does)
           // rather than closing them. moveFileToGroup already does its own per-file
@@ -180,7 +180,7 @@
             return;
           }
 
-          // window.lowarc.openInspector() — finds the CALLING plugin's own inspector contribution
+          // window.lowarc.openInspector(): finds the CALLING plugin's own inspector contribution
           // (never an arbitrary one named by the message, so a plugin can only ever show its own
           // content, never someone else's) and claims the slot with it. A plugin with no inspector
           // contribution at all is a silent no-op, same shape as showMenu/openPopup targeting
@@ -193,7 +193,7 @@
             return;
           }
 
-          // window.lowarc.broadcastToSelf() — relays to every OTHER mounted iframe of the SAME
+          // window.lowarc.broadcastToSelf(): relays to every OTHER mounted iframe of the SAME
           // plugin (never the sender, never a different plugin's iframe). iframe.plugin-panel-frame
           // is the one class every plugin-hosted iframe carries regardless of role (panel, viewer,
           // console tab; see iframeForWindow's own comment above), so this is the same enumeration
@@ -233,7 +233,7 @@
             return;
           }
 
-          // window.lowarc.notify() — routes into the exact same showToast() every host-chrome
+          // window.lowarc.notify(): routes into the exact same showToast() every host-chrome
           // error/confirmation already goes through (see primitives.js's toast/notification-
           // history section), tagged with which plugin it came from so the bell's history can
           // attribute it. Not routed through windowToFilePaths/windowToPlugin's file-specific
@@ -307,7 +307,7 @@
           // window.lowarc.showMenu(). See plugin_assets.rs's harness. data.x/data.y are in the
           // calling iframe's OWN document coordinates (typically a right-click's clientX/clientY);
           // this iframe could be mounted in either editor group's viewport, a sidebar/inspector
-          // panel, or a console tab, so its screen position isn't fixed — iframeForWindow() finds
+          // panel, or a console tab, so its screen position isn't fixed: iframeForWindow() finds
           // the actual element and its current getBoundingClientRect() gives the real offset to
           // add. Trust is windowToPlugin, same as every other action here: only a real, currently-
           // mounted plugin iframe can trigger this.
@@ -388,7 +388,7 @@
             return;
           }
 
-          // Every action below is "about" one specific open file — markDirty/markErrors/
+          // Every action below is "about" one specific open file: markDirty/markErrors/
           // requestClose/saveFile all carry an explicit path now (see plugin_assets.rs), since one
           // iframe can be responsible for several at once. windowToFilePaths is what validates a
           // plugin can only claim a path the host itself actually told it to open: not proof of
@@ -420,7 +420,7 @@
               await invoke("write_text_file", { path, contents: String(data.contents ?? "") });
               const file = openFiles.get(path);
               if (file) {
-                // A successful write also clears "missing" — saving recreates the file at this
+                // A successful write also clears "missing": saving recreates the file at this
                 // exact path if it had been deleted, which is a legitimate recovery, not a no-op.
                 file.dirty = false;
                 file.missing = false;

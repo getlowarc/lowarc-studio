@@ -8,7 +8,7 @@ Code editor for opened files, powered by [Monaco](https://microsoft.github.io/mo
 - Full editing surface for a broad range of languages (JS/TS, JSON, HTML/CSS, Markdown, Python,
   Rust, Go, Java, C/C++/C#, PHP, Ruby, shell, YAML/XML/SQL, Lua, Swift, Kotlin, Dart, PowerShell,
   Batch, INI, and plain text).
-- One editor instance per editor group, managing multiple open documents at once — switching tabs
+- One editor instance per editor group, managing multiple open documents at once: switching tabs
   swaps models rather than tearing down and recreating the editor, so per-file scroll position,
   cursor, and undo history all survive a tab switch.
 - Real per-language file-type icons, contributed to the shared icon set.

@@ -3,7 +3,7 @@
 //   void lowarc_module_frame(double delta_seconds);                                  // optional
 //   void lowarc_module_stop(void);                                                   // optional
 // Bootstrap (the exported, standalone app) dlopens this directly into its own disposable
-// process — fine there, since that process only ever runs once and exists for exactly this. This
+// process: fine there, since that process only ever runs once and exists for exactly this. This
 // IDE is not disposable: it stays alive across many dev-runs and holds unsaved work, so it can't
 // take on arbitrary native code (which by definition can crash, corrupt memory, or do literally
 // anything a native process can do) in its own address space the same way. Instead this loader

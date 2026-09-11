@@ -27,7 +27,7 @@
         stopBtn.classList.toggle("btn-ghost", !isRunning);
         stopBtn.disabled = !isRunning;
 
-        // The Run menu's own items mirror the toolbar's disabled state exactly — "Run" is only
+        // The Run menu's own items mirror the toolbar's disabled state exactly: "Run" is only
         // meaningful when nothing's running, "Pause"/"Stop"/"Restart" only once something is.
         document.getElementById("run-menu-run").disabled = isRunning;
         document.getElementById("run-menu-pause").disabled = !isRunning;
@@ -113,7 +113,7 @@
         stopRun();
       }
 
-      // The single place isPaused actually changes and gets announced — called after EITHER the
+      // The single place isPaused actually changes and gets announced: called after EITHER the
       // toolbar's own Pause button or a plugin's pauseRun()/resumeRun() successfully flips the
       // backend flag, so a plugin's own displayed state (the Debug plugin, so far) stays accurate
       // no matter which control was actually used. `log` is false for a plugin-triggered change
@@ -198,7 +198,7 @@
 
       const shell = document.getElementById("shell");
 
-      // min/closeAt are shared across all three panels on purpose — different thresholds per
+      // min/closeAt are shared across all three panels on purpose: different thresholds per
       // panel read as visually inconsistent (a sidebar and an inspector at different minimum
       // widths looks like a mistake, not a design choice).
       const PANELS = {
@@ -282,12 +282,12 @@
         }
       }
 
-      // Applies a saved order to whatever's already in the DOM — called once per renderTabStrip()
+      // Applies a saved order to whatever's already in the DOM: called once per renderTabStrip()
       // call (see there), whether that strip is built once and never re-rendered (the rail, the
       // console tabs) or rebuilt on every change (the file tab bars, whose contribution order
       // otherwise reverts to plain open-order (natural registry insertion order) on the very
       // next status change after a drag). anchorEl, if given, is a trailing non-item child items
-      // must stay before (the console's tabs-spacer, ahead of its own "+"/"..." controls) —
+      // must stay before (the console's tabs-spacer, ahead of its own "+"/"..." controls):
       // container.insertBefore(el, null) already behaves like appendChild, so omitting it for the
       // rail/file-tab-bar case (nothing trails there) needs no special case.
       function applySavedOrder(container, itemSelector, keyAttr, anchorEl) {

@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 #[serde(default)]
 pub struct ProjectPreset {
     pub requires: Vec<Dependency>,
-    /// Path to the project's entry file, relative to the project's own root. Empty by default —
+    /// Path to the project's entry file, relative to the project's own root. Empty by default:
     /// create_project never sets one (there's no project-configuration UI to set one from yet;
     /// this field exists so dev-run has something to read once that UI does). A blank entry is
     /// checked for on the frontend before start_dev_run is even called, so this stays a plain
@@ -101,7 +101,7 @@ pub fn resolve(preset: &ProjectPreset, modules_dir: &Path) -> Result<Vec<ModuleI
                 for dep in &manifest.requires {
                     // store_id(), not id: a contract requirement names the contract MODULE, which is
                     // what gets installed and version-checked. Which modules provide it is a
-                    // separate question answered at run time, and deliberately not resolved here —
+                    // separate question answered at run time, and deliberately not resolved here:
                     // pulling in every installed provider would silently add modules the project
                     // never asked for.
                     if !dep.store_id().is_empty() {

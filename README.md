@@ -2,7 +2,7 @@
 
 A Tauri v2 desktop IDE for [LowArc](https://lowarc.com), a game engine built around small,
 independently-loadable modules (native, process, or otherwise). LowArc Studio is where a project's
-modules get assembled, a project's code gets edited, and a dev build gets run and debugged — all
+modules get assembled, a project's code gets edited, and a dev build gets run and debugged: all
 in one self-contained app.
 
 ## Status
@@ -48,7 +48,7 @@ external checkout or network access needed for any of it.
 cargo clippy --all-targets -- -D warnings
 ```
 
-Clean as of this writing — CI (`.github/workflows/ci.yml`) runs both this and `cargo test` on
+Clean as of this writing: CI (`.github/workflows/ci.yml`) runs both this and `cargo test` on
 every push/PR. There's no `rustfmt.toml` yet, so `cargo fmt` isn't enforced: this codebase
 deliberately runs wider than rustfmt's 100-char default on long, well-commented single-line
 statements.
@@ -74,11 +74,11 @@ find) before invoking the platform bundler.
 - **`src-tauri/`**: the Rust backend. Notable modules:
   - `runtime/`: the actual game-engine runtime (loaders, driver, manifest resolution) embedded in
     the IDE for dev-run, and reused by `bin/lowarc_runtime.rs` for exported, standalone builds.
-  - `export/` — stages a project into a self-contained folder for distribution.
+  - `export/`: stages a project into a self-contained folder for distribution.
   - `plugin_host/`, `plugin_assets.rs`, `plugin_asset_server.rs`, `plugin_session.rs`: the plugin
     system: process isolation, the sandboxed-iframe asset server, and long-lived plugin sessions
     (Terminal).
-  - `bin/` — extra binary targets built alongside the main app: `lowarc_runtime` (the exported
+  - `bin/` holds the extra binary targets built alongside the main app: `lowarc_runtime` (the exported
     runtime), `native_module_host` (isolates a native-kind module in its own process),
     `file_explorer_backend`/`terminal_backend` (the two built-in plugins with their own backends).
 - **`plugins/`**: every built-in plugin, each its own folder (`plugin.json` + assets, optionally a
@@ -98,4 +98,4 @@ relayed through the host, which enforces per-plugin identity on every relayed ac
 ## Contributing
 
 Only commits/pushes that pass `cargo build`, `cargo test`, and `cargo clippy --all-targets -- -D
-warnings` should land on `main` — CI enforces the same three.
+warnings` should land on `main`: CI enforces the same three.

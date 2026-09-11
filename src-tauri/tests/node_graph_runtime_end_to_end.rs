@@ -153,7 +153,7 @@ fn the_interpreter_starts_on_the_marked_start_node_and_stays_there_without_an_in
 
     let modules_dir = temp_dir("no_input_modules");
     write_interpreter_module(&modules_dir);
-    // Deliberately no "input" module — node-graph-runtime's own manifest requires it, but a
+    // Deliberately no "input" module: node-graph-runtime's own manifest requires it, but a
     // project not providing one is a normal, supported case (see that module's own header
     // comment): it should just sit on its start node forever, not error.
 

@@ -1,5 +1,5 @@
-// Multi-document, same "one instance, several open files" shape Monaco and Terminal already use —
-// see monaco.js's own header comment for the reasoning. Nothing here is editable: no dirty
+// Multi-document, same "one instance, several open files" shape Monaco and Terminal already use.
+// See monaco.js's own header comment for the reasoning. Nothing here is editable: no dirty
 // tracking, no saveFile, and no lowarc:getContent handler either — a media file is shown, not
 // edited, so there's no unsaved state to ever ask this plugin for. moveFileToGroup() (editor.html)
 // re-reads a binary viewer's file straight from disk when moving it between groups instead of
@@ -61,7 +61,7 @@ function base64ToBytes(base64) {
 
 // ID3v2's own "syncsafe" integer: 4 bytes, each holding only 7 real bits (the high bit is always
 // 0, so a byte that looks like a sync frame marker can never appear inside a size field by
-// accident) — used for the tag's own overall size always, and for each frame's size too under
+// accident): used for the tag's own overall size always, and for each frame's size too under
 // ID3v2.4 specifically (2.3 uses a plain 4-byte big-endian size for frames instead, see below).
 function readSyncsafeInt(bytes, offset) {
   return ((bytes[offset] & 0x7f) << 21) | ((bytes[offset + 1] & 0x7f) << 14) | ((bytes[offset + 2] & 0x7f) << 7) | (bytes[offset + 3] & 0x7f);
@@ -78,7 +78,7 @@ function readAsciiRun(bytes, offset, length) {
 }
 
 // Finds where a frame's null-terminated string ends, honoring the frame's own declared text
-// encoding — encoding 0 (ISO-8859-1) and 3 (UTF-8) terminate on a single 0x00 byte; 1 (UTF-16
+// encoding: encoding 0 (ISO-8859-1) and 3 (UTF-8) terminate on a single 0x00 byte; 1 (UTF-16
 // with BOM) and 2 (UTF-16BE) terminate on a 0x00 0x00 PAIR, since a lone 0x00 is a perfectly valid
 // byte inside a UTF-16 code unit. Getting this wrong walks straight into the middle of the image
 // bytes that follow, corrupting everything after it: this is the one part of APIC parsing that's
@@ -142,7 +142,7 @@ const toolbar = document.getElementById("toolbar");
 const zoomLabel = document.getElementById("zoom-label");
 
 // path -> { wrap, kind: "image"|"video", el, fit: boolean, zoom: percent (only meaningful when
-// !fit) }. `fit` starts true for every image — "shrink to whatever the window's own size is,
+// !fit) }. `fit` starts true for every image: "shrink to whatever the window's own size is,
 // never larger than the image's real size" is the natural default, same as most image viewers.
 const docs = new Map();
 let activePath = null;
@@ -168,7 +168,7 @@ window.lowarc.on("lowarc:openFile", (payload) => {
     el.controls = true;
     wrap.appendChild(el);
   } else if (kind === "audio") {
-    // Same HTMLMediaElement API/native control bar as <video> above — play/pause/seek/volume all
+    // Same HTMLMediaElement API/native control bar as <video> above: play/pause/seek/volume all
     // come for free, nothing hand-rolled here just because there's no picture to show alongside.
     const visual = document.createElement("div");
     visual.className = "audio-visual";
@@ -304,7 +304,7 @@ container.addEventListener(
 );
 
 // ---------- Drag to pan ----------
-// Only relevant once an image is actually bigger than its viewport (zoomed in, not fit) — plain
+// Only relevant once an image is actually bigger than its viewport (zoomed in, not fit): plain
 // scrolling/scrollbars already work via .media-item's own overflow:auto regardless, this is an
 // alternate way to do the same thing without reaching for the scrollbar or a trackpad gesture.
 function initDrag(doc) {
@@ -341,7 +341,7 @@ function initDrag(doc) {
 
 // ---------- Audio visualizer ----------
 // A live frequency-bar display driven by the Web Audio API, tapped straight off the <audio>
-// element's own output — createMediaElementSource() reroutes playback through this graph, so the
+// element's own output: createMediaElementSource() reroutes playback through this graph, so the
 // analyser has to stay connected all the way to destination or the file would go silent while
 // open here, not just skip the visual.
 //

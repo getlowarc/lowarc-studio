@@ -59,7 +59,7 @@ pub struct PluginDescriptor {
     /// Read the same way (see loadRailIconSvg in plugin-hosting.js); absent falls back to a
     /// generic placeholder on the frontend.
     pub icon: Option<String>,
-    /// True for a plugin whose backend can't be invoke-per-call — Terminal, so far, and the only
+    /// True for a plugin whose backend can't be invoke-per-call: Terminal, so far, and the only
     /// thing this flag changes: the host spawns `command` once (see plugin_session.rs) instead of
     /// fresh per call, and keeps it running until explicitly stopped or the app exits. Everything
     /// else (contributes, path-traversal rules, etc.) is identical either way; the wire protocol
@@ -74,7 +74,7 @@ pub struct PluginDescriptor {
     /// declare any. Values themselves live in Settings.plugin_settings, keyed by plugin id then by
     /// each field's own `key`; a plugin reads its current values back via window.lowarc.getSettings()
     /// (see plugin_assets.rs). No mechanism forces a plugin to use this over reading its own
-    /// plugin-specific config some other way — it's the generic option, not a requirement.
+    /// plugin-specific config some other way: it's the generic option, not a requirement.
     #[serde(default)]
     pub settings: Vec<PluginSettingField>,
     /// Commands this plugin wants exposed in the app's Command Palette: the plugin-declared half
@@ -101,7 +101,7 @@ pub struct PluginCommand {
 #[derive(Debug, Default, Deserialize, Serialize, Clone)]
 #[serde(default, rename_all = "camelCase")]
 pub struct PluginSettingField {
-    /// This field's key within Settings.plugin_settings[pluginId] — stable identity, not shown to
+    /// This field's key within Settings.plugin_settings[pluginId]: stable identity, not shown to
     /// the user (label is).
     pub key: String,
     pub label: String,
@@ -110,7 +110,7 @@ pub struct PluginSettingField {
     /// the field entirely.
     #[serde(rename = "type", default = "default_setting_field_type")]
     pub field_type: String,
-    /// Only meaningful for "select" — ignored otherwise.
+    /// Only meaningful for "select": ignored otherwise.
     #[serde(default)]
     pub options: Vec<PluginSettingOption>,
     pub hint: Option<String>,
@@ -149,7 +149,7 @@ pub struct PanelContribution {
     /// file's viewer is picked by extension via the sibling `viewers` list instead, since the
     /// viewport now holds one iframe per open file rather than a single permanent plugin.
     pub location: String,
-    /// Path within the plugin's own folder, e.g. "index.html" — served over loopback HTTP, see
+    /// Path within the plugin's own folder, e.g. "index.html": served over loopback HTTP, see
     /// plugin_asset_server.rs.
     pub entry: String,
     /// Path to an svg within the plugin's folder. Only meaningful for `location: "sidebar"` — the
@@ -166,7 +166,7 @@ pub struct ConsoleTabContribution {
 }
 
 /// A plugin that can render an open file's contents in the tab bar's viewport. Matched by
-/// extension against the file being opened — first plugin to register a given extension wins it,
+/// extension against the file being opened: first plugin to register a given extension wins it,
 /// the same "first wins, no silent override" rule the single-slot panel locations use, since two
 /// viewers silently fighting over one file type would be worse than an honest "already taken".
 #[derive(Debug, Default, Deserialize, Serialize, Clone)]
@@ -174,10 +174,10 @@ pub struct ConsoleTabContribution {
 pub struct ViewerContribution {
     pub id: String,
     pub title: String,
-    /// Path within the plugin's own folder, e.g. "index.html" — served over loopback HTTP, see
+    /// Path within the plugin's own folder, e.g. "index.html": served over loopback HTTP, see
     /// plugin_asset_server.rs.
     pub entry: String,
-    /// Lowercase, dot-included ("`.png`", "`.md`") — matched case-insensitively against the open
+    /// Lowercase, dot-included ("`.png`", "`.md`"): matched case-insensitively against the open
     /// file's own extension.
     pub extensions: Vec<String>,
     /// False (the default — every existing viewer, Monaco included, wants this) reads the file as

@@ -15,7 +15,7 @@ build copy into a form the other modules work with. Stages 4 and 5 below describ
 **B · Native execution: the original idea.** The user's code runs normally, in its own language's
 runtime. Modules **provide** the words (`rectangle`, `play`) as real functions in that runtime; the
 code calls them because they exist. Nothing is parsed, translated or mutated by LowArc. Only the part
-of the code written *for* the modules ever crosses the boundary — logic, physics, control flow and
+of the code written *for* the modules ever crosses the boundary: logic, physics, control flow and
 variables just run, and LowArc never sees them.
 
 Model B was how LowArc was originally conceived, and it is recorded here because it is stronger than
@@ -42,7 +42,7 @@ a build step plus a library to link.
 
 What model B gives up: anything clever at compile. No static checking, no LowArc understanding the
 code before it runs. Studio's debugger would watch the module boundary rather than the user's own
-logic — solvable with a module for it, but a real change in what the IDE can see.
+logic: solvable with a module for it, but a real change in what the IDE can see.
 
 **What survives under either model:** source is never touched and both dev and export run a copy; the
 vocabulary belongs to the modules and never to LowArc; and state-in / calls-out, where emit-only
@@ -83,12 +83,12 @@ The more the pipeline rewrites, the more surface there is for LowArc to be at fa
 
 # The pipeline
 
-## 1 · Open a project — *exists*
+## 1 · Open a project: *exists*
 
 The IDE opens a root directory. The runtime knows it too: `start_run` takes `project_dir` alongside
 `entry_file`.
 
-## 2 · Build the copy — *decided, not implemented*
+## 2 · Build the copy: *decided, not implemented*
 
 Both dev run and export copy the project first, and run or package **the copy**. Rebuilt on every dev
 run and scrapped when it ends: no incremental build, no cache to invalidate, no stale-artifact class
@@ -102,12 +102,12 @@ Near-instant on NTFS, and byte-identical to what an export produces.
 `launch.json`, and drops the runtime exe beside it. Engine, modules and source stay three separate
 things. The copy-based model is new work in both paths.*
 
-## 3 · Resolve and order the modules — *exists*
+## 3 · Resolve and order the modules: *exists*
 
 `project.json`'s `requires` is walked to a dependency closure against the module store, then sorted
 so a provider always runs before its consumers. Contract modules resolve here and are never spawned.
 
-## 4 · Compile — *exists, but does almost nothing yet*
+## 4 · Compile: *exists, but does almost nothing yet*
 
 This is where the real work belongs. Four things happen:
 
@@ -116,7 +116,7 @@ This is where the real work belongs. Four things happen:
 2. **Select an interpreter per file**, by the file types it publicly declares. Precedent for the
    shape: a plugin already declares `contributes.viewers[].extensions` in `plugin.json`.
 3. **Follow imports.** What a file imports is syntax, so the interpreter reports it; the runtime
-   resolves the path and serves the bytes. Resolution *policy* is language-specific — `node_modules`,
+   resolves the path and serves the bytes. Resolution *policy* is language-specific: `node_modules`,
    Python packages and Rust crates follow different rules, so the runtime must not pretend to own
    it. Start at the entry, pick its interpreter, let it report what it imported, resolve, recurse.
    Cross-language imports fall out for free.
@@ -133,7 +133,7 @@ typed, an error must still point at their line.
 >
 > **What does the mutated code look like, such that one call's result can feed what comes after it?**
 >
-> A call is a name and its arguments — settled. What is unsettled is how the rewritten form expresses
+> A call is a name and its arguments: settled. What is unsettled is how the rewritten form expresses
 > *"this step needs that step's result."*
 >
 > **Why it lives at compile and not at run:** it is tempting to frame this as "execution has to stop
@@ -166,7 +166,7 @@ typed, an error must still point at their line.
 handed back to that module at start. Nothing puts anything in `items` or reads them. A module
 answering `ok: false` is dropped from the run.*
 
-## 5 · The frame loop — *exists*
+## 5 · The frame loop: *exists*
 
 Per tick, in run order:
 
@@ -188,7 +188,7 @@ a later step is decided by the shape chosen there, not by anything at this stage
 **c. Calls out.** The interpreter publishes this frame's calls.
 
 **d. The module that knows what the names mean** runs next, recognises `rectangle`, and maps it onto
-the output's vocabulary — `draw-commands`, or whatever the output speaks.
+the output's vocabulary: `draw-commands`, or whatever the output speaks.
 
 **e. The output module renders.** `vector-canvas` gathers `draw-commands` from every provider in run
 order and draws them; draw order is list order, so run order is z-order. It publishes `input-state`
@@ -199,12 +199,12 @@ tick's output rather than last tick's. Running independent modules in parallel i
 dependency graph to identify them exists, but the gain is bounded by the longest chain, and this
 pipeline is a chain.*
 
-## 6 · Stop — *exists*
+## 6 · Stop: *exists*
 
 Any module can send `{"requestStop": true}` to end the run. Every module gets its `stop` phase. The
 dev copy is then scrapped.
 
-## Export — *decided, not implemented*
+## Export: *decided, not implemented*
 
 Identical through stage 4, then packaged instead of run. Same copy, same compile, same artifact,
 which is what makes "it worked in dev" mean something.
@@ -220,7 +220,7 @@ faster" is half true, and stage 4's rewrite is the half worth building.
 
 ## Whether the per-frame protocol is fast enough is a measurement
 
-One JSON object per module per frame over stdin/stdout — at 60fps with four modules, 240
+One JSON object per module per frame over stdin/stdout: at 60fps with four modules, 240
 write-flush-read-parse round trips a second before any of the user's own work. Whether that is
 acceptable is measurable, not arguable: `FrameModuleTrace` already records `duration_ms` per module
 per frame, and nothing has yet looked at it for this question.

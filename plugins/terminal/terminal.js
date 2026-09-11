@@ -12,7 +12,7 @@ let activeSessionId = null;
 let instanceCounter = 0;
 
 // This plugin's own configured defaults (Settings > Plugins > Terminal, see plugin.json's
-// `settings` declaration) — read once at load via window.lowarc.getSettings(), the generic
+// `settings` declaration): read once at load via window.lowarc.getSettings(), the generic
 // per-plugin settings mechanism; like every setting read this way, a change while a terminal is
 // already open takes effect on its next instance, not live. configuredShell is only used when an
 // instance isn't given an explicit per-instance override (the console header's "..." menu). The
@@ -194,7 +194,7 @@ new ResizeObserver(() => {
 
 // The very first instance waits for the configured-shell fetch so it launches with the right
 // default immediately, instead of starting on "Default" and only respecting the setting from the
-// second instance on. A slow/failed fetch still can't hang this — getSettings() always resolves
+// second instance on. A slow/failed fetch still can't hang this: getSettings() always resolves
 // (falls back to {} on the host side), so this is a short real delay, never an indefinite one.
 window.lowarc.getSettings().then((settings) => {
   configuredShell = (settings && settings.shell) || null;

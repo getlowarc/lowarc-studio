@@ -1,6 +1,6 @@
 // The Inspector half of this plugin: never touches graph data directly. It shows whatever the
 // canvas iframe (node-graph.js) last pushed via window.lowarc.openInspector(), and sends edits
-// back the same way node-graph.js sends host actions — except there's no host action for "tell my
+// back the same way node-graph.js sends host actions, except there's no host action for "tell my
 // OTHER iframe something", so this uses window.lowarc.broadcastToSelf() instead, addressed by
 // path+nodeId since the canvas iframe can have several .lan files open at once.
 
@@ -17,7 +17,7 @@ const inputsList = document.getElementById("ng-inputs-list");
 const outputsList = document.getElementById("ng-outputs-list");
 const newNodeBtn = document.getElementById("ng-new-node-btn");
 
-// { path, nodeId, label, x, y, files, hasInput, hasOutput, inputs, outputs } | null — null before
+// { path, nodeId, label, x, y, files, hasInput, hasOutput, inputs, outputs } | null: null before
 // anything's ever been selected, which is a legitimate state (the Inspector can be shown with
 // nothing to inspect yet if something else in this plugin ever calls openInspector() without a
 // node context). inputs/outputs are [{id, label}]: the OTHER nodes this node's input/output
@@ -155,7 +155,7 @@ window.lowarc.on("lowarc:inspectorContext", (payload) => {
 labelInput.addEventListener("change", () => {
   const value = labelInput.value.trim();
   if (value) commit({ label: value });
-  else labelInput.value = current.label; // an empty label means nothing — revert rather than save it
+  else labelInput.value = current.label; // an empty label means nothing: revert rather than save it
 });
 
 xInput.addEventListener("change", () => {

@@ -1,4 +1,4 @@
-/* LowArc Studio's host-only component primitives — numeric input, dropdowns, searchbar, nav tabs,
+/* LowArc Studio's host-only component primitives: numeric input, dropdowns, searchbar, nav tabs,
    drag-reorder, toast, popup, floating menu, manage-list/detail, tooltip. Depends on the tokens
    defined in style.css's :root (load style.css first) and the shared building blocks in
    primitives-shared.css (buttons, inputs, checkboxes, progress bar, setting rows — load that next).
@@ -85,7 +85,7 @@
    previewLimit) a chevron: one per category in a grouped searchbar result list (see
    initSearchbar's `categories` option), never on its own without at least one matching option
    under it. The chevron toggles that one category between truncated and fully shown, hence being a
-   real element here rather than the line's own ::after — something has to sit to its right. */
+   real element here rather than the line's own ::after. Something has to sit to its right. */
 .dropdown-menu-group-label {
   display: flex;
   align-items: center;
@@ -310,7 +310,7 @@
 
 /* ---------- Toast ---------- */
 /* Same visual language as sidebar-tab's active state: a colored 3px left bar plus a matching
-   icon color — reused here for the four status variants instead of inventing a second pattern. */
+   icon color: reused here for the four status variants instead of inventing a second pattern. */
 
 .toast-stack {
   position: fixed;
@@ -506,7 +506,7 @@
    via .header-tab directly rather than a second style). flex:1 claims the space .popup-header's
    own justify-content:space-between would otherwise split evenly between three children, so the
    title stays flush left and the close button stays flush right regardless of how much (or little)
-   is in here. No overflow-x here on purpose — setting one of overflow-x/-y to anything but
+   is in here. No overflow-x here on purpose: setting one of overflow-x/-y to anything but
    visible computes the OTHER to auto too (a real CSS gotcha, not obvious from this rule alone),
    which turned .header-tab's own taller padding into a vertical scrollbar instead of just letting
    .popup-header grow to fit it, the way a plain flex row with no overflow already does for free. */
@@ -579,7 +579,7 @@
 }
 
 /* ---------- Dropdown menu ---------- */
-/* A small floating action list anchored to a trigger — File/Edit/View/Run/Help in editor.html's
+/* A small floating action list anchored to a trigger: File/Edit/View/Run/Help in editor.html's
    menu bar, and the rail's account/settings flyouts. .menu-dropdown is the position:relative
    wrapper around a trigger + list; .is-open on it shows the list. Items disabled rather than
    omitted when there's nothing to route to yet, same as everywhere else in the shell. */
@@ -605,7 +605,7 @@
   display: block;
 }
 
-/* For a trigger sitting near the right edge of its container (e.g. a per-row ⋮ button) — anchors
+/* For a trigger sitting near the right edge of its container (e.g. a per-row ⋮ button): anchors
    the list's right edge to the trigger instead of its left, so it opens leftward and never pushes
    the page wider than the viewport. */
 .menu-dropdown-list.anchor-right {
@@ -661,7 +661,7 @@
 
 /* ---------- Floating menu (host-level, never clipped) ---------- */
 /* .menu-dropdown-list above is positioned relative to its own trigger and constrained by whatever
-   ancestor happens to clip overflow — fine for chrome sitting in open space, but a trigger near a
+   ancestor happens to clip overflow: fine for chrome sitting in open space, but a trigger near a
    panel's edge needs a manual anchor-right/opens-upward override to avoid running off-screen (see
    the old .rail-dropdown-list/.console-session-menu-list overrides this replaced in editor.html),
    and a trigger inside a sandboxed plugin iframe can't be fixed with CSS at all — position:fixed
@@ -815,7 +815,7 @@
   gap: 16px;
 }
 
-/* The narrower right-hand column holding config.detailFields() output — kept visually distinct
+/* The narrower right-hand column holding config.detailFields() output: kept visually distinct
    from the main title/description/actions column with its own left border, matching the
    .manage-list/.manage-detail split's own "a border marks a column boundary" convention. */
 .detail-meta-column {
@@ -942,7 +942,7 @@
 
 /* ---------- Tooltip ---------- */
 /* One shared popup element (created lazily, reused for every [data-tooltip]) rather than one per
-   trigger — cheaper, and there's only ever one tooltip visible at a time anyway. */
+   trigger: cheaper, and there's only ever one tooltip visible at a time anyway. */
 
 .tooltip-popup {
   position: fixed;

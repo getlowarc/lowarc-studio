@@ -26,7 +26,7 @@ pub enum LogLevel {
     Error,
 }
 
-/// The one shape every "give me a callback to log through" spot in this module needs — named so
+/// The one shape every "give me a callback to log through" spot in this module needs: named so
 /// it's spelled once, not independently re-typed (and drifting) at every call site.
 pub type LogFn = Arc<dyn Fn(LogLevel, &str) + Send + Sync>;
 
@@ -43,7 +43,7 @@ pub enum Breakpoint {
     LogLevel { level: LogLevel, module: Option<String> },
     FrameCount { count: u64 },
     /// Pauses when `module`'s frame reply has the value at `path` (a JSON Pointer, e.g.
-    /// "/state/hp") equal to `equals`. The one genuinely conditional kind — inspects whatever a
+    /// "/state/hp") equal to `equals`. The one genuinely conditional kind: inspects whatever a
     /// module chooses to put in its own frame reply, without the engine needing to understand
     /// what that data means. `path`/`equals` are meaningless for a module that never puts
     /// anything interesting in its reply: that's an honest limit of a module-agnostic design,
@@ -51,7 +51,7 @@ pub enum Breakpoint {
     JsonMatch { module: String, path: String, equals: Value },
 }
 
-/// One module's request/reply for one frame, captured for the debugger — see
+/// One module's request/reply for one frame, captured for the debugger. See
 /// `process_module::ProcessModule::frame`, the one place this is actually produced. `id` is the
 /// manifest's stable id (what a project's own project.json names this module by), deliberately
 /// NOT its decorative display `name`: a breakpoint's `module` field has to match something the
@@ -83,7 +83,7 @@ pub struct FrameTrace {
 }
 
 /// The whole debugger feature surface, bundled into one field on `RunContext` rather than four
-/// flat ones — they only ever travel together (`lib.rs` constructs all four per run, and both
+/// flat ones: they only ever travel together (`lib.rs` constructs all four per run, and both
 /// `driver.rs` and `process_module.rs` need the full set), so bundling avoids `RunContext`'s field
 /// list ballooning for what's really one cohesive feature.
 #[derive(Clone)]
@@ -92,7 +92,7 @@ pub struct DebugHooks {
     /// `driver::run`, not per-module, since pausing (like stopping) is a whole-run action.
     pub pause_flag: Arc<AtomicBool>,
     /// While paused, the driver lets exactly this many more ticks through before re-blocking, then
-    /// decrements it — set via a step command, consumed by the driver as it ticks. Zero while
+    /// decrements it: set via a step command, consumed by the driver as it ticks. Zero while
     /// running freely or fully paused with nothing requested yet.
     pub step_request: Arc<AtomicU32>,
     /// Replaced wholesale by the frontend's set-breakpoints call (mirrors "always resend the full
@@ -155,7 +155,7 @@ pub fn check_log_level_breakpoint(breakpoints: &Mutex<Vec<Breakpoint>>, level: L
 }
 
 /// Everything a loader might need to run a set of modules. `stop_flag` is the one thing every
-/// loader MUST honor promptly — it's how a user's Stop click actually reaches a running module,
+/// loader MUST honor promptly: it's how a user's Stop click actually reaches a running module,
 /// and it's a single flag for the whole run, not per-module, since stopping is a whole-run action.
 pub struct RunContext<'a> {
     pub source_code: &'a str,
@@ -168,7 +168,7 @@ pub struct RunContext<'a> {
 }
 
 pub trait RuntimeLoader: Send + Sync {
-    /// Stable id, for error messages and logging — mirrors IModuleLoader.Id.
+    /// Stable id, for error messages and logging: mirrors IModuleLoader.Id.
     fn id(&self) -> &'static str;
     /// Asked in registration order; the first `true` owns the whole run.
     fn can_handle(&self, modules: &[ModuleInfo]) -> bool;

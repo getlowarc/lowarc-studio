@@ -2,14 +2,14 @@
 // plugin_host::protocol::PanelContribution). The actual transport is plugin_asset_server.rs — a
 // loopback HTTP server, not a Tauri custom URI scheme. A custom scheme (`plugin://...`) was tried
 // first and works fine for top-level navigation, but on Windows/WebView2 a sub-frame (iframe)
-// navigation to a custom scheme silently never reaches the registered handler at all — confirmed
+// navigation to a custom scheme silently never reaches the registered handler at all: confirmed
 // directly (zero invocations logged, "provisional headers only" in devtools, reproduced even for
 // a hardcoded response with no filesystem access) and matches a known, still-unresolved Tauri
 // limitation (tauri-apps/tauri discussions #10868). A real `http://127.0.0.1:<port>` origin has
 // none of that custom-scheme baggage, so panels are hosted there instead.
 //
 // This file owns the two things every caller of a plugin's assets needs to agree on:
-//   1. Path-traversal protection — canonicalizing the resolved path and checking it's still under
+//   1. Path-traversal protection: canonicalizing the resolved path and checking it's still under
 //      the plugin's own folder before ever reading it.
 //   2. The harness script and CSP every response should carry.
 
@@ -156,7 +156,7 @@ pub const HARNESS_JS: &str = r#"(function () {
       window.parent.postMessage({ type: "host", action: "openFile", path, openInSplit: Boolean(opts && opts.openInSplit) }, "*");
     },
     // Tells the host a path's on-disk content just changed out from under any editor that has it
-    // open — e.g. the Draft Tool's Revert writing straight to disk, bypassing the editor entirely.
+    // open: e.g. the Draft Tool's Revert writing straight to disk, bypassing the editor entirely.
     // A no-op if that path isn't currently open anywhere. Not addressed to any one plugin, same
     // reasoning as openFile above: the open-files list (and re-reading a path's real content) is
     // core IDE state, not something a sidebar panel manages itself.
@@ -385,7 +385,7 @@ pub const HARNESS_JS: &str = r#"(function () {
 // URL) that immediately importScripts() the real (same-origin) worker file — 'blob:' for the
 // Worker constructor call itself, 'self' for the importScripts target. Without worker-src, that
 // falls back to default-src 'none' and silently breaks every worker Monaco tries to create.
-// font-src covers Monaco's own icon font (fold arrows, error/warning glyphs, etc.) — it's a
+// font-src covers Monaco's own icon font (fold arrows, error/warning glyphs, etc.): it's a
 // `data:` URI embedded directly in editor.main.css, not a separate file, so without explicit
 // permission here it also falls back to default-src 'none' and silently renders as fallback
 // tofu/square glyphs instead of the real icons.
@@ -405,7 +405,7 @@ pub const CSP: &str = "default-src 'none'; script-src 'self'; style-src 'self' '
 /// re-fetch a stylesheet without reloading it.
 pub const SHARED_STYLE_CSS: &str = include_str!("../../src/style.css");
 
-/// The host's genuinely reusable component styles — buttons, text/numeric inputs, checkboxes, a
+/// The host's genuinely reusable component styles: buttons, text/numeric inputs, checkboxes, a
 /// progress bar, setting rows. Split out of primitives.css so it could be exposed here, via
 /// `include_str!` so it is one real file rather than a copy. Served at `__lowarc-primitives.css`,
 /// opt-in like `__lowarc.css`. Deliberately NOT the larger primitives.css, which is full of
@@ -413,7 +413,7 @@ pub const SHARED_STYLE_CSS: &str = include_str!("../../src/style.css");
 /// reimplementing that JS. Depends on `__lowarc.css`'s tokens, so link both, that one first.
 pub const SHARED_PRIMITIVES_CSS: &str = include_str!("../../src/primitives-shared.css");
 
-/// File-type icons — vendored from vscode's built-in "Seti" icon theme (see
+/// File-type icons: vendored from vscode's built-in "Seti" icon theme (see
 /// src/vendor/seti-icons/SETI_LICENSE), same include_str!/include_bytes! vendoring as everything
 /// else here. Three pieces, all opt-in the same way as __lowarc.css: the font itself
 /// (__lowarc-icons.woff), the generated stylesheet mapping each icon id to its glyph + color
@@ -430,7 +430,7 @@ pub const SHARED_ICONS_WOFF: &[u8] = include_bytes!("../../src/vendor/seti-icons
 /// __lowarc-dropdown.js; exposes one function, `createLowarcDropdown(options, value, onChange)`.
 pub const SHARED_DROPDOWN_JS: &str = include_str!("../../src/dropdown-shared.js");
 
-/// Compact number formatting ("1.4K", "10K", "1M") built on Intl.NumberFormat — see
+/// Compact number formatting ("1.4K", "10K", "1M") built on Intl.NumberFormat. See
 /// format-shared.js's own header. Served at __lowarc-format.js; exposes one function,
 /// `lowarcFormatCompact(n)`.
 pub const SHARED_FORMAT_JS: &str = include_str!("../../src/format-shared.js");
@@ -443,7 +443,7 @@ pub fn resolve_asset_path(plugin_id: &str, rel_path: &str) -> Option<PathBuf> {
     if rel_path.is_empty() {
         return None;
     }
-    // plugin_id has to name exactly one folder directly under plugins() — reject anything that
+    // plugin_id has to name exactly one folder directly under plugins(): reject anything that
     // could shift plugin_root itself outside that directory (a bare "..", an embedded path
     // separator, or a "." component) before it's ever joined onto a real path. Without this, a
     // plugin_id of ".." would make plugin_root canonicalize to plugins()'s own parent, and the
@@ -474,7 +474,7 @@ mod tests {
     fn resolve_asset_path_rejects_a_traversal_via_plugin_id() {
         // Regression test for a real path-traversal bug: plugin_id used to be joined onto
         // plugins() and canonicalized BEFORE being checked, so a plugin_id of ".." shifted the
-        // confinement boundary itself to plugins()'s own parent — letting any rel_path reachable
+        // confinement boundary itself to plugins()'s own parent: letting any rel_path reachable
         // from there (e.g. settings.json, one directory up from plugins/ in a dev checkout) through
         // the starts_with(plugin_root) check below it. Both files genuinely exist on disk here.
         assert!(resolve_asset_path("..", "settings.json").is_none());

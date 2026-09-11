@@ -61,7 +61,7 @@ command must not take down everything else being drawn.
 `fill` and `stroke` are independent: a shape carrying both is filled and then stroked, and one
 carrying neither draws nothing. `w`/`h` on `image` default to the file's natural size.
 
-`file` and `font` paths are relative to the project root, and are cached by path — decoding a PNG or
+`file` and `font` paths are relative to the project root, and are cached by path: decoding a PNG or
 parsing a TTF every frame would be the obvious performance trap here.
 
 ## Versioning

@@ -1,4 +1,4 @@
-// Theme resolution and application — loaded early (right after style.css, before body content)
+// Theme resolution and application: loaded early (right after style.css, before body content)
 // on every page so the resolved theme applies before first paint as often as possible. style.css's
 // :root values are the fallback for the instant before this runs at all; everything after that is
 // this file's job.
@@ -135,7 +135,7 @@ function applyCachedThemeIfAny() {
     const cached = localStorage.getItem(THEME_CACHE_KEY);
     if (cached) applyThemeColors(JSON.parse(cached));
   } catch {
-    // Corrupt or missing cache — resolveAndApplyTheme() below still runs and repaints correctly.
+    // Corrupt or missing cache: resolveAndApplyTheme() below still runs and repaints correctly.
   }
 }
 

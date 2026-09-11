@@ -77,7 +77,7 @@ fn collecting_logger() -> (LogFn, Arc<Mutex<Vec<String>>>) {
 #[test]
 fn runs_a_process_module_end_to_end_via_its_own_request_stop() {
     if !cfg!(windows) {
-        return; // fixture is a PowerShell script — matches how Bootstrap's own tests are scoped
+        return; // fixture is a PowerShell script: matches how Bootstrap's own tests are scoped
     }
 
     let modules_dir = temp_dir("self_stop_modules");
@@ -111,7 +111,7 @@ fn an_external_stop_flag_ends_a_run_that_never_asks_to_stop_itself() {
     }
 
     let modules_dir = temp_dir("external_stop_modules");
-    // A huge frame count means it would never request its own stop within the test's timeout —
+    // A huge frame count means it would never request its own stop within the test's timeout:
     // proving this run only ends because the external flag was set, not because the module asked.
     write_fixture_module(&modules_dir, 1_000_000);
 
@@ -226,7 +226,7 @@ fn a_frame_count_breakpoint_pauses_the_run_automatically() {
     let handle = std::thread::spawn(move || runtime::start_run(&entry, &project_dir, &modules_dir, 200, serde_json::json!({}), stop_flag_for_thread, log, debug));
 
     // Nothing else gates this run, so if the breakpoint didn't fire it would be well past frame 3
-    // within this window — generous to absorb a slow PowerShell process startup, not because
+    // within this window: generous to absorb a slow PowerShell process startup, not because
     // reaching frame 3 itself is slow.
     std::thread::sleep(Duration::from_millis(1000));
 

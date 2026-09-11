@@ -116,7 +116,7 @@
         border-radius: 5px;
       }
 
-      /* Wide enough for #RRGGBBAA and no wider — ch units so this tracks the mono font rather than
+      /* Wide enough for #RRGGBBAA and no wider: ch units so this tracks the mono font rather than
          a pixel guess, and stays correct if the font changes. Not flex:1: stretching to fill the
          column is what made these look oversized. */
       .color-field input.input {
@@ -140,7 +140,7 @@
          setPopupHeaderControls() below). -->
     <div class="page">
       <div class="page-body">
-        <!-- Always visible regardless of which tab is showing (Appearance included) — typing here
+        <!-- Always visible regardless of which tab is showing (Appearance included): typing here
              swaps the visible panel to #tab-panel-search, same showTab() every header tab already
              uses, just never listed as one of ITS OWN clickable tabs. Clearing it restores whatever
              tab was showing before. See the script below for why this is a plain wired input, not
@@ -242,7 +242,7 @@
             }
             value = num;
           }
-          // Preserve every other field — save_settings replaces the whole Settings object, so
+          // Preserve every other field: save_settings replaces the whole Settings object, so
           // sending just the one changed key would silently reset the rest to their defaults.
           loadedSettings = { ...loadedSettings, [entry.key]: value };
           try {

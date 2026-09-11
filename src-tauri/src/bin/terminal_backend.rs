@@ -12,7 +12,7 @@
 // resolved by the *caller* (plugin_session.rs), not here: this binary just execs whatever command
 // string it's given as its first argument.
 //
-// Wire protocol — JSON lines, both directions, for as long as the process lives (not one-shot):
+// Wire protocol: JSON lines, both directions, for as long as the process lives (not one-shot):
 //   host -> this (stdin):
 //     {"type":"input","data":"..."}              raw text to write to the pty
 //     {"type":"resize","cols":N,"rows":N}         inform the pty of a new terminal size
@@ -25,7 +25,7 @@ use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Write};
 
 fn main() {
-    // argv[1] is the shell command to run (e.g. "powershell", "pwsh", "bash", "zsh") — chosen by
+    // argv[1] is the shell command to run (e.g. "powershell", "pwsh", "bash", "zsh"): chosen by
     // plugin_session.rs from Settings, with a platform-appropriate fallback. Nothing in this
     // binary hardcodes a specific shell.
     let shell = std::env::args().nth(1).unwrap_or_else(default_shell);
@@ -46,7 +46,7 @@ fn main() {
             return;
         }
     };
-    // Must drop our copy of the slave end once the child owns it — on Unix in particular, the
+    // Must drop our copy of the slave end once the child owns it: on Unix in particular, the
     // master's reader never sees EOF after the child exits as long as any other process (this one
     // included) still holds the slave fd open.
     drop(pair.slave);

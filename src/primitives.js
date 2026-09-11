@@ -629,7 +629,7 @@ function showToast({ variant = "info", message, duration = 4000, source = null }
 }
 
 // The one-line "show a caught error as a toast" wrapper every page's own catch blocks kept
-// redefining independently (startup.js, and the manager page factory below, among others) —
+// redefining independently (startup.js, and the manager page factory below, among others):
 // String(err) so both a real Error and a plain string/Rust-side error message display the same way.
 function reportError(err) {
   showToast({ variant: "error", message: String(err) });
@@ -872,7 +872,7 @@ async function buildSearchableSettingsList() {
   try {
     plugins = await invoke("list_installed_plugins");
   } catch (err) {
-    // A page that can't reach the plugin list (shouldn't happen) just gets core settings only —
+    // A page that can't reach the plugin list (shouldn't happen) just gets core settings only:
     // better than throwing and losing search entirely.
   }
   for (const plugin of plugins) {
@@ -1270,7 +1270,7 @@ function parseSanitizedSvg(text) {
 }
 
 // ---------- Markdown rendering (Overview/Changelog tabs) ----------
-// Vendored marked.js (src/vendor/marked/marked.umd.js, MIT; see MARKED_LICENSE) — real CommonMark
+// Vendored marked.js (src/vendor/marked/marked.umd.js, MIT; see MARKED_LICENSE): real CommonMark
 // support (tables, nested emphasis, the works) for ~44KB, the same vendor-a-real-library-under
 // src/vendor call this repo already makes for three.js/xterm.js/Monaco. Only modules.html/
 // plugins.html load the vendor script; everywhere else primitives.js is loaded (editor.html,
@@ -1318,7 +1318,7 @@ function configureMarkedOnce() {
 function renderMarkdown(text) {
   configureMarkedOnce();
   // The vendor script not being loaded shouldn't happen for createManagerPage, its only real
-  // caller — degrade to plain escaped text rather than throw if it somehow isn't.
+  // caller: degrade to plain escaped text rather than throw if it somehow isn't.
   if (typeof marked === "undefined") return `<p>${escapeHtml(text)}</p>`;
   return marked.parse(text);
 }
@@ -1738,7 +1738,7 @@ function createManagerPage(config) {
     document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("is-active", p.id === `tab-panel-${value}`));
   }
 
-  // Lets a caller deep-link straight to the Marketplace tab — e.g. the sidebar manager panel's own
+  // Lets a caller deep-link straight to the Marketplace tab: e.g. the sidebar manager panel's own
   // "Marketplace" button (see plugin-hosting.js) opens this popup with `?tab=marketplace` rather
   // than always landing on Installed. Same pattern settings.html already uses for its own tabs.
   const requestedTab = new URLSearchParams(location.search).get("tab") === "marketplace" ? "marketplace" : "installed";
@@ -1801,7 +1801,7 @@ async function initWindowControls(beforeClose) {
   }
 
   // appWindow.close() (what our own titlebar button below calls) does NOT reliably fire
-  // onCloseRequested in Tauri v2 — confirmed (tauri-apps/tauri#5288), and this app runs with
+  // onCloseRequested in Tauri v2: confirmed (tauri-apps/tauri#5288), and this app runs with
   // decorations:false, so that JS call IS the only "close" path our own X button has; gating it
   // right here, before ever calling .close(), is what actually protects it. onCloseRequested
   // below is still worth wiring too. It DOES correctly fire for Alt+F4/a taskbar "close window",

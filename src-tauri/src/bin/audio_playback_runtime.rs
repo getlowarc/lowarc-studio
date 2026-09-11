@@ -27,7 +27,7 @@
 //
 // Cross-platform via rodio (Windows/macOS/Linux, itself built on cpal). A platform or environment
 // with no real audio output device at all (a locked-down or headless CI runner, say) doesn't fail
-// the whole module — playing/justFinished just stays empty every frame, the same "missing
+// the whole module: playing/justFinished just stays empty every frame, the same "missing
 // hardware degrades gracefully" shape device_input_runtime.rs already uses for an unavailable gamepad
 // backend.
 //
@@ -87,7 +87,7 @@ struct ActiveSound {
 }
 
 /// Decodes `file` (resolved against `project_root`, if it isn't already absolute) fresh and starts
-/// it playing on `mixer` — `.repeat_infinite()` before ever handing the source to the Player is
+/// it playing on `mixer`: `.repeat_infinite()` before ever handing the source to the Player is
 /// what makes looping gapless (rodio buffers it in memory rather than this module re-decoding the
 /// file from disk every time it would otherwise reach the end).
 fn start_sound(mixer: &Mixer, project_root: &Option<PathBuf>, req: &PlayRequest) -> Result<Player, String> {
@@ -146,7 +146,7 @@ fn main() {
             "start" => {
                 let mut extra = Map::new();
                 if mixer.is_none() {
-                    extra.insert("degraded".into(), json!("no audio output device is available — nothing will play"));
+                    extra.insert("degraded".into(), json!("no audio output device is available, so nothing will play"));
                 }
                 reply_ok(extra);
             }
@@ -192,7 +192,7 @@ fn main() {
                                 sound.request = req.clone();
                             }
                             // Either genuinely new, or the file/loop changed under an existing
-                            // handle — restart it fresh either way, since a Player's source can't
+                            // handle: restart it fresh either way, since a Player's source can't
                             // be swapped after the fact.
                             _ => match start_sound(mixer, &project_root, req) {
                                 Ok(player) => {

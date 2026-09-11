@@ -1,6 +1,6 @@
 // Monaco's own web workers (language services for json/css/html/ts, plus the generic editor
 // worker) are spun up via a Worker(blob-url) that immediately importScripts() the real worker
-// file with a path relative to *this* document — Chromium resolves that relative path against the
+// file with a path relative to *this* document: Chromium resolves that relative path against the
 // creating document's URL, not the blob's, so a bare relative path here is enough; no need to
 // hardcode an absolute origin. Requires the host's CSP to allow `worker-src 'self' blob:`.
 const WORKER_BY_LABEL = {
@@ -64,7 +64,7 @@ function languageForPath(path) {
 require.config({ paths: { vs: "vs" } });
 
 // Plugin settings (Settings > Plugins > Monaco, see plugin.json's `settings` declaration) are
-// always stored/returned as plain strings — Settings.plugin_settings is a
+// always stored/returned as plain strings: Settings.plugin_settings is a
 // HashMap<String, HashMap<String, String>> with no per-field type on the Rust side, so parsing
 // and defaulting each one is this plugin's own job, same as every other plugin that reads its own
 // settings this way. Fetched in parallel with the (much slower) editor.main module load itself,
@@ -82,8 +82,8 @@ function numSetting(settings, key, fallback) {
 // Monaco does NOT read the app's CSS variables; it owns its own theme registry. Its theming splits
 // in two, and only one half is ours:
 //
-//   rules   54 syntax token scopes  — colours the WORDS
-//   colors  431 ids                 — colours the FURNITURE
+//   rules   54 syntax token scopes: colours the WORDS
+//   colors  431 ids: colours the FURNITURE
 //
 // `rules` stays empty, permanently. The line: if it would still make sense with the editor empty it
 // belongs to LowArc, and if it only means something because there is code on screen it belongs to
@@ -214,7 +214,7 @@ Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve
     // Everything below is VS Code furniture that Monaco turns on by default and that nothing in
     // this app ever feeds. Each one is either a control with no provider behind it (so it can only
     // ever render empty), or a second surface competing with one LowArc already owns. Measured
-    // against the vendored build rather than assumed — all of these read as enabled out of the box.
+    // against the vendored build rather than assumed: all of these read as enabled out of the box.
     //
     // Sticky scroll is the most visible: a floating breadcrumb bar pinned over the top lines,
     // duplicating what the Outline panel is already for, while eating editor rows to do it.
@@ -269,7 +269,7 @@ Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve
     }
   });
 
-  // This instance can now outlive any one file — it's mounted once per (editor group, Monaco) pair
+  // This instance can now outlive any one file: it's mounted once per (editor group, Monaco) pair
   // and stays alive as long as ANY file that group opened through Monaco is still open, the same
   // "one iframe, many documents" shape the Terminal plugin already uses for multiple terminal tabs
   // (see its own file header). path -> {model, viewState, savedVersionId}. Nothing here is read
@@ -284,7 +284,7 @@ Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve
   // "just opened" from reading as "already edited."
   let loading = false;
 
-  // The baseline to compare against for dirty-tracking — Monaco's own "back to saved" detection
+  // The baseline to compare against for dirty-tracking: Monaco's own "back to saved" detection
   // (undoing past every edit) rather than a plain string-equality diff, so redo/undo round-trips
   // back to a clean state clear the dirty flag exactly the way VS Code's own editor does. Kept
   // per-doc (in docs, not one shared variable) since each open file needs its own baseline.
@@ -370,7 +370,7 @@ Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve
   });
 
   // The host's one HOST-initiated request (see requestPluginContent() in editor.html, used when
-  // moving a file to the other editor group) — replies with this instance's actual current text
+  // moving a file to the other editor group): replies with this instance's actual current text
   // for that path, unsaved edits included, rather than making the host re-read the file from disk
   // and silently discard them.
   window.lowarc.on("lowarc:getContent", (payload) => {
@@ -426,7 +426,7 @@ Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve
   window.lowarc.on("lowarc:requestSave", save);
 
   // The host's Edit menu (Undo/Redo/Cut/Copy/Find/Replace — everything except Paste) and any
-  // matching host-level shortcut — editor.trigger(), not editor.getAction(id).run() (what
+  // matching host-level shortcut: editor.trigger(), not editor.getAction(id).run() (what
   // lowarc:runCommand below uses), because Undo/Redo aren't registered Actions, only Commands;
   // trigger() dispatches to either kind, so one handler covers all of them.
   window.lowarc.on("lowarc:editorCommand", (payload) => {

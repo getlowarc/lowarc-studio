@@ -1,4 +1,4 @@
-// A generic loaded shared library — LoadLibrary/GetProcAddress on Windows, dlopen/dlsym on Unix.
+// A generic loaded shared library: LoadLibrary/GetProcAddress on Windows, dlopen/dlsym on Unix.
 // Direct port of lowarc/Bootstrap's dylib.rs: this part is fully generic (load a library, look
 // up a symbol), nothing CLR-specific about it, so it's identical here even though this crate has
 // no CLR loader at all.
@@ -13,7 +13,7 @@ mod platform {
 
     pub type NativeString = Vec<u16>;
 
-    // Unused on Windows today — symbol() takes a plain CString directly since GetProcAddress
+    // Unused on Windows today: symbol() takes a plain CString directly since GetProcAddress
     // wants narrow strings, not wide ones. Kept for parity with the Unix module (which does use
     // its own to_native internally) and for whatever eventually needs a wide string here.
     #[allow(dead_code)]

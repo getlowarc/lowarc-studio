@@ -7,14 +7,14 @@ All notable changes to the Device Input module are documented here. Format loose
 
 ### Changed
 
-- Provides the `input-state` contract, so a consumer can read input by role rather than by this module's name — alongside `vector-canvas`, which reports the same kind of state in canvas coordinates.
+- Provides the `input-state` contract, so a consumer can read input by role rather than by this module's name: alongside `vector-canvas`, which reports the same kind of state in canvas coordinates.
 
 ## 0.2.0 - 2026-09-07
 
 ### Changed
 
 - Renamed from `input` to `device-input`. Two reasons. First-party module names are literal, and
-  this one polls hardware globally in screen coordinates — distinct from the window-scoped input
+  this one polls hardware globally in screen coordinates: distinct from the window-scoped input
   `vector-canvas` publishes. It also collided with `node-graph-runtime`'s optional `input`
   dependency, which is a convention ROLE wanting `shared.input.advanceTo` and never matched what
   this module publishes; the two are now separate. A project requiring `input` must update its
