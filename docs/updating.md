@@ -118,9 +118,9 @@ This is the security root of the entire feature: **anyone holding the private ke
 code to every user.** Deliberately not generated here. It's a long-lived credential that should be
 created by you and never pass through anything else.
 
-- Private key → repository secret `TAURI_SIGNING_PRIVATE_KEY` (plus
+- Private key goes in the repository secret `TAURI_SIGNING_PRIVATE_KEY` (plus
   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`). Never committed.
-- Public key → `tauri.conf.json`, committed. Safe by design; it only verifies.
+- Public key goes in `tauri.conf.json`, committed. Safe by design; it only verifies.
 
 ### 2. Hosting — **decided: lowarc.com**
 
@@ -210,7 +210,7 @@ Template variables: `{{target}}` (`windows`/`darwin`/`linux`), `{{arch}}` (`x86_
 ### 4. The UI
 
 VSCode's model: a button near the searchbar, hidden until there's something to install. States:
-available → downloading → ready to restart.
+available, then downloading, then ready to restart.
 
 Reuse what exists rather than inventing: the toast system, `setProgress`, and the `install-progress`
 event shape already used for plugin and module installs.

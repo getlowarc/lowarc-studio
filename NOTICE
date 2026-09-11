@@ -1,0 +1,17 @@
+LowArc Studio
+Copyright 2026 Nolan Baxter
+
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+This product bundles third-party software under their own licenses:
+
+  Monaco Editor        Microsoft Corporation, MIT
+                       plugins/monaco/LICENSE.md
+  three.js             three.js authors, MIT
+                       plugins/3d-viewer/LICENSE.md
+  xterm.js             The xterm.js authors, MIT
+                       plugins/terminal/LICENSE.md
+  marked               MarkedJS and Christopher Jeffrey, MIT
+                       src/vendor/marked/MARKED_LICENSE
+  Seti UI icon set     Jesse Weed, MIT
+                       src/vendor/seti-icons/SETI_LICENSE

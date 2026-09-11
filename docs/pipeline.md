@@ -4,7 +4,7 @@
 Written down mid-design so it stops having to be re-derived. Each stage says whether it exists today;
 nothing here describes shipped behaviour unless it says so.
 
-## ⚠ Two models, and the second is the one LowArc started from
+## Two models, and the second is the one LowArc started from
 
 Everything below stage 3 was written for the **translation model**, and there is a second model that
 overturns most of it. Neither has been chosen.

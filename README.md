@@ -99,3 +99,8 @@ relayed through the host, which enforces per-plugin identity on every relayed ac
 
 Only commits/pushes that pass `cargo build`, `cargo test`, and `cargo clippy --all-targets -- -D
 warnings` should land on `main`: CI enforces the same three.
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE), and [NOTICE](NOTICE) for the third-party code LowArc Studio
+bundles.
