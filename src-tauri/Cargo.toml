@@ -27,7 +27,7 @@ tauri-plugin-clipboard-manager = "2"
 mime_guess = "2"
 tiny_http = "0.12"
 portable-pty = "0.8"
-base64 = "0.22"
+base64 = "0.23"
 # std::sync::Mutex poisons itself if a thread panics while holding the lock — every later .lock()
 # then fails too, permanently, until the process restarts. parking_lot's Mutex has no poisoning at
 # all, so a panic loses that one operation's work without bricking the mutex (and whatever feature
