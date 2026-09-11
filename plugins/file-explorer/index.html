@@ -83,9 +83,9 @@
   .row.selected { background: var(--border); }
   .row.drop-target { outline: 1px solid var(--cyan); outline-offset: -2px; }
 
-  /* One of these per ancestor directory, in place of the old flat depth*12px padding-left — a thin
-     vertical line down the middle of each 12px slot, the same "show the nesting, not just imply it
-     with whitespace" convention VS Code's own tree uses. Stacking them left-to-right for however
+  /* One of these per ancestor directory: a thin vertical line down the middle of each 12px slot,
+     the same "show the nesting, not just imply it with whitespace" convention VS Code's own tree
+     uses, rather than flat indentation. Stacking them left-to-right for however
      deep a row is nested reproduces the full-height, unbroken-looking rule across sibling rows for
      free, since every row at a given depth draws the exact same line in the exact same slot. The
      line's own position (left: 5px in its 12px slot) stays fixed — every row at a given depth

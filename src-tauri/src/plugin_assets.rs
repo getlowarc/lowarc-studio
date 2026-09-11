@@ -16,15 +16,13 @@
 use crate::app_paths::AppPaths;
 use std::path::PathBuf;
 
-/// Every plugin's entry HTML is expected to load this first, before its own script. It exists for
-/// exactly one reason: defense in depth on top of the real security boundary (capabilities/
-/// default.json granting nothing to this origin). Verified directly against the installed wry
-/// source that on Windows specifically, Tauri's IPC bridge script is injected into every frame —
-/// including a sandboxed iframe — regardless of the for_main_frame_only flag (wry's own comment:
-/// "Windows: scripts are always added to subframes regardless of the for_main_frame_only option";
-/// only the macOS/Linux backends actually honor it). So window.__TAURI__ genuinely exists here for
-/// a moment no matter what — this deletes it as early as content under our control possibly can,
-/// before any plugin-authored script gets a chance to touch it.
+/// Every plugin's entry HTML loads this before its own script. Defence in depth on top of the real
+/// boundary, which is capabilities/default.json granting this origin nothing.
+///
+/// On Windows, wry injects Tauri's IPC bridge into every frame including a sandboxed iframe,
+/// regardless of for_main_frame_only; only the macOS and Linux backends honour that flag. So
+/// window.__TAURI__ does exist here briefly, and this deletes it as early as content under our
+/// control can.
 pub const HARNESS_JS: &str = r#"(function () {
   try { delete window.__TAURI__; } catch (e) {}
   try { delete window.__TAURI_INTERNALS__; } catch (e) {}
@@ -34,14 +32,11 @@ pub const HARNESS_JS: &str = r#"(function () {
   // this ever runs, so that path is unaffected. Anything without one just gets no menu at all.
   window.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  // A click inside a sandboxed iframe never bubbles to the host document, so the host's own
-  // "click outside closes it" handlers never see it and an open menu stays stuck open — noticed
-  // on the main panel, which is simply the biggest click target in the app. The host already
-  // closes its overlays when an iframe takes FOCUS, but that only fires on the transition: once
-  // this iframe already has focus (right-click a tab while the caret is in the editor, then click
-  // back into it) no focus moves and nothing fires. A pointerdown always happens, so this is the
-  // signal that does not depend on where focus already was. Capture phase, so a plugin that stops
-  // propagation inside its own content cannot accidentally disable the host's menus.
+  // A click inside a sandboxed iframe never bubbles to the host document, so the host's
+  // click-outside handlers never see it and an open menu stays stuck open. Focus is not enough on
+  // its own: it fires only on the transition, so clicking back into an already-focused iframe
+  // moves no focus. A pointerdown always happens. Capture phase, so a plugin stopping propagation
+  // in its own content cannot disable the host's menus.
   window.addEventListener("pointerdown", () => {
     try { window.parent.postMessage({ type: "pointerdown" }, "*"); } catch (e) {}
   }, true);
@@ -94,34 +89,23 @@ pub const HARNESS_JS: &str = r#"(function () {
       if (!listeners.has(event)) listeners.set(event, []);
       listeners.get(event).push(handler);
     },
-    // A multi-document viewer plugin (Monaco is the first) manages several open files inside ONE
-    // mounted iframe instead of getting a fresh iframe per file — cheaper, and it's what lets a
-    // widget's own view state (scroll/cursor/folds) survive a tab switch the same way a real
-    // editor's undo history already does, without the host needing to know anything about that
-    // internal state. The host drives this with three emits a plugin listens for via on(), not new
-    // methods here — there was nothing to add to the call surface, only new events to handle:
-    //   lowarc:openFile   {path, contents} — a file was opened; create whatever internal state
-    //                      this file needs (e.g. a model) if it doesn't exist yet. Not necessarily
-    //                      the one to show — activateFile is the separate "make this visible" step.
+    // A multi-document viewer plugin manages several open files inside ONE mounted iframe, which is
+    // what lets its view state (scroll, cursor, folds) survive a tab switch without the host
+    // knowing anything about that state. Driven by three emits a plugin listens for via on():
+    //   lowarc:openFile     {path, contents} — create whatever internal state this file needs.
+    //                        Not necessarily the one to show; activateFile is that step.
     //   lowarc:activateFile {path} — switch to showing this already-opened path.
-    //   lowarc:closeFile  {path} — dispose whatever was created for this path; it won't be
-    //                      referenced again unless a fresh lowarc:openFile arrives for it later.
-    // The host can also ask for a path's current (possibly unsaved) content — e.g. when moving a
-    // file to the other editor group, where re-reading from disk would silently drop unsaved
-    // edits. This is the one case where a HOST-initiated request needs a reply, the reverse of
-    // every other request/reply pair in this file — there's no dedicated method for it since it's
-    // not something a plugin ever calls, only receives:
-    //   lowarc:getContent {path, replyId} — reply with
+    //   lowarc:closeFile    {path} — dispose whatever was created for it.
+    //
+    // The host can also ask for a path's current, possibly unsaved, content, which is the one
+    // HOST-initiated request that needs a reply:
+    //   lowarc:getContent   {path, replyId} — reply with
     //     window.parent.postMessage({type: "hostRequestReply", replyId, content}, "*")
-    //     (content: the current text, or null if this plugin has nothing for that path).
-    // markDirty/requestClose talk straight to the host's own tab-bar UI, not through this
-    // plugin's backend process the way call()/on() do — there's nothing for a backend to decide
-    // here, it's just "update my tab", so routing it through a process round-trip would be pure
-    // overhead. A viewer plugin (see tab-bar/open-files) is the only kind of plugin these mean
-    // anything to; anyone else calling them is just poking a host tab that doesn't exist for them.
-    // `path` is required, not implicit — one viewer iframe can now be responsible for several open
-    // files at once (see lowarc:openFile/activateFile/closeFile below), so there's no longer a
-    // single unambiguous file this call could only be about.
+    //     where content is the current text, or null for a path this plugin has nothing for.
+    //
+    // markDirty and requestClose talk straight to the host's tab-bar UI rather than through the
+    // plugin's backend, since there is nothing for a backend to decide. `path` is required because
+    // one iframe can hold several files at once.
     markDirty(path, dirty) {
       window.parent.postMessage({ type: "host", action: "markDirty", path, dirty: Boolean(dirty) }, "*");
     },
@@ -144,14 +128,11 @@ pub const HARNESS_JS: &str = r#"(function () {
     requestClose(path) {
       window.parent.postMessage({ type: "host", action: "requestClose", path }, "*");
     },
-    // Lets a plugin that isn't itself the file's own viewer (Outline, editing a value it parsed
-    // out of the file) push a change into whatever IS currently showing that file — the host
-    // forwards it as a lowarc:applyLineEdit emit to that path's owning viewer instance, which
-    // applies it as a real edit (Monaco: model.applyEdits, not setValue — preserves undo history
-    // and fires the exact same dirty-tracking a person's own keystroke would). `line` is 1-based,
-    // `text` replaces that entire line's content. Fire-and-forget, same reasoning as markDirty —
-    // nothing for the caller to wait on; if the path isn't open or has no viewer, this silently
-    // does nothing rather than erroring, the same as every other host-owned action here.
+    // Lets a plugin that is not the file's viewer (Outline, editing a value it parsed out) push a
+    // change into whatever is showing that file. The host forwards it as lowarc:applyLineEdit and
+    // the viewer applies it as a real edit, so undo and dirty-tracking behave as if typed. `line`
+    // is 1-based and `text` replaces that whole line. Fire-and-forget: a path that is not open
+    // does nothing rather than erroring.
     editFile(path, line, text) {
       window.parent.postMessage({ type: "host", action: "editFile", path, line, text }, "*");
     },
@@ -216,30 +197,23 @@ pub const HARNESS_JS: &str = r#"(function () {
         window.parent.postMessage({ type: "host", action: "createFile", id, opts: opts || {} }, "*");
       });
     },
-    // Asks the host to show THIS plugin's own inspector contribution (a plugin.json panel with
-    // location: "inspector") right now, opening the Inspector panel if it's closed, and passing
-    // context straight through as a lowarc:inspectorContext emit to whatever's now showing.
-    // Fire-and-forget — the caller has nothing to wait on, same as openFile. A plugin with no
-    // inspector contribution declared just gets silently ignored by the host, same "nothing to do"
-    // shape as showMenu/openPopup targeting something that doesn't exist. This exists because the
-    // Inspector, unlike the sidebar or console, has no permanent icon/tab of its own for a person
-    // to click — something IN a plugin (a node getting clicked, e.g.) has to be able to ask for it
-    // instead.
+    // Shows this plugin's inspector contribution, opening the Inspector panel if closed and
+    // passing context through as a lowarc:inspectorContext emit. Fire-and-forget; a plugin with no
+    // inspector contribution is silently ignored. It exists because the Inspector has no permanent
+    // icon of its own, so something inside a plugin has to ask for it.
     //
-    // onlyIfOpen (default false): when true, this is a silent no-op unless the Inspector panel is
-    // ALREADY open — never forces it open, never switches its content if it was closed. For a
-    // continuous interaction that touches a node repeatedly (dragging it around, say) that already
-    // opened the Inspector once on its own — a background drag shouldn't be able to yank the panel
-    // open or hijack whatever it was already showing.
+    // onlyIfOpen (default false): a silent no-op unless the Inspector is ALREADY open. For a
+    // repeated interaction like dragging a node, so a background drag cannot yank the panel open
+    // or hijack what it was showing.
     openInspector(context, onlyIfOpen) {
       window.parent.postMessage({ type: "host", action: "openInspector", context: context ?? null, onlyIfOpen: Boolean(onlyIfOpen) }, "*");
     },
     // Sends event/payload to every OTHER currently-mounted iframe belonging to THIS SAME plugin —
     // never the caller itself, and never a different plugin's iframe. Fire-and-forget. Exists for
     // a plugin with more than one simultaneous iframe that need to coordinate (e.g. Node Graph's
-    // Inspector drawer editing a node that a separate canvas iframe actually owns and renders) —
-    // there was previously no way for two iframes of the same plugin to talk to each other at all,
-    // only host-to-plugin and plugin-to-host.
+    // Inspector drawer editing a node that a separate canvas iframe owns and renders). Everything
+    // else in this harness is host-to-plugin or plugin-to-host; this is the one plugin-to-itself
+    // path.
     broadcastToSelf(event, payload) {
       window.parent.postMessage({ type: "host", action: "broadcastToSelf", event, payload: payload ?? null }, "*");
     },
@@ -253,16 +227,11 @@ pub const HARNESS_JS: &str = r#"(function () {
     notifyPathRenamed(oldPath, newPath) {
       window.parent.postMessage({ type: "host", action: "notifyPathRenamed", oldPath, newPath }, "*");
     },
-    // A "session": true plugin's own UI (Terminal, so far) manages its own instances — each open
-    // terminal tab is its own sessionId, chosen by the plugin itself (a UUID is fine; the host
-    // never needs to parse it, only use it as an opaque map key). Namespaced under `session`
-    // (2026-09-01) rather than sitting flat as startSession/sendSession/stopSession — this is a
-    // generic mechanism any "session": true plugin could use, not something tied to the file-
-    // lifecycle/host-chrome calls that make up most of this object, and grouping it makes that
-    // boundary visible instead of just implied by a shared name prefix. All three are fire-and-
-    // forget: start's session doesn't exist yet to reply through, send's replies (if any) arrive
-    // separately as lowarc:sessionOutput emits tagged with that same sessionId, and stop has
-    // nothing to report back beyond the process simply no longer running.
+    // A "session": true plugin manages its own instances: each open terminal tab is its own
+    // sessionId, chosen by the plugin and opaque to the host. Namespaced rather than flat because
+    // it is generic to any session plugin, unlike the file-lifecycle calls around it. All three are
+    // fire-and-forget: start has no session to reply through yet, send's replies arrive separately
+    // as lowarc:sessionOutput emits tagged with the same sessionId, and stop has nothing to report.
     session: {
       start(sessionId, shell) {
         window.parent.postMessage({ type: "host", action: "startSession", sessionId, shell: shell || null }, "*");
@@ -286,14 +255,10 @@ pub const HARNESS_JS: &str = r#"(function () {
         window.parent.postMessage({ type: "host", action: "saveFile", id, path, contents }, "*");
       });
     },
-    // Asks the host to render a context/action menu on the real screen, outside this iframe's own
-    // (sandboxed, position:fixed-can't-escape) box — see the .floating-menu primitive in
-    // primitives.css for why this exists at all. x/y are this document's own coordinates (e.g. a
-    // right-click's clientX/clientY) — the host translates them into screen space itself, since it
-    // knows where this iframe sits in its own layout and this iframe doesn't. items is
-    // [{label, value, disabled}] (a divider is {divider: true}); resolves to the chosen item's
-    // value, or null if the menu was dismissed without a choice. Same reply plumbing as saveFile(),
-    // since the caller genuinely needs to know what was picked.
+    // Renders a menu on the real screen, outside this iframe's box, which a position:fixed element
+    // here cannot escape. x and y are this document's own coordinates; the host translates them,
+    // since only it knows where this iframe sits. items is [{label, value, disabled}], with
+    // {divider: true} for a divider. Resolves to the chosen value, or null if dismissed.
     showMenu(items, x, y) {
       return new Promise((resolve) => {
         const id = nextId++;
@@ -323,14 +288,11 @@ pub const HARNESS_JS: &str = r#"(function () {
         window.parent.postMessage({ type: "host", action: "getSettings", id }, "*");
       });
     },
-    // Run-debugging primitives — generic, not scoped to any one plugin (any plugin could build a
-    // run monitor, not just the first-party Debugger one). Namespaced under `debug` (2026-09-01),
-    // same reasoning as `session` above: a distinct, generic mini-API, not another file/host-
-    // chrome call sitting flat among them. Fire-and-forget, same reasoning as requestClose/
-    // markDirty: a failure (e.g. "no run is active") has nothing for the caller itself to branch
-    // on, so the host just surfaces it as its own toast. setBreakpoints always sends the WHOLE
-    // list — same "frontend always resends everything" convention plugin settings/commands
-    // already use, one fewer state-sync mechanism to get wrong.
+    // Run-debugging primitives, generic rather than scoped to the first-party Debugger. Namespaced
+    // for the same reason `session` is. Fire-and-forget: a failure like "no run is active" has
+    // nothing for the caller to branch on, so the host surfaces it as a toast. setBreakpoints
+    // always sends the WHOLE list, the same resend-everything convention settings and commands
+    // use, which is one fewer state-sync mechanism to get wrong.
     debug: {
       pause() {
         window.parent.postMessage({ type: "host", action: "pauseRun" }, "*");
@@ -345,17 +307,12 @@ pub const HARNESS_JS: &str = r#"(function () {
         window.parent.postMessage({ type: "host", action: "setBreakpoints", breakpoints: breakpoints || [] }, "*");
       },
     },
-    // A plain DOM utility, not a host round-trip like everything else here — wires up any
-    // ".numeric-input" markup (see __lowarc-primitives.css) with real, working steppers. This is
-    // the ENTIRE reason that CSS class is safe to expose to plugins at all: a native
-    // type="number" input's spin arrows can't be restyled to match the app (hence the drawn
-    // ".numeric-steppers" buttons instead), and CSS alone would just be buttons that visibly do
-    // nothing on click. Same clamp/read-attributes behavior as the host's own initNumericInputs()
-    // in primitives.js — kept as a separate copy on purpose, same as everything else in this file:
-    // this is the plugin-facing contract, and it shouldn't secretly depend on a host-only script a
-    // plugin can never load. Dispatches BOTH "input" and "change" so a caller can commit with a
-    // plain input.addEventListener("change", ...), the exact same pattern already used for every
-    // other field type — no special-casing just because this one has stepper buttons too.
+    // A plain DOM utility rather than a host round-trip: wires ".numeric-input" markup up with
+    // working steppers. Without it the class would be buttons that do nothing on click, since a
+    // native type="number" input's spin arrows cannot be restyled to match the app. A separate copy
+    // of the host's initNumericInputs() on purpose, because this is the plugin-facing contract and
+    // must not depend on a host script a plugin can never load. Dispatches both "input" and
+    // "change", so a caller commits the same way it would for any other field.
     initNumericInputs(root) {
       (root || document).querySelectorAll(".numeric-input").forEach((el) => {
         if (el.dataset.numericInit) return;
@@ -380,17 +337,11 @@ pub const HARNESS_JS: &str = r#"(function () {
         });
       });
     },
-    // Same data-tooltip="..." convention as the host's own initTooltips() in primitives.js — wires
-    // up any element carrying that attribute (set once in markup, or any time via
-    // el.dataset.tooltip = "..."), a small delayed popup on hover, one shared ".tooltip-popup"
-    // element per document. NOT a byte-for-byte port, though, unlike most of this file's other
-    // pairs: the host's version only ever prefers a side and falls back once, which is fine in the
-    // full app window but was a real, shipped bug the first time a plugin tried it in its own
-    // narrow iframe — a "fixed" element here can only ever paint inside THIS iframe's own
-    // viewport, so a tooltip wider than the panel would just get cut off no matter which side it
-    // preferred. This version clamps fully inside window.innerWidth/innerHeight instead of only
-    // choosing a side, and pairs with ".tooltip-popup"'s max-width/wrapping in
-    // __lowarc-primitives.css for the same reason.
+    // Same data-tooltip convention as the host's initTooltips(), but NOT a byte-for-byte port. The
+    // host's version prefers a side and falls back once, which is wrong in a narrow iframe: a fixed
+    // element here can only paint inside THIS iframe's viewport, so a tooltip wider than the panel
+    // gets cut off whichever side it picks. This clamps fully inside window.innerWidth and
+    // innerHeight, and pairs with ".tooltip-popup"'s max-width and wrapping.
     initTooltips(root) {
       let tooltipEl = document.querySelector(".tooltip-popup");
       if (!tooltipEl) {
@@ -447,26 +398,19 @@ pub const CSP: &str = "default-src 'none'; script-src 'self'; style-src 'self' '
 /// rules) — the literal same file every host page (editor.html, settings.html, etc.) already
 /// links, via `include_str!` so this can never drift from it. Served at `__lowarc.css`.
 ///
-/// A plugin opts in entirely on its own — nothing forces this on any plugin, first-party or not —
-/// by adding `<link rel="stylesheet" href="__lowarc.css">` to its own HTML, same convention as
-/// `<script src="__lowarc.js">`. Its `:root` block is the DEFAULT palette only — the resolved theme
-/// comes from the separate `__lowarc-theme.css` route (see plugin_asset_server.rs), which a plugin
-/// links after this one and which serves whatever Settings.themeMode currently resolves to. That
-/// covers a plugin's initial load; a theme changed while it is already open arrives over the
-/// harness's own `lowarc:theme` message instead, since re-fetching a stylesheet is not something the
-/// host can make a sandboxed iframe do without reloading it.
+/// Opt-in: a plugin links it itself, nothing forces it. The `:root` block here is the DEFAULT
+/// palette only. The resolved theme comes from `__lowarc-theme.css` (see plugin_asset_server.rs),
+/// linked after this one. That covers initial load; a theme changed while a plugin is open arrives
+/// over the harness's `lowarc:theme` message, since the host cannot make a sandboxed iframe
+/// re-fetch a stylesheet without reloading it.
 pub const SHARED_STYLE_CSS: &str = include_str!("../../src/style.css");
 
 /// The host's genuinely reusable component styles — buttons, text/numeric inputs, checkboxes, a
-/// progress bar, setting rows — split out of primitives.css specifically so it could be exposed
-/// here (see primitives-shared.css's own header for the full reasoning); `include_str!` again, one
-/// real file, never a copy. Served at `__lowarc-primitives.css`, same opt-in-only convention as
-/// `__lowarc.css` above — a plugin author links it, nothing forces it. Deliberately NOT the much
-/// larger primitives.css: that file is packed with host-chrome-specific classes (`.rail`,
-/// `.tab-bar`, `.manage-list`, dropdowns/toasts/popups/floating-menus) that assume the host's own
-/// DOM structure and JS-driven interaction — a plugin can't meaningfully reuse any of that without
-/// also reimplementing the JS behind it, so none of it is exposed. Depends on
-/// `__lowarc.css`'s tokens; a plugin using this should link both, `__lowarc.css` first.
+/// progress bar, setting rows. Split out of primitives.css so it could be exposed here, via
+/// `include_str!` so it is one real file rather than a copy. Served at `__lowarc-primitives.css`,
+/// opt-in like `__lowarc.css`. Deliberately NOT the larger primitives.css, which is full of
+/// host-chrome classes assuming the host's DOM and JS: a plugin could not reuse them without
+/// reimplementing that JS. Depends on `__lowarc.css`'s tokens, so link both, that one first.
 pub const SHARED_PRIMITIVES_CSS: &str = include_str!("../../src/primitives-shared.css");
 
 /// File-type icons — vendored from vscode's built-in "Seti" icon theme (see

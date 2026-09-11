@@ -107,22 +107,15 @@ fn start_sound(mixer: &Mixer, project_root: &Option<PathBuf>, req: &PlayRequest)
 }
 
 fn main() {
-    // A platform/environment with no real audio output at all shouldn't fail the whole module —
-    // see this file's own header comment. Every "frame" reply below just reports nothing playing
-    // in that case, same shape device_input_runtime.rs uses for an unavailable gamepad backend.
+    // An environment with no audio output must not fail the whole module; every frame reply just
+    // reports nothing playing.
     //
-    // The tricky part: on some environments with no real device (a locked-down or headless CI
-    // runner, confirmed live — this is not a hypothetical) opening the default sink doesn't fail
-    // quickly, it just hangs indefinitely instead. A bare `.ok()` on that call would never even
-    // get the chance to turn an Err into a graceful None — this module's own "start" reply, and
-    // every module after it in the same run (spawn_and_run starts modules one at a time), would
-    // sit frozen on it forever. Racing it against a bounded timeout on a background thread is
-    // what actually makes the "missing hardware degrades gracefully" promise true rather than
-    // aspirational; a device open that eventually succeeds after the deadline is simply never
-    // collected — one leaked thread for the life of this otherwise-short-lived process is a fine
-    // price for never hanging. (No named type for the channel here on purpose — DeviceSinkBuilder
-    // ::open_default_sink()'s own return type is verbose to spell out; letting the compiler infer
-    // it from the closure below is simpler and just as correct.)
+    // The catch is that opening the default sink where no real device exists does not fail
+    // quickly, it hangs. A bare `.ok()` never gets to turn that into a graceful None, so this
+    // module's start reply, and every module after it in the run, would freeze on it. Racing the
+    // open against a bounded timeout on a background thread is what makes the graceful-degradation
+    // promise true. An open that succeeds after the deadline is never collected; one leaked thread
+    // in a short-lived process is a fair price for never hanging.
     let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
         let _ = tx.send(DeviceSinkBuilder::open_default_sink().ok());
@@ -147,9 +140,9 @@ fn main() {
                 project_root = msg.get("sourcePath").and_then(|p| p.as_str()).map(PathBuf::from).and_then(|p| p.parent().map(|p| p.to_path_buf()));
                 reply_ok(Map::new());
             }
-            // No mixer means no output device was available (see main's own comment on racing that
-            // open against a timeout). Playback silently doing nothing for a whole run used to be
-            // indistinguishable from a project that never asked for a sound; this says which.
+            // No mixer means no output device was available (see main's own comment on racing
+            // that open against a timeout). Reporting it as degraded is what separates "nothing
+            // could play" from "nothing was asked to play", which look identical otherwise.
             "start" => {
                 let mut extra = Map::new();
                 if mixer.is_none() {

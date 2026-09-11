@@ -43,15 +43,12 @@ impl ProjectPreset {
     }
 }
 
-/// Resolves the transitive closure of modules a project needs — its own preset, plus whatever
-/// each resolved module itself Requires, exactly like the existing C# ModuleRegistry's dependency
-/// closure. Every error found (missing module, or more than one global module claiming the same
-/// id) is collected and returned together, not just the first — so the user sees the whole
-/// picture at once and can actually decide, rather than fixing one conflict only to hit the next.
+/// Resolves the transitive closure of modules a project needs: its preset, plus whatever each
+/// resolved module requires. Every error is collected and returned together rather than just the
+/// first, so a user sees the whole picture instead of fixing one conflict only to hit the next.
 ///
-/// NOTE: matches by id only right now. `Dependency.version` (">=1.0.0", "=2.0.0", etc.) is not
-/// yet checked for satisfaction — that needs real semver range logic (the `semver` crate, not a
-/// hand-rolled comparator) and is a deliberate, acknowledged gap, not an oversight.
+/// Matches by id only. `Dependency.version` is not checked for satisfaction yet; that needs real
+/// semver range logic rather than a hand-rolled comparator, and is an acknowledged gap.
 pub fn resolve(preset: &ProjectPreset, modules_dir: &Path) -> Result<Vec<ModuleInfo>, Vec<String>> {
     let by_id = scan_store(modules_dir);
 

@@ -36,16 +36,12 @@ fn restore_timer_resolution() {}
 /// as Bootstrap's PacedDriver: sleep the bulk of the remaining time, spin the last ~1ms so frames
 /// land on the deadline instead of drifting on coarse sleeps.
 ///
-/// `pause_flag`/`step_request` add a second gate on top of that pacing, purely for the debugger:
-/// while paused, no tick fires at all (an idle sleep instead) unless a step has been requested, in
-/// which case exactly one tick fires — paced against `target_fps` like any other tick, not fired
-/// instantly — and the step count is decremented right when that tick actually happens, not the
-/// moment a step was merely seen as available (decrementing early would let a second in-flight
-/// step get silently swallowed by another thread reading it as already spent before its own tick
-/// had fired). `last` is reset right before the first tick that follows time spent paused, so
-/// `delta` reflects one configured interval rather than however long the pause itself lasted — a
-/// resumed module should not see a multi-second delta just because a human was staring at a
-/// breakpoint.
+/// `pause_flag` and `step_request` gate that pacing for the debugger. While paused nothing ticks
+/// unless a step is requested, in which case exactly one tick fires, still paced against
+/// `target_fps` rather than immediately. The step count decrements when that tick actually happens,
+/// not when the step is first seen: decrementing early would let another thread read a second
+/// in-flight step as already spent. `last` is reset before the first tick after a pause, so
+/// `delta` is one interval rather than however long a human stared at a breakpoint.
 pub fn run<F: FnMut(f64)>(target_fps: u32, stop_flag: &Arc<AtomicBool>, pause_flag: &Arc<AtomicBool>, step_request: &Arc<AtomicU32>, mut tick: F) {
     let raised = raise_timer_resolution();
     let start = Instant::now();

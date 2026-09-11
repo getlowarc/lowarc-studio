@@ -98,13 +98,11 @@
     border-left: 1px solid var(--border);
     display: flex;
     flex-direction: column;
-    /* The whole sidebar scrolls as one unit — the list used to be the only scrollable piece
-       (flex:1 + overflow-y:auto) with the add-breakpoint form pinned below it at a fixed size, so
-       whenever the console was short enough that the list AND form together didn't fit, the form
-       just got clipped by this container's own overflow:hidden with no way to reach it. Letting
-       this whole column scroll instead means the form is always reachable, at the cost of the list
-       and form no longer having independent scroll regions — an acceptable trade for "everything
-       stays reachable no matter how short the console gets". */
+    /* The whole sidebar scrolls as one unit, rather than the list scrolling with the
+       add-breakpoint form pinned below it. Scrolling only the list means the form gets clipped by
+       this container whenever the console is too short to fit both, with no way to reach it. The
+       trade is that the list and form share one scroll region, which is worth it to keep
+       everything reachable however short the console gets. */
     overflow-y: auto;
   }
   .sidebar-section-title {

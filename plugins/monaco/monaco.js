@@ -79,27 +79,21 @@ function numSetting(settings, key, fallback) {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
-// Monaco does NOT read the app's CSS variables — it owns its own theme registry, so the panel
-// around the editor restyles with the rest of the IDE while the editor surface itself stays on
-// whatever theme it was last told about.
+// Monaco does NOT read the app's CSS variables; it owns its own theme registry. Its theming splits
+// in two, and only one half is ours:
 //
-// WHERE THE LINE IS. Monaco splits its theming in two, and only one half is ours:
+//   rules   54 syntax token scopes  — colours the WORDS
+//   colors  431 ids                 — colours the FURNITURE
 //
-//   rules   54 syntax token scopes (comment, keyword, string, number, ...) — colours the WORDS.
-//   colors  431 ids (editor.background, editorGutter.*, ...)              — colours the FURNITURE.
+// `rules` stays empty, permanently. The line: if it would still make sense with the editor empty it
+// belongs to LowArc, and if it only means something because there is code on screen it belongs to
+// Monaco. Keywords and squiggles are Monaco's; a background, gutter, cursor and find box are not.
+// Remapping syntax would also read worse, since the palette has four chromatic hues against
+// syntax's eight-plus roles, and would put danger-red on keywords.
 //
-// `rules` stays empty here, permanently and on purpose. The rule of thumb: if it would still make
-// sense with the editor empty, it belongs to LowArc; if it only means something because there is
-// code on screen, it belongs to Monaco. An empty editor still has a background, a gutter, line
-// numbers, a cursor, a scrollbar and a find box — IDE furniture that happens to live inside Monaco,
-// and it should match the IDE exactly. Keywords, strings, brackets and error squiggles only exist
-// because of the code; Monaco already colours those well, and this app's palette has four
-// chromatic hues against syntax's need for eight-plus roles, so remapping them would make code
-// harder to read and put danger-red on keywords.
-//
-// So this inherits from whichever built-in matches the app's ground (which brings all 54 rules with
-// it) and overrides ~30 furniture colours. Everything not listed falls back to the base theme, so
-// the map goes stale rather than broken as Monaco adds ids.
+// So this inherits whichever built-in matches the app's ground, which brings all 54 rules with it,
+// and overrides about 30 furniture colours. Anything unlisted falls back, so the map goes stale
+// rather than broken as Monaco adds ids.
 function luminanceOfHex(hex) {
   const m = /^#?([0-9a-f]{6})$/i.exec((hex || "").trim());
   if (!m) return 0;
@@ -390,8 +384,8 @@ Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve
   // or model.setValue() — this is the one that actually integrates with the editor's own
   // undo-redo controller the same way a real keystroke does; a bare model-level edit still lands
   // in the model's own undo stack, but doesn't reliably wire up to Ctrl+Z the way a genuine editor
-  // operation does (confirmed missing live: an Outline edit couldn't be undone at all before this
-  // was executeEdits). Only valid while this file is the one actually showing in the editor —
+  // operation does, so without it an Outline edit cannot be undone at all. Only valid while this
+  // file is the one actually showing in the editor:
   // executeEdits acts on whatever model is CURRENTLY SET, so editing a backgrounded file through
   // it would silently corrupt whichever OTHER file happens to be on screen; falls back to a plain
   // model edit for that case; genuinely rare in practice, since Outline only ever shows the active
@@ -455,44 +449,27 @@ Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve
     editor.focus();
   });
 
-  // Monaco ships its own command palette (F1 / Ctrl+Shift+P), a second, separate "list of every
-  // action" surface competing with the host's own — reported directly by the person building this
-  // app as something they want living in ONE place, not two. Feeding Monaco's real action list into
-  // the host's palette (rather than a hand-picked subset) via window.lowarc.setCommands() gets
-  // everything Monaco can actually do into the same list as everything else; overriding these two
-  // keybindings to no-ops (same trick already used above for Ctrl+S) removes Monaco's own overlay
-  // so there's no second competing surface left to open.
-  // Overriding just the F1/Ctrl+Shift+P keybindings (still done below, as further insurance)
-  // wasn't enough on its own — Monaco's own keybinding for its built-in quickCommand action
-  // apparently still won that resolution. Neutering the action's own .run() is the one place
-  // every trigger path (keybinding dispatch, a context-menu click, anything calling
-  // editor.getAction(id).run() directly) actually goes through, so this is the real kill switch.
+  // Monaco ships its own command palette on F1 and Ctrl+Shift+P, a second list-of-every-action
+  // surface competing with the host's. Its real action list goes into the host's palette via
+  // setCommands() instead, so there is one list rather than two.
+  //
+  // Overriding the keybindings alone is not enough, since Monaco's own binding for quickCommand
+  // still wins that resolution. Neutering the action's .run() is the one place every trigger path
+  // goes through, so that is the actual kill switch; the keybinding overrides below are insurance.
   const quickCommandAction = editor.getAction("editor.action.quickCommand");
   if (quickCommandAction) quickCommandAction.run = async () => {};
 
-  // Runs once per editor instance, on creation — now genuinely once per (editor group, Monaco)
-  // pair rather than once per opened file, since this instance persists across every file it
-  // shows instead of being recreated per open. Monaco's own action list doesn't depend on which
-  // file is active anyway, so re-sending it on every file open was always redundant (the host
-  // replaces this plugin's previous registration rather than accumulating duplicates — see
-  // setDynamicPluginCommands in editor.html); this just also removes the redundancy itself,
-  // rather than merely being harmless underneath it.
-  // Monaco reports 127 labelled actions, and the palette is a list a person reads — so the ones
-  // that cannot work here are dropped rather than left to be found and clicked. Three reasons, in
-  // order of how much they matter:
+  // Runs once per editor instance. Monaco's action list does not depend on which file is active,
+  // so this never needs re-sending per open.
   //
-  //  - toggleHighContrast swaps Monaco onto a theme of its own, wiping the palette mapping in
-  //    applyEditorTheme() with no way back short of reopening the file. That one is not clutter,
-  //    it is a trap.
-  //  - fontZoom* changes the font size behind the app's own Editor setting, so the setting and the
-  //    editor disagree until something re-applies it.
-  //  - the rest simply have nothing behind them: features turned off above, a context menu that is
-  //    disabled, Monaco's own clipboard reads that the sandbox blocks anyway (the host does paste),
-  //    "in Files" variants of marker navigation that assume VS Code's multi-file workspace, and
-  //    Monaco's internal Developer: entries.
+  // Monaco reports 127 labelled actions and the palette is a list a person reads, so the ones that
+  // cannot work here are dropped. toggleHighContrast is the one that matters: it swaps Monaco onto
+  // a theme of its own and wipes applyEditorTheme()'s mapping with no way back short of reopening
+  // the file. fontZoom* moves the font size behind the app's own Editor setting. The rest have
+  // nothing behind them at all.
   //
-  // A list, not a pattern match, so adding one is a deliberate act — and anything Monaco adds in a
-  // future version shows up rather than being silently swallowed by an over-broad rule.
+  // A list rather than a pattern, so anything Monaco adds in a future version shows up instead of
+  // being swallowed by an over-broad rule.
   const DEAD_COMMANDS = new Set([
     "editor.action.quickCommand", // the host owns the palette; see the kill switch above
     "editor.action.toggleHighContrast",

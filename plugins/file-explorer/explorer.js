@@ -156,9 +156,8 @@ function appendIndentGuides(row, depth) {
 }
 
 // Files get the real per-language glyph from the vendored Seti set (see window.lowarcIconClass,
-// __lowarc-icons.js) when it's loaded; falling back to the old generic FILE_SVG is what keeps this
-// plugin working even if a plugin author's own build omits the icon assets, rather than a silently
-// blank icon slot.
+// __lowarc-icons.js) when it is loaded. Falling back to the generic FILE_SVG keeps this plugin
+// working even if a build omits the icon assets, rather than leaving a blank icon slot.
 function fileIconHtml(name) {
   if (typeof window.lowarcIconClass !== "function") return FILE_SVG;
   return `<span class="file-icon ${window.lowarcIconClass(name)}"></span>`;
@@ -166,9 +165,9 @@ function fileIconHtml(name) {
 
 // ONE slot, not a chevron slot followed by a separate icon slot — a folder's chevron and a file's
 // icon are the same thing positionally (the row's one "what is this" marker), so they need to
-// literally share one element's box, not two sequential ones. Two slots was the actual bug behind
-// "a file's icon and a sibling folder's chevron aren't at the same horizontal position": every file
-// row was reserving an invisible chevron-width column before its icon even started.
+// literally share one element's box, not two sequential ones. Two separate slots would make every
+// file row reserve an invisible chevron-width column before its icon started, so a file's icon and
+// a sibling folder's chevron would not line up.
 function createRowMarker(isDir, isExpanded, label) {
   const marker = document.createElement("span");
   marker.className = "row-marker" + (isDir ? " chevron" + (isExpanded ? " expanded" : "") : "");
@@ -482,10 +481,9 @@ async function deleteConfirmed(path) {
 // ---------- Context menu ----------
 // Rendered by the HOST, not this iframe — window.lowarc.showMenu() asks editor.html to open the
 // shared .floating-menu overlay at this iframe's (x, y) plus wherever the host has this panel
-// mounted, and resolves to whichever item's value was picked (or null if dismissed). This used to
-// be a menu built and positioned entirely inside this document, clamped by hand to this iframe's
-// own viewport — position:fixed can't escape a sandboxed iframe's box no matter what, so a menu
-// opened flush against this panel's edge would otherwise clip there even though the rest of the
+// mounted, and resolves to whichever item's value was picked, or null if dismissed. Building the
+// menu in this document instead does not work: position:fixed cannot escape a sandboxed iframe's
+// box, so a menu opened flush against this panel's edge clips there even though the rest of the
 // window has room. showMenu() replaces all of that; see lowarc-studio-floating-menu memory for the
 // host-side half of this.
 async function openContextMenu(x, y, target) {

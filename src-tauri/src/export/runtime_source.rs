@@ -1,9 +1,7 @@
-// Where the runtime executable export_folder copies into every export actually comes from.
-// There used to be a cross-repo story here — an earlier version of this module built
-// lowarc-bootstrap.exe from a sibling `lowarc` checkout, meaning export only worked at all on a
-// dev machine with both repos present. That's gone: bin/lowarc_runtime.rs is now a real binary
-// target of THIS crate's own workspace, so Cargo already builds it as a normal side effect of
-// building lowarc-studio itself — nothing left to fetch from anywhere else, ever.
+// Where the runtime executable export_folder copies into every export comes from.
+// bin/lowarc_runtime.rs is a binary target of this crate's own workspace, so Cargo builds it as a
+// normal side effect of building lowarc-studio. Nothing has to be fetched from anywhere else, and
+// export works on any machine that can build this repo.
 //
 // Same "next to the running exe, or runtime_helpers() as the installed-copy fallback" shape as
 // runtime::native_module::native_module_host_path() — see that function's own comment for why an

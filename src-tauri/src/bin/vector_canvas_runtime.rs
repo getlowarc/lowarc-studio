@@ -209,17 +209,12 @@ impl App {
         }
         let Some(settings) = self.settings.as_ref() else { return };
 
-        // catch_unwind, not just the Result, because this stack PANICS rather than returning Err on
-        // a machine with no usable GL — and that is not hypothetical, it is what a CI runner does.
-        // Two known panics, neither of which the Result can express: glutin's config picker is
-        // required by its own signature to produce a Config or panic (a machine with no matching GL
-        // config yields an empty iterator), and build_surface_attributes panics on a zero-sized
-        // window. Enumerating them individually would still leave whatever the next driver quirk
-        // turns out to be, so the boundary is the thing that gets guarded, not each known cause.
-        //
-        // This is the module's whole "degrades where there is no display" promise. An earlier
-        // version returned a Result here and looked correct; CI proved the process just died
-        // instead, which is exactly the failure the audio module was already bitten by once.
+        // catch_unwind rather than just the Result, because this stack PANICS instead of returning
+        // Err on a machine with no usable GL, which is what a CI runner is. Two known panics the
+        // Result cannot express: glutin's config picker must produce a Config or panic, and an
+        // empty iterator means no matching GL config; and build_surface_attributes panics on a
+        // zero-sized window. Guarding the boundary rather than each known cause is what also covers
+        // the next driver quirk. This is the module's whole degrade-without-a-display promise.
         let built = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| build_window(event_loop, settings)));
 
         self.init_failed = true;

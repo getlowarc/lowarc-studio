@@ -25,9 +25,8 @@ const MIME_BY_EXT = {
   ".m4a": "audio/mp4",
   ".aac": "audio/aac",
   ".opus": "audio/opus",
-  // .ogg used to be lumped in with video/ogg here — reclassified to audio since a plain .ogg file
-  // is overwhelmingly Vorbis audio in practice (Ogg video almost always uses .ogv instead), and
-  // <audio src="..."> plays a real Ogg/Vorbis file exactly as well as <video> would have.
+  // .ogg is treated as audio, not video: a plain .ogg is overwhelmingly Vorbis audio in practice,
+  // since Ogg video almost always uses .ogv instead.
   ".ogg": "audio/ogg",
 };
 
@@ -45,21 +44,14 @@ const MAX_ZOOM = 800;
 const ZOOM_STEP = 25;
 
 // ---------- Embedded album art (ID3v2 only, for now) ----------
-// No metadata-parsing library here on purpose — this iframe is fully sandboxed (no network, no
-// bundler this app's plugins go through), so pulling one in would mean vendoring a real dependency
-// the way Monaco/three.js are, for what's otherwise a small, well-documented binary format. ID3v2
-// (MP3's tagging format) covers the overwhelming majority of real-world "does this audio file have
-// cover art" cases; FLAC's METADATA_BLOCK_PICTURE and MP4/M4A's covr atom are different formats
-// entirely and aren't handled here — a file using either just shows the plain icon instead, same as
-// a format with no embedded art at all. Extending to those is more of this same kind of work, not
-// a redesign, if it's ever worth it.
+// No metadata library, since this iframe is sandboxed and pulling one in would mean vendoring a
+// dependency for a small, well-documented binary format. ID3v2 covers the overwhelming majority of
+// real files with cover art. FLAC's METADATA_BLOCK_PICTURE and MP4's covr atom are different
+// formats and show the plain icon instead; adding them is more of the same work, not a redesign.
 //
-// Decodes base64 -> raw bytes once (atob() + a byte-by-byte charCode read is the plain, dependency-
-// free way to do this in a sandboxed iframe), then walks the ID3v2 header and its frames looking
-// for an APIC (attached picture) frame. Returns {mime, bytes: Uint8Array} or null — anything that
-// doesn't look like a well-formed ID3v2 tag (wrong magic, no APIC frame, truncated data) just
-// returns null rather than throwing, since this is a "nice to have if present" feature, not
-// something that should ever break opening the file.
+// Decodes base64 to bytes, then walks the ID3v2 header looking for an APIC frame. Returns
+// {mime, bytes} or null. Anything malformed returns null rather than throwing, since this is a
+// nice-to-have that must never break opening the file.
 function base64ToBytes(base64) {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);

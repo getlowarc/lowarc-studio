@@ -184,15 +184,11 @@ pub fn remove_plugin(plugins_dir: &Path, id: &str) -> Result<(), String> {
     std::fs::remove_dir_all(&folder).map_err(|e| e.to_string())
 }
 
-/// Reads `rel_path` (e.g. "README.md", "CHANGELOG.md", or a declared `icon` path) relative to an
-/// already-installed module/plugin's own folder — the one generic file read the Modules/Plugins
-/// manage pages' Overview/Changelog tabs and icon both use, rather than three narrower commands.
-/// `folder` must canonicalize to somewhere inside `modules_dir` or `plugins_dir` (the only two
-/// places anything ever gets installed to), and the resolved file must stay inside `folder`
-/// itself — the same two-layer containment shape as plugin_assets::resolve_asset_path, just
-/// generalized to an arbitrary already-known install folder instead of a plugin id under one
-/// fixed root. Returns None for anything missing, unreadable, or failing either containment
-/// check — a module/plugin shipping no README/CHANGELOG/icon is the ordinary case, not an error.
+/// Reads `rel_path` relative to an installed module or plugin's folder: one generic read behind the
+/// Overview and Changelog tabs and the icon, rather than three narrower commands. `folder` must
+/// canonicalize inside `modules_dir` or `plugins_dir`, and the resolved file must stay inside
+/// `folder`. Same two-layer containment as plugin_assets::resolve_asset_path. Returns None for
+/// anything missing, unreadable or failing either check, since shipping no README is ordinary.
 pub fn read_install_text_file(modules_dir: &Path, plugins_dir: &Path, folder: &str, rel_path: &str) -> Option<String> {
     if rel_path.is_empty() {
         return None;

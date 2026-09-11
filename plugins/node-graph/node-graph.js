@@ -22,14 +22,10 @@ const container = document.getElementById("container");
 const docs = new Map(); // path -> Doc
 let activePath = null;
 
-// This plugin's own configured default (Settings > Plugins > Node Graph, see plugin.json's
-// `settings` declaration). getSettings() is async, so nodes can (and do) paint once already, using
-// this optimistic default, before the real stored value comes back — without the refresh below,
-// that first paint would just sit there until the next edit happened to call renderBadges() again,
-// which looks exactly like "badges vanish the moment I touch a node" even though the node edit
-// itself has nothing to do with it. Refreshing every already-open doc right when settings resolve
-// makes the correction happen immediately instead of appearing to piggyback on whatever the user
-// does next.
+// This plugin's configured default. getSettings() is async, so nodes paint once on this optimistic
+// value before the stored one arrives. Without the refresh below that first paint would stand until
+// the next edit happened to call renderBadges(), which reads as "badges vanish the moment I touch a
+// node" even though the edit has nothing to do with it.
 let showBadges = true;
 function refreshOpenDocsForBadgeSetting() {
   for (const doc of docs.values()) {
@@ -415,8 +411,8 @@ function renderAll(doc) {
   // this exact point — the group/iframe around it can still be settling its own box — so the
   // socket rects renderConnections just measured may have been zeroed, drawing nothing or garbage.
   // Re-measuring once more after the browser's next paint corrects for that without having to pin
-  // down the exact reason the first measurement was too early; this was previously only ever fixed
-  // by something else (a click, a tab switch) happening to call renderConnections again later.
+  // down the exact reason the first measurement was too early. Without it, connections stay wrong
+  // until something else happens to call renderConnections again.
   requestAnimationFrame(() => renderConnections(doc));
 }
 
@@ -476,10 +472,9 @@ function addNode(doc, x, y) {
   return node;
 }
 
-// The node's own labeled fields (label, files, sockets, position) are ONLY ever edited through the
-// Inspector — there's deliberately no rename-in-place on the canvas anymore. That used to exist as
-// a dblclick handler here, but having two separate editors for the same field was worse than
-// having one: this way there's exactly one place a node's identity gets changed.
+// The node's labeled fields (label, files, sockets, position) are ONLY edited through the
+// Inspector, deliberately: there is exactly one place a node's identity gets changed, rather than
+// two editors for the same field.
 
 // Which OTHER nodes this node's input/output currently connects to, by label — for the Inspector's
 // read-only "Input"/"Output" lists. direction "in" = nodes feeding into this one; "out" = nodes

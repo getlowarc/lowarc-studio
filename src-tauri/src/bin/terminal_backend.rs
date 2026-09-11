@@ -54,15 +54,11 @@ fn main() {
     let mut writer = pair.master.take_writer().expect("pty master writer");
     let mut reader = pair.master.try_clone_reader().expect("pty master reader");
 
-    // Reads whatever the shell produces and forwards it line-by-line-of-JSON (not line-by-line-of-
-    // terminal-output — a single read can and often does land mid-escape-sequence, which is fine;
-    // xterm.js on the other end parses a continuous byte stream, not discrete lines). EOF here
-    // (read returns 0) is the one reliable "the shell exited" signal — not something checked from
-    // the stdin loop below, since that loop blocks waiting for the *host* to send something, and
-    // the shell can exit on its own (the user typing `exit`) with the host sending nothing at all.
-    // exits the whole process on EOF (not just this thread) since there's nothing left to do once
-    // the shell is gone — including unblocking the main thread's blocking stdin read, which has no
-    // other clean way to be interrupted.
+    // Forwards shell output as lines of JSON, not lines of terminal output: a read often lands
+    // mid-escape-sequence, which is fine, since xterm.js parses a continuous byte stream. EOF is
+    // the one reliable "the shell exited" signal, and it cannot come from the stdin loop below,
+    // which blocks waiting on the host while the shell can exit on its own. Exits the whole process
+    // rather than this thread, which also unblocks the main thread's stdin read.
     std::thread::spawn(move || {
         let mut stdout = std::io::stdout();
         let mut buf = [0u8; 4096];

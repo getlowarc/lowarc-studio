@@ -111,22 +111,16 @@ impl AppPaths {
         Ok(())
     }
 
-    /// A source checkout's own plugin backend binaries (file_explorer_backend.exe,
-    /// terminal_backend.exe) are build OUTPUT, not source — Cargo already compiles them as a side
-    /// effect of building this same workspace (src/bin/*.rs is picked up automatically, no [[bin]]
-    /// needed in Cargo.toml), landing them right next to this very executable. All that was missing
-    /// was copying them into the plugin folder the app actually loads plugins from — this does that,
-    /// so a fresh clone works with nothing beyond `cargo build`/`cargo run`, no separate manual step
-    /// it would have no way to know about. Only runs for a source build; an installed copy gets its
-    /// plugins a different way (bundled resources / the normal install flow), not this. Skips a
-    /// binary that isn't built yet (e.g. `cargo test`'s own exe lives elsewhere) rather than erroring
-    /// — plugin binaries genuinely not existing yet is a normal state, not a failure. Also skips a
-    /// plugin folder with no plugin.json in it: on a fresh clone that's never true (plugin.json is
-    /// tracked source, checked out already — only the compiled binary is ever missing), so this
-    /// never blocks the intended fresh-clone-just-works case. But if a user has actually removed
-    /// one of these plugins (folder deleted, whether through the app's own Remove button or by
-    /// hand), an empty/missing folder is exactly what that looks like — resurrecting just the
-    /// binary into it on the next launch would silently undo a deliberate removal.
+    /// A source checkout's plugin backend binaries are build OUTPUT, not source: Cargo compiles
+    /// them from src/bin/*.rs as a side effect of building this workspace, next to this executable.
+    /// This copies them into the plugin folder the app loads from, so a fresh clone works with
+    /// nothing beyond `cargo build`. Source builds only; an installed copy gets its plugins from
+    /// bundled resources instead.
+    ///
+    /// Skips a binary that is not built yet rather than erroring, since that is a normal state.
+    /// Also skips a plugin folder with no plugin.json: on a fresh clone that never happens, because
+    /// plugin.json is tracked source and only the binary is ever missing. An empty folder means the
+    /// user removed that plugin, and putting the binary back would undo a deliberate removal.
     pub fn ensure_builtin_plugin_binaries() -> std::io::Result<()> {
         if Self::dev_root().is_none() {
             return Ok(());
@@ -149,24 +143,16 @@ impl AppPaths {
         Ok(())
     }
 
-    /// The installed-copy counterpart to ensure_builtin_plugin_binaries() above — that one only
-    /// runs for a source checkout (dev_root().is_some(), the opposite guard from this one). A
-    /// fresh install's plugins()/runtime_helpers() start out completely empty: unlike a source
-    /// checkout, where user_data() IS the repo root, so plugins() already IS the real plugins/
-    /// folder with everything already in it, an installed copy's writable per-user data location
-    /// has no relationship to where the installer actually put anything. `resource_dir` is where
-    /// Tauri's own bundled resources (this app's `bundle.resources`, populated at build time by
-    /// prepare-bundle.ps1 — see its own comment for the full bundling story) actually live; this
-    /// copies the built-in plugins and native_module_host out of there and into the writable
-    /// locations the rest of the app already expects to find them in, exactly once.
+    /// The installed-copy counterpart to ensure_builtin_plugin_binaries(), which runs only for a
+    /// source checkout. An installed copy's plugins() and runtime_helpers() start empty, since its
+    /// writable per-user location has no relationship to where the installer put anything.
+    /// `resource_dir` is where Tauri's bundled resources live; this copies the built-in plugins and
+    /// native_module_host out of there into the writable locations the app expects, once.
     ///
-    /// First-run only, not a sync: skips a plugin folder that already has a plugin.json, the same
-    /// "don't resurrect something the user deliberately removed" reasoning as
-    /// ensure_builtin_plugin_binaries(). Deliberately does NOT handle "this installed copy was
-    /// upgraded to a newer version, refresh what's already there" — that needs real update
-    /// infrastructure to do safely (a user's own edits inside a plugin folder shouldn't be
-    /// silently clobbered by an update), which is a separate, larger piece of work, not something
-    /// to fake here.
+    /// First run only, not a sync: skips a plugin folder that already has a plugin.json, so a
+    /// deliberate removal is not undone. Refreshing an upgraded install is deliberately out of
+    /// scope, since doing it safely without clobbering a user's own edits needs real update
+    /// infrastructure.
     pub fn ensure_installed_copy_resources(resource_dir: &Path) -> std::io::Result<()> {
         if Self::dev_root().is_some() {
             return Ok(());

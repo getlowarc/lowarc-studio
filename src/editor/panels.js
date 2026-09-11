@@ -50,10 +50,10 @@
         return (await invoke("entry_file_exists", { projectDir: projectPath, entry })) ? entry : null;
       }
 
-      // Run just runs the saved config. It deliberately no longer opens a file picker mid-click the
-      // way it used to — picking one file was never enough to make a project runnable anyway (a
-      // project with no modules resolves to nothing), and a Run button that silently sets
-      // configuration as a side effect is a surprise. An unrunnable config opens the editor instead,
+      // Run just runs the saved config, and deliberately never opens a file picker mid-click: a
+      // Run button that sets configuration as a side effect is a surprise, and picking one file
+      // would not make a project runnable anyway, since a project with no modules resolves to
+      // nothing. An unrunnable config opens the editor instead,
       // and runs on the spot if that edit fixed it.
       async function startRun() {
         if (isRunning) return;
@@ -230,18 +230,12 @@
         shell.dataset[p.dataAttr] = p.open ? "true" : "false";
       }
 
-      // Read-modify-write helper — every save* function below goes through this rather than
-      // spreading the cached loadedSettings directly. Real bug hit and fixed live: set_plugin_
-      // enabled/set_module_enabled/install_*/remove_* all write Settings straight from a *fresh*
-      // settings::load() on the Rust side, without loadedSettings (a plain JS variable, never
-      // pushed to from those other commands) ever finding out — so a later save*() spreading the
-      // stale cache would silently clobber whatever one of those had just written. Concretely:
-      // toggling Terminal's Enabled checkbox back on in the plugin manager, then later dragging a
-      // rail icon (triggering saveTabOrder), re-disabled Terminal — the drag's own save spread a
-      // loadedSettings snapshot captured before the enable toggle. Always re-fetching here instead
-      // of trusting the cache costs one extra IPC round-trip per save (infrequent, user-initiated
-      // actions, not a hot path) and closes the whole class of bug at once rather than patching
-      // each caller that happens to race with one of those other commands.
+      // Read-modify-write: every save* below goes through this rather than spreading the cached
+      // loadedSettings. set_plugin_enabled, install_* and remove_* all write Settings from a fresh
+      // load() on the Rust side, and nothing pushes that back into this cache, so a later save
+      // spreading a stale snapshot silently clobbers whatever they just wrote. Re-fetching here
+      // costs one IPC round-trip per save, on user-initiated actions rather than a hot path, and
+      // closes the whole class of bug instead of patching each caller that races.
       let loadedSettings = null;
       let restoredSidebarActiveKey = null;
 

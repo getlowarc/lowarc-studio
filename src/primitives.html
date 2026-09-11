@@ -373,11 +373,8 @@
       initTooltips();
 
       // ---------- Popup contributions ----------
-      // The four examples below used to be hand-authored static HTML toggled by an older,
-      // simpler element-toggle popup pair (openPopup(id)/closePopup(id)) — that system is gone
-      // now (every other page already used the Base popup stack), so these are contributed the
-      // same way a real page's popups are: see editor/menus.js's "new-project" contribution for
-      // another example of this exact pattern.
+      // Contributed the same way a real page's popups are, rather than as static markup: see
+      // editor/menus.js's "new-project" contribution for another example of the same pattern.
       contribute("popups", {
         id: "popup-sm-example",
         sourceType: "host",

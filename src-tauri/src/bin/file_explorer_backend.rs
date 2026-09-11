@@ -438,9 +438,9 @@ mod tests {
 
     // open_draft/commit/revert_all all touch the ONE shared active_draft_path() now (not
     // anything keyed by draft_id) — cargo test runs tests in parallel by default, so without this
-    // every test calling any of the three could stomp on another's active-pointer expectations
-    // (confirmed live: get_active_draft's own tests failed intermittently before this existed).
-    // parking_lot, not std::sync — a std Mutex poisons permanently on a panicking test, which
+    // every test calling any of the three would otherwise stomp on another's active-pointer
+    // expectations, which shows up as intermittent failures.
+    // parking_lot, not std::sync: a std Mutex poisons permanently on a panicking test, which
     // would otherwise cascade an unrelated assertion failure into every other test sharing this
     // lock; parking_lot has no poisoning, so one failure stays exactly that.
     static ACTIVE_DRAFT_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());

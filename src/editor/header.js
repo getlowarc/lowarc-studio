@@ -70,15 +70,12 @@
         return commands;
       }
 
-      // Opens whichever slot `pluginId` actually contributes (sidebar panel, inspector, or console
-      // tab), mounting its iframe fresh if it wasn't already, and resolves once that iframe is
-      // genuinely ready to receive a message — not just once the element exists. A freshly-created
-      // iframe's own scripts (including whatever registers window.lowarc.on("lowarc:runCommand", ...))
-      // haven't run yet the instant mount() returns; waiting for the iframe's `load` event is what
-      // actually guarantees the plugin's own listener exists before anything gets sent to it. An
-      // already-mounted iframe's `load` already fired in the past, so it's returned immediately —
-      // attaching a new `load` listener to it here would just wait forever. Resolves null for a
-      // plugin with no panel/console-tab contribution at all (e.g. viewer-only) — nothing to open.
+      // Opens whichever slot `pluginId` contributes, mounting its iframe if needed, and resolves
+      // once that iframe can actually receive a message rather than once the element exists. A
+      // fresh iframe's scripts have not run when mount() returns, so its `load` event is what
+      // guarantees the plugin's listener exists. An already-mounted iframe is returned immediately,
+      // since its `load` fired in the past and a new listener would wait forever. Resolves null for
+      // a plugin with nothing to open, such as a viewer-only one.
       function ensurePluginMounted(pluginId) {
         for (const [key, entry] of pluginPanels) {
           if (entry.pluginId !== pluginId) continue;

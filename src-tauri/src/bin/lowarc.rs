@@ -1,8 +1,8 @@
 // The headless CLI — running a LowArc project without Studio.
 //
-// Until this existed, the only way to run a project was to click a button, which blocked three
-// unrelated things that share one missing entry point: automated testing of a game, CI for projects
-// built on LowArc, and a repro command you can paste into a bug report.
+// Three unrelated things need a project to be runnable without clicking a button: automated
+// testing of a game, CI for projects built on LowArc, and a repro command you can paste into a bug
+// report.
 //
 // Deliberately thin. runtime::start_run already loads the preset, resolves modules against the
 // store, picks a loader and runs — Studio only writes a temporary launch.json because it drives the

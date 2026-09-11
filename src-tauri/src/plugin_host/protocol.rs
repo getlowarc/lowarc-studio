@@ -200,14 +200,12 @@ impl PluginDescriptor {
     }
 }
 
-/// Spawns `desc.command` fresh in `folder`, writes exactly one `{"method":..,"params":..}` line to
-/// its stdin, and returns whatever it replies with — or a synthetic `{"ok":false,"error":..}` if
-/// it fails to launch, doesn't reply within `desc.timeout_ms`, or replies with something that
-/// isn't valid JSON. The process is killed immediately once a reply is in hand (or the timeout
-/// fires) regardless of whether it was already finishing up on its own — a one-shot invocation has
-/// nothing left to do for it once it's answered. Command resolution and the spawn itself
-/// (resolve_command/spawn_piped) are shared with plugin_session.rs and this crate's own
-/// runtime::process_module, not reimplemented here — see runtime::child_process.
+/// Spawns `desc.command` fresh in `folder`, writes one `{"method":..,"params":..}` line to its
+/// stdin, and returns its reply, or a synthetic `{"ok":false,"error":..}` if it fails to launch,
+/// does not answer within `desc.timeout_ms`, or replies with invalid JSON. The process is killed
+/// as soon as a reply is in hand, since a one-shot invocation has nothing left to do. Command
+/// resolution and the spawn come from runtime::child_process, shared with plugin_session.rs and
+/// runtime::process_module.
 pub fn invoke(folder: &Path, desc: &PluginDescriptor, plugin_id: &str, method: &str, params: &Value, log: &LogFn) -> Value {
     let exe = resolve_command(folder, &desc.command);
 

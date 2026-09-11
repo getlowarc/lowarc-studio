@@ -1,9 +1,7 @@
 // Recent-projects tracking and project creation/opening. The recents file is JSON, one entry per
-// project (path + pinned) — a bare path-per-line list had nowhere to put per-entry state once
-// pinning was added, so this replaced it outright (pre-release dev tool, no migration needed). A
-// missing path still shows up as `exists: false` for the frontend to render as a visible error,
-// not silently dropped from the list (Nolan's call, mirrored from the same rule the old IDE never
-// had).
+// project (path and pinned), since a bare path-per-line list has nowhere to put per-entry state.
+// A missing path shows up as `exists: false` for the frontend to render as a visible error, rather
+// than being silently dropped from the list.
 
 use crate::app_paths::AppPaths;
 use serde::{Deserialize, Serialize};

@@ -31,18 +31,13 @@
           container.appendChild(iframe);
           entry.iframe = iframe;
           windowToPlugin.set(iframe.contentWindow, entry.pluginId);
-          // Session-mode plugins (Terminal, so far — plugin.json's "session": true) start their
-          // own sessions on demand (window.lowarc.session.start(), see plugin_session.rs) — one
-          // per instance it wants running, not one the host auto-starts at mount time. Terminal
-          // requests its first instance itself, the moment its own script runs, the exact same
-          // way it requests every instance after that.
-          // A panel has no filesystem access of its own, so if it needs to know the project root
-          // (a file explorer does; most panels won't care) it's a URL fragment, not a postMessage
-          // pushed after load (synchronous and readable the instant the plugin's own script
-          // starts — no push-arrival-timing race to get wrong). Src is assigned once the
-          // (cached, near-instant) plugin asset port is known — callers here get the iframe
-          // element back synchronously to toggle classes on; they don't need the navigation
-          // itself to have started yet.
+          // A session-mode plugin starts its own sessions on demand, one per instance it wants,
+          // rather than the host starting one at mount.
+          //
+          // A panel has no filesystem access, so the project root arrives as a URL fragment rather
+          // than a postMessage: readable the instant the plugin's script runs, with no
+          // arrival-timing race. Callers get the iframe back synchronously to toggle classes on,
+          // so src is assigned once the cached asset port is known.
           pluginAssetUrl(entry.pluginId, entry.panel.entry, `project=${encodeURIComponent(projectPath)}`)
             .then((url) => {
               iframe.src = url;
@@ -61,16 +56,13 @@
         return entry.iframe;
       }
 
-      // Generalizes what showSidebarPanel used to be into something any tab-strip region can use
-      // (console joins in Phase 4) — shows contribution `id` from `slot` inside the element with id
-      // `containerId`, mounting it (once, ever — cached below, regardless of source) the first time
-      // it's actually shown. Host and plugin content are treated identically here: every
-      // contribution gets the same reused per-tab wrapper (.host-panel-frame's existing show/hide
-      // convention — flex column, 100%/100%, toggled via .is-active — not a new class just for
-      // this), and mount(el) is free to build whatever it wants inside it, including delegating
-      // straight to mountPanelIframe() the way a plugin adapter's mount() does; a plain iframe as
-      // that wrapper's sole flex child fills it exactly the same as a host panel's own toolbar+list
-      // markup does today.
+      // Shows contribution `id` from `slot` inside the element with id `containerId`, mounting it
+      // once ever (cached below, whatever its source) the first time it is shown. Host and plugin
+      // content are treated identically: every contribution gets the same reused per-tab wrapper,
+      // a .host-panel-frame flex column at 100% by 100% toggled with .is-active, and mount(el) can
+      // build whatever it wants inside it, including delegating straight to mountPanelIframe() the
+      // way a plugin adapter's mount() does. A plain iframe as that wrapper's sole flex child fills
+      // it exactly as a host panel's own toolbar-and-list markup does.
       const slotTabMounted = new Map(); // "slot::id" -> the wrapper element already mounted for it
 
       function showSlotTab(slot, containerId, id) {
@@ -215,11 +207,10 @@
           initTooltips();
         }
 
-        // The row header's own enable/disable toggle — the app's one standard control for this
-        // (.checkbox-row/.checkbox-box, same as createManagerPage's detail-pane toggle in
-        // primitives.js) in place of what used to be a purely decorative, unclickable .status-dot.
-        // Its own click is stopped from bubbling so it doesn't also trigger the row header's
-        // expand/collapse.
+        // The row header's enable/disable toggle, using the app's standard control for this
+        // (.checkbox-row and .checkbox-box, the same as createManagerPage's detail-pane toggle in
+        // primitives.js). Its click is stopped from bubbling so it does not also trigger the row
+        // header's expand and collapse.
         function renderEnabledToggle(item) {
           const label = document.createElement("label");
           label.className = "checkbox-row plugin-manager-row-toggle";
@@ -414,9 +405,9 @@
       }
 
       // Keyed with no "::" so a reserved id can never collide with panelKey()'s "pluginId::panelId"
-      // shape. order is negative so both managers sort ahead of any plugin-contributed icon (which
-      // defaults to order 0) regardless of how many plugins are installed — matching the fixed
-      // "Modules, then Plugins, then everything else" position this HTML used to hard-code.
+      // shape. order is negative so both managers sort ahead of any plugin-contributed icon,
+      // which defaults to order 0, however many plugins are installed. Modules, then Plugins, then
+      // everything else.
       const pluginManagerPanel = createManagerPanel({
         listCommand: "list_installed_plugins",
         enableCommand: "set_plugin_enabled",
@@ -490,9 +481,9 @@
       // requestNewTerminal() below needs it on every click, not just on activation.
       let activeConsoleTabKey = "__run";
 
-      // Generalizes what activateConsoleTab(btn, key) used to be — takes just the key now (not a
-      // button reference) so it can be called both from a real click (via renderTabStrip's
-      // onActivate, below) and programmatically (startRun(), which has no click event to hand it).
+      // Takes just the key, not a button reference, so it can be called both from a real click
+      // (via renderTabStrip's onActivate below) and programmatically (startRun(), which has no
+      // click event to hand it).
       // Manually re-toggling is-active here is redundant on the click path (primitives.js's
       // initTabs() already did it, since #console-tabs is a [data-tabs] container) but necessary on
       // the programmatic one — cheap enough either way not to bother with two separate functions.

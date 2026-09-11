@@ -30,11 +30,10 @@
       // Every top-bar dropdown shares the same open/close mechanics: click a trigger to open it
       // (closing any other open menu first), click outside/Escape/pick an item to close it, and
       // hovering a different trigger while one is already open switches to it (how a real menu bar
-      // behaves) rather than requiring a fresh click. The rail's account/settings flyouts and the
-      // console's "New Terminal With…" used to be part of this same MENU_IDS-driven list (each its
-      // own local .menu-dropdown) — they've moved to the shared .floating-menu overlay instead (see
-      // openMenuFromTrigger below), since all three sit near a window edge that a locally-anchored
-      // dropdown could run off of.
+      // behaves) rather than requiring a fresh click. The rail's account and settings flyouts and
+      // the console's session menu are not in this list: they open through the shared .floating-menu
+      // overlay instead (see openMenuFromTrigger below), because all three sit near a window edge
+      // that a locally-anchored dropdown could run off of.
       const MENU_IDS = ["file-menu", "edit-menu", "view-menu", "run-menu", "help-menu"];
 
       function closeAllMenus() {
@@ -96,10 +95,9 @@
       // A menu rendered here is a sibling of every panel and every iframe (see the HTML above,
       // right after .shell closes), so nothing can clip it and it isn't bound to any one trigger's
       // local DOM position the way .menu-dropdown-list is — it's positioned and clamped to the real
-      // window on every open instead. Everything that used to be a local .menu-dropdown near a
-      // window edge (the rail's account/settings flyouts, the console's "New Terminal With…") now
-      // opens through this; a plugin's own content can ask for one too, via window.lowarc.showMenu
-      // (see the "showMenu" branch in the message listener below).
+      // window on every open instead. Anything that opens near a window edge uses this: the rail's
+      // account and settings flyouts, and the console's session menu. A plugin's own content can ask
+      // for one too, via window.lowarc.showMenu (see the "showMenu" branch in the listener below).
       let floatingMenuResolve = null;
 
       function closeFloatingMenu(result) {
@@ -124,8 +122,8 @@
       }
 
       // Low-level: positions the shared #floating-menu-list at `anchor` ({x, y} in viewport
-      // coordinates, the corner it tries to open from — below-right by default, matching where
-      // .menu-dropdown-list used to open) and shows the overlay. Callers fill the list's content
+      // coordinates, the corner it tries to open from, below-right by default) and shows the
+      // overlay. Callers fill the list's content
       // themselves first — shared by openMenuOverlay (action-menu items) and the notification
       // bell's read-only history panel below, since the actual position/clamp/show mechanics are
       // identical for both; only what's inside, and what happens on close, differs.
@@ -203,17 +201,13 @@
         });
       }
 
-      // Convenience for a real trigger element — opens just below it, same default corner
-      // .menu-dropdown-list used to, minus the per-trigger CSS overrides that used to be needed
-      // for triggers near an edge (openMenuOverlay's own clamping replaces those). Also owns
-      // aria-expanded on the trigger itself — every caller here is a flyout that markup already
-      // declares aria-haspopup="true" aria-expanded="false" on (account/settings/console-session),
-      // so this is the one place that needs to flip it, rather than every caller remembering to.
-      // .finally() rather than .then() since the menu can close via a chosen item, Escape, an
-      // outside click, or another menu opening on top of it — aria-expanded should go back to
-      // false (and focus return to the trigger) in every one of those cases, not just a
-      // deliberate selection. Standard menu-button pattern: whether or not a keyboard user
-      // actually Tab'd into the menu's own items, focus lands back on the button that opened it.
+      // Opens just below a real trigger element, with no per-trigger CSS needed near an edge since
+      // openMenuOverlay clamps to the window. Also owns aria-expanded on the trigger, so no caller
+      // has to remember it.
+      //
+      // .finally() rather than .then(), because a menu can close through a chosen item, Escape, an
+      // outside click, or another menu opening over it, and aria-expanded and focus should return
+      // in all of those, not only a deliberate selection.
       function openMenuFromTrigger(triggerEl, items) {
         const rect = triggerEl.getBoundingClientRect();
         triggerEl.setAttribute("aria-expanded", "true");
@@ -224,17 +218,13 @@
       }
 
       // ---------- Popup contributions (host) ----------
-      // showPopup()/the "popups" stack itself now lives in primitives.js (promoted there once
-      // settings.html/modules.html/plugins.html adopted it too — see the comment on it there for
-      // the full mechanics). These are the three popups editor.html used to hand-author as static
-      // HTML toggled by an older, simpler element-toggle pair (openPopup(id)/closePopup(id)) —
-      // that system is gone now, every page (including primitives.html's own showcase examples)
-      // has migrated to this one.
+      // showPopup() and the "popups" stack itself live in primitives.js, since settings.html,
+      // modules.html and plugins.html all use them too. See the comment there for the mechanics.
+      // These are the three editor.html registers for itself.
 
-      // The project's run configuration — what project.json actually holds. Replaces the old "Set
-      // Entry File…" menu item, which could only set one of the two fields and left the other
-      // (which modules the project needs) editable nowhere at all: a project's requires could only
-      // be changed by hand-editing project.json.
+      // The project's run configuration, which is what project.json actually holds: the entry file
+      // and which modules the project requires. Both are editable here; neither was reachable from
+      // the IDE before, so a project's requires meant hand-editing the file.
       //
       // target is { projectPath }; resolves true if it saved, false otherwise, so a caller that
       // opened it to fix an unrunnable config knows whether to retry.
@@ -248,8 +238,8 @@
           const body = document.createElement("div");
           body.className = "popup-body";
 
-          // Held here and only written on Save — the point of an editor over the old menu item is
-          // that nothing takes effect until you say so, including a cancelled file picker.
+          // Held here and only written on Save, so nothing takes effect until you say so,
+          // including a file picker you opened and cancelled.
           let entry = "";
           const selected = new Set();
 
@@ -640,8 +630,9 @@
         },
       });
 
-      // Settings/Modules/Plugins stay their own separate documents (real Tauri API access,
-      // multiple entry points already before this) — see contributeIframePopup() in primitives.js.
+      // Settings, Modules and Plugins stay their own separate documents, since they need real
+      // Tauri API access and several entry points each. See contributeIframePopup() in
+      // primitives.js.
       // The url passed to each showPopup() call below is what actually varies per trigger (e.g.
       // settings.html's own ?tab=appearance), not the registration itself.
       contributeIframePopup("settings", { title: "Settings" });

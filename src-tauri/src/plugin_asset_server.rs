@@ -27,15 +27,11 @@ pub fn start() {
     let port = server.server_addr().to_ip().expect("loopback server has an ip address").port();
     PORT.store(port, Ordering::SeqCst);
     std::thread::spawn(move || {
-        // A thread per request, not one loop handling requests one at a time — Monaco alone
-        // pulls in dozens of separate chunk files (vs/editor/*, vs/language/*/, its worker
-        // scripts) the instant its own iframe navigates, and the browser fires most of those
-        // concurrently; serialized behind a single thread, each one queues behind whatever
-        // std::fs::read was already mid-flight, which is exactly the several-second stall
-        // reported on a file's first open (and doubly so opening a second Monaco instance for
-        // split view, competing for the same one thread). Every request here is a plain
-        // stateless disk read with no shared mutable state to race on, so unbounded concurrency
-        // costs nothing but a thread per in-flight request.
+        // A thread per request rather than one loop serving them in turn. Monaco alone pulls dozens
+        // of chunk files the instant its iframe navigates, and the browser fires most concurrently;
+        // behind a single thread each one queues on whatever read is mid-flight, which is a
+        // multi-second stall on a file's first open. Every request here is a stateless disk read
+        // with no shared mutable state, so unbounded concurrency costs only a thread apiece.
         for request in server.incoming_requests() {
             std::thread::spawn(move || handle(request));
         }

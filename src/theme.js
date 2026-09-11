@@ -102,19 +102,14 @@ function applyThemeColors(colors) {
     if (value) root.setProperty(token.cssVar, value);
   }
 
-  // Which way a button should move on hover, derived from the theme's own background rather than
-  // hardcoded per built-in theme — so a user's own preset gets the right direction too.
+  // Which way a button moves on hover, derived from the theme's own background so a user's preset
+  // gets the right direction too. Brightening only works on a dark ground: on a light theme it
+  // pushes a filled button up toward its own ink, which is usually pure white and cannot brighten
+  // further, so a white glyph vanishes into the button. Darkening moves them apart instead.
   //
-  // Buttons hover by brightening, which only works on a dark ground. On a light theme it pushes a
-  // filled button UP toward its own ink: light ink is typically pure white, which cannot get any
-  // brighter, so the two converge and the label or icon vanishes into the button. The Run button in
-  // the header was exactly this — a white play glyph on teal, fading into a brightening surface.
-  // Darkening instead moves them apart, which is also what light UIs conventionally do.
-  //
-  // A filter is used rather than per-type hover colors because it brightens the whole rendered
-  // button, content included; there is no way to filter only the background. Getting the DIRECTION
-  // right is what makes that acceptable, since the content then moves away from the surface rather
-  // than into it.
+  // A filter rather than per-type hover colours, because there is no way to filter only the
+  // background; it brightens the content too. Getting the direction right is what makes that
+  // acceptable, since the content then moves away from the surface rather than into it.
   root.setProperty("--btn-hover-brightness", luminanceOf(colors.bg) > 0.5 ? "0.92" : "1.1");
 
   // Announced rather than pushed anywhere from here: this file has no business knowing which

@@ -3,12 +3,11 @@
 // line, the same shape runtime::process_module already uses one level down for an individual
 // module.
 //
-// Why this exists at all: a dev-run used to execute on a background thread INSIDE lowarc-studio.exe
-// itself. Every module was already its own child process, so a module crash couldn't reach Studio —
-// but the loader/driver machinery, and anything ever loaded alongside it, sat directly in the
-// address space holding the user's unsaved editor work. User code must never be able to take Studio
-// down; a crash should end the run being debugged and nothing else. Moving the run out here makes
-// that structural rather than a property of what modules happen to do.
+// Why this is a separate process: user code must never be able to take Studio down. Run on a
+// thread inside lowarc-studio.exe, the loader and driver machinery, and anything loaded alongside
+// it, would sit in the address space holding the user's unsaved editor work. Out here, a crash
+// ends the run being debugged and nothing else, structurally rather than by the good behaviour of
+// whatever modules happen to be loaded.
 //
 // Separate from bin/lowarc_runtime.rs on purpose, even though both ultimately call
 // runtime::run_from_launch_dir. That binary IS a shipped export — "no IDE, no window, no UI of its

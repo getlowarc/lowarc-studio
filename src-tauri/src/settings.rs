@@ -1,6 +1,6 @@
 // Studio's own app-level preferences — distinct from the per-module `settings` Value threaded
 // through runtime/ (that's opaque config handed to game modules at dev-run start, not this).
-// One field so far: the dev-run target FPS, previously hardcoded to 60 in lib.rs.
+// One field so far: the dev-run target FPS.
 
 use crate::app_paths::AppPaths;
 use serde::{Deserialize, Serialize};
@@ -33,10 +33,8 @@ pub struct Settings {
     pub disabled_plugins: Vec<String>,
     /// Values for whatever config fields a plugin has declared in its own plugin.json's `settings`
     /// (see plugin_host::protocol::PluginSettingField) — keyed by plugin id, then by that plugin's
-    /// own field key. The generic mechanism any plugin can opt into; superseded the old one-off
-    /// `terminal_shell` field, which was this exact same idea (a persisted per-user override for
-    /// one plugin's launch behavior) hand-coded for a single plugin instead of expressed through a
-    /// schema every plugin can use. Plain strings, not typed values — a checkbox field's value is
+    /// own field key. The generic mechanism any plugin can opt into, rather than a field hand-coded
+    /// per plugin. Plain strings, not typed values, since a checkbox field's value is
     /// "true"/"false", matching how per-module settings (runtime/'s own `settings: HashMap<String,
     /// String>`) already keep this simple rather than modeling a real type system for it.
     #[serde(default)]

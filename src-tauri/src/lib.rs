@@ -34,20 +34,20 @@ use tauri::{AppHandle, Emitter, Manager, State};
 /// rather than silently replacing it — mirrors "throw a visible error, let the user decide" rather
 /// than guessing what they meant.
 ///
-/// A run executes in its own process now (bin/dev_run_host.rs), not on a thread inside this one, so
-/// what's held here is that child and the pipe used to drive it — not the stop/pause/step atomics
-/// this used to carry. Those live in the child; every control command is a JSON line written to
-/// `stdin` below. See dev_run_host.rs's own header for why the run moved out at all (short version:
-/// user code must never be able to crash Studio).
+/// A run executes in its own process (bin/dev_run_host.rs), not on a thread inside this one, so
+/// what is held here is that child and the pipe used to drive it. The stop, pause and step state
+/// lives in the child, and every control command is a JSON line written to `stdin` below. See
+/// dev_run_host.rs for why the run is out of process at all: user code must never be able to crash
+/// Studio.
 struct ActiveRun {
     child: Child,
     stdin: ChildStdin,
     /// The scratch folder holding this run's generated launch.json, removed when the run ends.
     scratch: PathBuf,
-    /// Mirrors the child's own pause_flag, purely so step_dev_run can keep refusing a step on a
-    /// freely-running loop the way it did when it owned that flag directly. Two things move it: the
-    /// pause/resume commands sent from here, and a frame trace arriving with a `triggered`
-    /// breakpoint — the child pausing ITSELF, which is otherwise invisible to this process.
+    /// Mirrors the child's own pause_flag, so step_dev_run can refuse a step on a freely-running
+    /// loop. Two things move it: the pause and resume commands sent from here, and a frame trace
+    /// arriving with a `triggered` breakpoint, which is the child pausing ITSELF and otherwise
+    /// invisible to this process.
     paused: bool,
 }
 
@@ -89,9 +89,9 @@ fn log_level_str(level: LogLevel) -> &'static str {
     }
 }
 
-/// The log callback every plugin_host::protocol::invoke call gets — plugins are invoked fresh per
-/// call now (no persistent process to wire this up once for at launch), so this is built fresh
-/// per call too rather than stored anywhere.
+/// The log callback every plugin_host::protocol::invoke call gets. Plugins are invoked fresh per
+/// call, with no persistent process to wire this up once at launch, so it is built per call rather
+/// than stored anywhere.
 fn plugin_log_fn(app: &AppHandle) -> plugin_host::protocol::LogFn {
     let handle = app.clone();
     Arc::new(move |level, message| {
@@ -153,9 +153,8 @@ fn start_dev_run(
     let mut active = ActiveRun { child, stdin, scratch, paused: false };
 
     // Breakpoints are configured independently of any one run (see BreakpointState's own comment),
-    // so the child starts life knowing nothing about them — it has to be told, both now and on
-    // every later edit (see set_breakpoints). While the run lived in this process, a shared Arc
-    // made both of those free.
+    // so the child starts life knowing nothing about them and has to be told, both now and on
+    // every later edit (see set_breakpoints).
     let _ = active.send(serde_json::json!({"cmd": "setBreakpoints", "breakpoints": breakpoints}));
 
     *guard = Some(active);
@@ -345,9 +344,8 @@ fn step_dev_run(state: State<'_, RunState>, count: Option<u32>) -> Result<(), St
 /// the whole set rather than adding/removing one at a time, same "frontend always resends
 /// everything" convention plugin settings/commands already use.
 ///
-/// A live run now needs telling separately: it's another process holding its own copy, so an edit
-/// made mid-run no longer reaches it for free through a shared Arc the way it did when the run
-/// lived in this one.
+/// A live run needs telling separately, since it is another process holding its own copy. An edit
+/// made mid-run does not reach it unless this sends it.
 #[tauri::command]
 fn set_breakpoints(
     state: State<'_, BreakpointState>,
@@ -466,24 +464,16 @@ fn read_text_file(path: String) -> Result<String, String> {
 /// `window.lowarc.saveFile(path, contents)`, same reasoning as read: a sandboxed viewer iframe
 /// has no filesystem access of its own.
 ///
-/// Every save in the app flows through here — Monaco's today, anything else that edits files
-/// later too — which makes this the one generic place to give a plugin a chance to see a file's
-/// content the instant BEFORE it's overwritten, not after (a moment nothing else in the app
-/// otherwise exposes). Reads the current content first and emits "file-about-to-save" with it,
-/// then writes. Not addressed to any particular plugin — this file has no idea Offshoot exists,
-/// same reasoning read_text_file/write_text_file never knew about any one viewer plugin either;
-/// see split-view.js's listener for how it actually reaches a plugin's iframe. `previousContent`
-/// is None for a brand-new file (nothing existed to read yet) or one that failed to read as UTF-8
-/// text — either way, "no prior text content" is a fact worth telling a listener, not an error
-/// worth failing the save over.
+/// Every save flows through here, which makes it the one place a plugin can see a file's content
+/// the instant BEFORE it is overwritten. Reads the current content, emits "file-about-to-save" with
+/// it, then writes. Addressed to no particular plugin; see split-view.js's listener for how it
+/// reaches an iframe. `previousContent` is None for a new file or one that is not UTF-8 text, which
+/// is a fact worth telling a listener rather than an error worth failing the save over.
 ///
-/// The emitted "path" is deliberately the ORIGINAL, un-canonicalized argument, not `validated`
-/// below — on Windows, PathBuf::canonicalize() returns the `\\?\`-prefixed extended-length form,
-/// which is byte-for-byte different from the plain path every other part of the app (the file
-/// tree, openFile, Monaco's own `activePath`) already uses for this exact same file. Confirmed
-/// live: a listener trying to match this event's path against its own tree-row paths never found
-/// a match, because they weren't actually the same string. `validated` is still what actually
-/// gets read/written — this only changes what string a listener sees.
+/// The emitted "path" is the ORIGINAL argument, not `validated`. On Windows, canonicalize() returns
+/// the `\\?\`-prefixed extended-length form, which is a different string from the plain path the
+/// file tree, openFile and Monaco all use for the same file, so a listener matching against its own
+/// paths would never find it. `validated` is still what gets read and written.
 #[tauri::command]
 fn write_text_file(app: AppHandle, path: String, contents: String) -> Result<(), String> {
     let validated = validate_file_path(&path)?;
@@ -778,9 +768,8 @@ fn read_install_text_file(folder: String, rel_path: String) -> Option<String> {
 /// and editor.html's message-relay listener) into a fresh invocation of that plugin's backend,
 /// and surfaces its reply. This is the only path a plugin's UI has back to its own backend — it
 /// never gets a real Tauri capability of its own. A reply carrying an "emit" field gets relayed on
-/// to the plugin's own mounted panels the same way a live process's unprompted push used to — the
-/// one piece of that mechanism that survives invoke-per-call, since it rides along on a reply
-/// instead of needing anything to persist between calls.
+/// to the plugin's own mounted panels. It rides along on a reply rather than needing anything to
+/// persist between calls, which is what makes it work with one invoke per call.
 #[tauri::command]
 fn invoke_plugin(app: AppHandle, id: String, method: String, params: serde_json::Value) -> Result<serde_json::Value, String> {
     if !AppPaths::is_valid_component_id(&id) {
@@ -814,8 +803,8 @@ fn invoke_plugin(app: AppHandle, id: String, method: String, params: serde_json:
 /// from its "..." menu) — genuinely generic, not Terminal-specific: whatever the frontend passes is
 /// pushed verbatim, with no Rust-side knowledge of what it means or which plugin asked for it. A
 /// plugin that wants a persisted default (like Terminal's own shell setting) reads it itself via
-/// get_plugin_settings/window.lowarc.getSettings() and passes the resolved value here — this
-/// command no longer reaches into Settings on any plugin's behalf.
+/// get_plugin_settings and window.lowarc.getSettings() and passes the resolved value here. This
+/// command never reaches into Settings on a plugin's behalf.
 #[tauri::command]
 fn start_plugin_session(app: AppHandle, id: String, session_id: String, shell: Option<String>, sessions: State<plugin_session::SessionRegistry>) -> Result<(), String> {
     if !AppPaths::is_valid_component_id(&id) {

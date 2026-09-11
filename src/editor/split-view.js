@@ -83,25 +83,17 @@
       }
       initSplitDividerDrag();
 
-      // Relays a plugin's own webview content calling lowarc.call(method, params) (see the
-      // __lowarc.js harness served by plugin_assets.rs) into that exact plugin's process via
-      // invoke_plugin, and the reply back. Trust comes from windowToPlugin — event.source is the
-      // actual sending window, not something a message can lie about — never from anything the
-      // message payload itself claims. A second branch below handles "host" messages
-      // (lowarc.markDirty/requestClose) the same way, just routed to a tab instead of a process.
+      // Relays a plugin calling lowarc.call(method, params) into that plugin's process via
+      // invoke_plugin, and the reply back. Trust comes from windowToPlugin, keyed by event.source,
+      // which a message cannot lie about, never from anything the payload claims. A second branch
+      // below handles "host" messages the same way, routed to a tab instead of a process.
       //
-      // CORRECTED (2026-08-27): this used to compare event.origin against the plugin asset
-      // server's real "http://127.0.0.1:<port>" origin, on the theory that a sandboxed iframe's
-      // messages would report it. That's wrong — sandbox="allow-scripts" without
-      // allow-same-origin forces the iframe into a genuinely opaque origin, and every browser
-      // reports that as the literal string "null" on postMessage, regardless of what URL actually
-      // served the content. The dynamic-origin comparison could therefore never once match, and
-      // was silently rejecting every plugin-to-host action from every plugin the whole time it
-      // existed — confirmed live (event.origin really is the string "null"). Checking for that
-      // literal instead is what a legitimately-sandboxed plugin iframe's message actually looks
-      // like; the real per-plugin identity check remains windowToPlugin/windowToFilePaths below
-      // (keyed by the unforgeable event.source), unchanged and doing the actual trust work here —
-      // this origin check only ever added defense-in-depth on top of that, never replaced it.
+      // The origin check below compares against the literal string "null", NOT against the asset
+      // server's http://127.0.0.1:<port> origin. sandbox="allow-scripts" without allow-same-origin
+      // forces the frame into an opaque origin, and every browser reports that as "null" on
+      // postMessage whatever URL served the content. Comparing against the real origin would
+      // reject every plugin message. This is defence in depth only; the identity check is
+      // windowToPlugin below, keyed by the unforgeable event.source.
       window.addEventListener("message", async (event) => {
         const data = event.data;
         if (!data || typeof data !== "object") return;
@@ -459,8 +451,8 @@
       });
 
       // Plugins are invoked per call now, not kept running (see plugin_host/protocol.rs) — a
-      // backend can't push something unprompted at some arbitrary later time any more, since
-      // nothing persists between calls. It CAN still ride an "emit" along on a call's own reply
+      // backend cannot push something unprompted at an arbitrary later time, since nothing
+      // persists between calls. It CAN ride an "emit" along on a call's own reply
       // though (invoke_plugin in lib.rs re-fires it as this event), so a plugin can tell its own
       // other panels/viewers "something changed" as a side effect of whatever it was just asked
       // to do — still call-triggered, just not truly live.

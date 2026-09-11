@@ -1,33 +1,29 @@
       // ---------- Base system: shared region renderers ----------
       // Built on primitives.js's contribute()/getSlot() registry.
 
-      // For a region with a tab strip — (re)builds a button per contribution in `slot`, into
-      // `container` (already wired as a [data-tabs] strip by primitives.js's initTabs(), and —
-      // separately — by whichever initReorderable(...) call already covers this container, see the
-      // "Drag-to-reorder" block above; this only builds the buttons and their activate/close
-      // behavior on top of both, it doesn't reimplement either). Safe to call repeatedly — every
-      // call clears and rebuilds just the tab elements (and the empty-state placeholder, if any) it
-      // itself owns, the same "rebuild from scratch on every relevant change" shape renderTabBar()
-      // already used before this existed; listener wiring (tab-change/click) only happens once per
-      // container, guarded below, so repeated calls don't stack duplicate listeners.
+      // Builds a button per contribution in `slot` into `container`, which initTabs() and any
+      // initReorderable() call have already wired. This only adds the buttons and their
+      // activate/close behaviour on top. Safe to call repeatedly: it rebuilds only the elements it
+      // owns, and listener wiring is guarded so repeated calls do not stack duplicates.
       //
-      // opts: { itemClass, anchorEl (a trailing non-item child tabs must stay before — the
-      // console's own "+"/spacer controls; omit if there's none), iconBased (default true — rail
-      // tabs are icon-only with a tooltip for the label, matching addSidebarRailIcon's old
-      // convention; pass false for a text-label strip like the console's/a file tab's), emptyText
-      // (shown in the strip itself when the slot has no contributions — omit for a strip that's
-      // fine looking merely empty, like the rail), onActivate(contribution) (a tab just became the
-      // active one), onToggleClose(contribution, btn) (optional — clicking the ALREADY-active tab
-      // calls this INSTEAD of onActivate; return false to leave it active and let the click fall
-      // through as normal), onClose(contribution) (optional — only takes effect on a contribution
-      // whose own closeable is exactly true, e.g. a file tab; renders a close button and routes it
-      // here instead of onActivate/onToggleClose), decorate(contribution, tabEl) (optional — called
-      // for every tab element right after it's built, so a caller can apply status classes it reads
-      // from ITS OWN live state rather than the contribution, which is meant to stay a fairly static
-      // declaration — see renderTabBar()'s dirty/missing classes for the motivating case). An
-      // icon-based contribution's icon is either static (iconHtml, shown immediately) or resolved
-      // async (resolveIcon(), a plugin's own railIcon fetched over IPC — shown once it resolves,
-      // FALLBACK_RAIL_ICON_SVG until then), matching how addSidebarRailIcon used to load one.
+      // opts:
+      //   itemClass
+      //   anchorEl        a trailing non-item child tabs must stay before, like the console's
+      //                   "+" and spacer. Omit when there is none.
+      //   iconBased       default true, for icon-only tabs with a tooltip label. False for a
+      //                   text-label strip like the console's or a file tab.
+      //   emptyText       shown in the strip when the slot has no contributions. Omit for a strip
+      //                   that is fine looking empty, like the rail.
+      //   onActivate      (contribution) a tab became the active one.
+      //   onToggleClose   (contribution, btn) optional. Clicking the ALREADY-active tab calls this
+      //                   instead of onActivate. Return false to let the click fall through.
+      //   onClose         (contribution) optional, only for a contribution with closeable === true.
+      //   decorate        (contribution, tabEl) optional, called per tab as it is built, so a
+      //                   caller can apply status classes from its own live state rather than from
+      //                   the contribution, which stays a static declaration.
+      //
+      // An icon-based contribution's icon is either static (iconHtml) or async (resolveIcon(), a
+      // plugin's railIcon over IPC, showing FALLBACK_RAIL_ICON_SVG until it resolves).
       function renderTabStrip(container, slot, opts) {
         const { itemClass = "sidebar-tab", anchorEl = null, iconBased = true, emptyText = null, onActivate, onToggleClose, onClose, decorate } = opts;
 
@@ -50,8 +46,8 @@
         for (const contribution of contributions) {
           const closeable = contribution.closeable === true;
           // A closeable tab hosts a real nested <button> (the close control) — buttons can't nest,
-          // so it's a div standing in for one (role/tabindex/keydown-triggers-click), the same shape
-          // file-tabs already used before this existed. A non-closeable tab stays a real <button>.
+          // so it is a div standing in for one (role, tabindex, keydown-triggers-click). A
+          // non-closeable tab stays a real <button>.
           const tab = document.createElement(closeable ? "div" : "button");
           tab.className = itemClass;
           tab.dataset.tabValue = contribution.id;
@@ -136,10 +132,8 @@
           });
         }
 
-        // Toggle-close-on-reclick — generic here instead of hand-wired per region. This is the
-        // actual payoff of unifying: the behavior used to only exist for plugin-added rail icons
-        // (wired inside addSidebarRailIcon() itself) until the two host-added manager icons — added
-        // a different way — needed a second, separate fix. Capture phase: observes pre-click state
+        // Toggle-close-on-reclick, generic here rather than hand-wired per region, so every tab
+        // strip gets it from one place. Capture phase: observes pre-click state
         // before [data-tabs]' own bubble-phase handler (primitives.js's initTabs()) mutates
         // is-active, and — only once onToggleClose actually handles it — stops that handler from
         // also firing and immediately reopening what this just closed.
@@ -347,11 +341,10 @@
         // just whenever a user happens to click the Run tab first. Until that reparenting happens,
         // #console-run-panel's own permanently-baked-in "is-active" class (see its static HTML)
         // makes it render on its own regardless of any other tab's wrapper — a same-height phantom
-        // sibling stacking underneath whatever tab genuinely is active, which is exactly what showed
-        // up as unexplained extra scroll height the moment Terminal (or anything else) became active
-        // before Run ever had been. Doesn't open the console panel itself — activateConsoleTab()
-        // never does that — just establishes Run as the active tab underneath, matching what the
-        // static HTML already visually implied by default.
+        // sibling stacking underneath whatever tab genuinely is active, which shows up as
+        // unexplained extra scroll height as soon as any other tab becomes active first. This does
+        // not open the console panel, since activateConsoleTab() never does; it just establishes
+        // Run as the active tab underneath, matching what the static HTML visually implies.
         activateConsoleTab("__run");
 
         // [data-tabs] only marks .is-active in response to a real click (see initTabs() in

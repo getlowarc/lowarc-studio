@@ -201,16 +201,13 @@
       });
 
       // ---------- Global keyboard shortcuts ----------
-      // Deliberately small — Ctrl+S/Ctrl+Shift+S/Ctrl+Shift+P mirror the three menu items that had
-      // no prior way to invoke them at all (Monaco's own Ctrl+S already exists inside its iframe,
-      // but a host-level one is what makes the File > Save menu item actually feel wired rather
-      // than mouse-only, and is also what fires while some OTHER panel has focus). NOT extended to
-      // Undo/Redo/Cut/Copy/Paste/Find/Replace — Monaco already binds all of those natively inside
-      // its own iframe, so a second host-level binding for them would be pure redundancy, not a
-      // gap. Like the existing Escape handler above, this only ever fires while the HOST document
-      // itself has focus — a sandboxed plugin iframe's keydown (an editor tab included) never
-      // reaches here, so these do nothing while you're actually typing in one. See the "shortcuts"
-      // popup's own comment for the fuller version of this caveat.
+      // Deliberately small. Ctrl+S, Ctrl+Shift+S and Ctrl+Shift+P are host-level so they fire while
+      // some other panel has focus, not only inside the editor. Not extended to Undo, Cut, Find and
+      // friends, which Monaco already binds inside its own iframe.
+      //
+      // Like the Escape handler above, these only fire while the HOST document has focus: a
+      // sandboxed iframe's keydown never reaches here, so they do nothing while you are typing in
+      // one. See the "shortcuts" popup for the fuller caveat.
       document.addEventListener("keydown", (e) => {
         const mod = e.ctrlKey || e.metaKey;
         if (!mod || e.altKey) return;

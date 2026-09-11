@@ -308,31 +308,22 @@ fn spawn_stderr_reader(stderr: std::process::ChildStderr, log: LogFn, name: Stri
     });
 }
 
-/// Spawns one ProcessModule per `(info, descriptor)` pair, then drives them through the standard
-/// compile→start→frame-loop→stop lifecycle, sorted into requires-order (see manifest::
-/// requires_rank — NOT just each module's own raw manifest.load_order; two modules can declare any
-/// loadOrder numbers regardless of what they actually require, so only a real requires-DFS
-/// guarantees a producer runs before its consumers, which the shared/publish design below depends
-/// on for correctness, not just tidiness).
+/// Spawns one ProcessModule per `(info, descriptor)` pair and drives them through
+/// compile, start, the frame loop and stop, in requires-order. That ordering must come from
+/// manifest::requires_rank rather than raw load_order: two modules can declare any loadOrder
+/// regardless of what they require, and only a requires-DFS guarantees a producer runs before its
+/// consumers, which the shared/publish design depends on for correctness.
 ///
-/// Shared by ProcessLoader (real process.json modules) and NativeLoader (native.json modules
-/// bridged through the native_module_host helper process — see that file for why: it needs the
-/// exact same spawn/start/frame/stop shape a real process module gets, just with a synthetic
-/// descriptor pointing at the helper instead of one read from disk). The "compile" phase is a
-/// harmless no-op for a native-bridging module — native_module_host answers it immediately with
-/// no work to do — so this lifecycle doesn't need to know which kind of module it's driving.
+/// Shared by ProcessLoader and NativeLoader, the latter bridging native modules through the
+/// native_module_host helper with a synthetic descriptor. The compile phase is a no-op for a
+/// native module, so this lifecycle never needs to know which kind it is driving.
 ///
-/// Inter-module communication, in full: `shared` below is one run-wide map, module id -> whatever
-/// that module last published (persists frame to frame; a key nobody's touched yet this tick just
-/// keeps its previous value). Every module's frame() call reads its own filtered view of it (only
-/// the ids it `requires` — see ProcessModule::frame) and may return new entries to publish under
-/// its OWN id, merged into `shared` the moment that module's frame() call returns. Because `started`
-/// is sorted by requires_rank (see this function's own header above — a module always runs after
-/// everything it requires), a consumer's frame() this same tick sees its dependency's output from
-/// THIS tick, not one tick stale — no separate synchronization or double-buffering needed, it falls
-/// out of the existing ordering for free. No new manifest field either: requires already means "I
-/// depend on this existing", so it doing double duty as the communication permission is the least
-/// arbitrary reading of it, not a second, parallel concept to keep in sync with the first.
+/// `shared` is one run-wide map of key to whatever was last published under it, persisting frame to
+/// frame. Each module's frame() reads only the keys it `requires` and may publish under its own id
+/// and under every contract it provides. Since `started` is in requires-order, a consumer sees its
+/// dependency's output from THIS tick rather than one tick stale, with no double-buffering needed.
+/// `requires` doing double duty as the read permission means there is no second, parallel concept
+/// to keep in sync with it.
 pub fn spawn_and_run(descriptors: Vec<(&ModuleInfo, ProcessDescriptor)>, ctx: &RunContext) -> Result<(), String> {
     let mut spawned: Vec<ProcessModule> = Vec::new();
     for (info, desc) in &descriptors {

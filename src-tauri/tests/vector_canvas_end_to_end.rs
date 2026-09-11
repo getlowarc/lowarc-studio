@@ -24,10 +24,10 @@ struct Module {
     child: Child,
     stdin: ChildStdin,
     stdout: BufReader<std::process::ChildStdout>,
-    /// Only ever read when the module dies unexpectedly. Piping it and then never reading it is how
-    /// an earlier version of this test reported "the module closed its output before replying" and
-    /// nothing else, while the actual panic message sat in a pipe nobody drained — on a CI runner,
-    /// which is the one machine where that message was the whole answer.
+    /// Only read when the module dies unexpectedly, and it must actually be read: piping stderr
+    /// and never draining it leaves a panic message sitting in the pipe, so the failure reports
+    /// "the module closed its output before replying" and nothing else. On a CI runner that message
+    /// is the whole answer.
     stderr: Option<std::process::ChildStderr>,
 }
 
@@ -135,8 +135,7 @@ fn it_answers_every_phase_and_publishes_a_surface_a_director_can_read() {
     // The degraded marker has to agree with reality, and this holds on BOTH kinds of machine
     // without the test needing to know which it is on — a developer box reports a real window and
     // no marker, a display-less CI runner reports neither and must say so. Pinning the pair is what
-    // makes "it degrades" a checked claim rather than an intention; the module previously died here
-    // instead, and passing tests said nothing about it.
+    // makes "it degrades" a checked claim rather than an intention.
     let width = published.get("width").and_then(Value::as_u64).unwrap_or(0);
     let degraded = start.get("degraded").and_then(Value::as_str);
     if width > 0 {

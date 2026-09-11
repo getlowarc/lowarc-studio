@@ -121,14 +121,12 @@ function extOf(path) {
 }
 
 // ---------- Editable values ----------
-// Deliberately narrow: only a bare boolean/number/quoted-string literal sitting at the very END
-// of the declaration line (past the last real assignment operator) counts — anything more
-// complex (a function call, an object/array literal, string concatenation, another identifier)
-// is left alone, since this can't tell what those actually mean well enough to safely rewrite
-// them. Two operators, not one: `=` for most languages' assignment, `:` for JSON/YAML/INI-style
-// key-value lines — a line only ever matches one of these in practice, so trying both costs
-// nothing. The `d` flag (match.indices) is what gives group 1's own start/end offsets, not just
-// the whole match's — needed to splice a replacement in without disturbing the rest of the line.
+// Deliberately narrow: only a bare boolean, number or quoted string at the very END of the line
+// counts. Anything more complex is left alone, since this cannot tell what a call or an object
+// literal means well enough to rewrite it safely. Two operators, `=` for assignment and `:` for
+// JSON, YAML and INI-style lines, since a line only ever matches one. The `d` flag gives group 1's
+// own offsets, which is what allows splicing a replacement without disturbing the rest of the
+// line.
 const VALUE_RE = /(?<![!<>=])=(?!=)\s*(true|false|-?\d+(?:\.\d+)?|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')\s*;?\s*$/d;
 const COLON_VALUE_RE = /:\s*(true|false|-?\d+(?:\.\d+)?|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')\s*,?\s*$/d;
 

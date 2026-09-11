@@ -15,8 +15,8 @@ const CHECKMARK_SVG = '<svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.
 const DELETE_SVG = '<svg viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>';
 
 // Appends a .popup-actions row with a Cancel button plus one other action button — the shape most
-// simple popups need (a delete/discard confirmation, a create-with-validation form's Cancel+Create
-// pair), hand-built identically at several popup contributions before this existed. Returns the
+// simple popups need: a delete or discard confirmation, a create-with-validation form's
+// Cancel and Create pair. Returns the
 // confirm button so a caller needing more than a bare click listener (new-project's own async
 // validation, triggered by Enter in its input too — see menus.js) can hold onto it.
 function appendConfirmActions(container, { cancelLabel = "Cancel", confirmLabel, confirmVariant = "confirm", onCancel, onConfirm } = {}) {
@@ -174,46 +174,31 @@ function initTabs(root = document) {
   });
 }
 
-// Drag-to-reorder for a tab/rail strip — opt-in per container via the data-reorderable attribute
-// (checked here, not left to callers to remember), not wired onto every [data-tabs] container
-// automatically: most tab strips in this app (the top menu bar, a standalone page's view tabs)
-// have no business being reorderable, and the caller shouldn't have to think about that each time
-// — the container either declares data-reorderable in its own markup or this is a silent no-op.
-// Pointer Events, not native HTML5 drag-and-drop — same reasoning as every other drag interaction
-// in this app (see editor.html's initDividerDrag): setPointerCapture keeps tracking the pointer
-// reliably regardless of what's visually underneath it, and native DnD's dataTransfer/ghost-image
-// machinery is unneeded complexity for an in-page reorder with no drop target outside the page.
-// itemSelector picks which children count as draggable items (default [data-tab-value], override
-// for a container using a different identity attribute); keyAttr names the matching dataset
-// property read for that item's identity when reporting the final order. axis is "x" for a
-// horizontal strip, "y" for a vertical one (the rail). onReorder(orderedKeys) fires once, after a
-// completed drag that ends back in this same container, with the container's full new order — not
-// on every intermediate move, so a caller doing something non-trivial with it (like persisting to
-// disk) isn't doing that on every pixel of pointer movement.
+// Drag-to-reorder for a tab or rail strip. Opt-in per container via data-reorderable, checked here
+// rather than left to callers, since most strips in this app have no business being reorderable.
+// Pointer Events rather than native drag-and-drop: setPointerCapture keeps tracking regardless of
+// what is visually underneath, which native DnD does not.
 //
-// crossContainer + onMoveAcross(key, targetContainer, beforeKey) are optional — pass a SECOND
-// reorderable container an item from this one can be dropped into (the editor's two split groups,
-// each passing the other as its crossContainer — see editor.html). crossZone is the (typically
-// larger) element that actually counts as "hovering over the other side" — e.g. the whole editor
-// group/pane rather than just its thin tab strip, a far easier drop target — while the indicator
-// itself still only ever renders inside crossContainer (it has to; that's what has the sibling
-// tab elements to position relative to). Defaults to crossContainer when omitted.
+// itemSelector picks the draggable children; keyAttr names the dataset property read for an item's
+// identity; axis is "x" for a horizontal strip or "y" for the rail. onReorder(orderedKeys) fires
+// once on a completed drag that ends in this container, not on every intermediate move, so a
+// caller persisting to disk is not doing that per pixel.
 //
-// Pointer Capture keeps clientX/clientY reporting the real screen position throughout the drag
-// regardless of which element the events are captured to, which is what makes detecting "the
-// pointer is now over the OTHER side" possible at all without a second listener tree. A
-// collapsed/hidden crossZone (e.g. the split isn't open) has offsetParent === null, checked
-// explicitly below rather than relying on a hidden element's rect happening to sit at (0,0). On
-// drop, if the pointer ended up over the other side, the actual DOM node is deliberately left
-// alone (only the indicator moves during the drag) — onMoveAcross is expected to update whatever
-// real state governs group membership and re-render both sides from scratch, which would discard
-// any manual DOM surgery done here anyway; onReorder does NOT fire for a cross-container drop.
-// handleSelector optionally narrows WHERE within an item a drag can start from. Omitted (the
-// default), the whole item is the handle — right for a tab, which is nothing but its own label.
-// An item with a real content area inside it needs the narrower version: the plugin/module
-// managers' rows expand to show a description, version and action buttons, and dragging the list
-// around by that text is both surprising and in the way of selecting it. Those pass their header,
-// so an expanded row still reorders by its title bar and its body behaves like ordinary content.
+// crossContainer and onMoveAcross(key, targetContainer, beforeKey) allow dropping into a SECOND
+// reorderable container, the editor's two split groups each naming the other. crossZone is the
+// larger element counting as "over the other side", typically the whole pane rather than its thin
+// tab strip; the indicator still renders inside crossContainer, which is what has the siblings to
+// position against. Defaults to crossContainer.
+//
+// A collapsed crossZone has offsetParent === null, checked explicitly below rather than trusting a
+// hidden element's rect to sit at (0,0). On a cross-container drop the DOM node is left alone and
+// onReorder does NOT fire: onMoveAcross updates the real state and re-renders both sides, which
+// would discard any DOM surgery done here.
+//
+// handleSelector narrows where a drag can start. Omitted, the whole item is the handle, right for
+// a tab that is nothing but its label. The manager rows expand to show a description and buttons,
+// so they pass their header instead: an expanded row reorders by its title bar and its body
+// behaves like ordinary content.
 function initReorderable(container, { itemSelector = "[data-tab-value]", keyAttr = "tabValue", axis = "x", handleSelector, onReorder, crossContainer, crossZone, onMoveAcross } = {}) {
   if (!container || !container.hasAttribute("data-reorderable")) return;
   if (container.dataset.reorderInit) return;
@@ -356,21 +341,15 @@ function initReorderable(container, { itemSelector = "[data-tab-value]", keyAttr
 // Wires a plain text input to filter `options` ({value, label, category?}[]) into the shared
 // dropdown-menu popover.
 //
-// `categories` (optional): an ORDERED [{id, label, browsable?}] list — when given, matches are
-// grouped under a labeled divider per category, in this fixed order, rather than one flat list. A
-// category with nothing in it just doesn't render its divider at all; nothing pads the list out to
-// show every category every time. An option whose `category` doesn't name any listed id falls into
-// one final ungrouped, unlabeled bucket at the end, rather than being silently dropped.
+// `categories` (optional): an ORDERED [{id, label, browsable?}] list. Matches group under a
+// labeled divider per category in that order. An empty category renders no divider, and an option
+// naming no listed id falls into an unlabeled bucket at the end rather than being dropped.
 //
-// Two distinct states, not one: focusing an EMPTY bar opens a "browse" view — every browsable
-// category (browsable: false opts a category out, e.g. an in-file-search category has nothing
-// meaningful to show with no query typed) starts fully collapsed to just its own divider+chevron
-// (previewLimit defaults to 0 — no partial preview, a category is purely a navigational heading
-// until a user actually opens it), expanding to show everything in it on click. Typing a real
-// query switches to normal filtered results instead — full, ungrouped-by-truncation matches, not a
-// preview of anything. Clearing back to empty (or blurring away and refocusing) returns to a
-// fresh, re-collapsed browse view — an expand a user triggered doesn't linger past the search that
-// was open when they did it.
+// Two states. Focusing an EMPTY bar opens a browse view: every browsable category starts collapsed
+// to its divider and chevron, expanding on click (previewLimit defaults to 0, so a category is a
+// navigational heading until opened). Typing switches to normal filtered results. Clearing back to
+// empty returns a freshly collapsed browse view, so an expand does not outlive the search it was
+// opened for.
 function initSearchbar(el, { options, onSelect, categories, previewLimit = 0 } = {}) {
   const input = el.querySelector("input");
   const menu = el.querySelector("[data-dropdown-menu]");
@@ -397,9 +376,9 @@ function initSearchbar(el, { options, onSelect, categories, previewLimit = 0 } =
     const overflowing = truncatable && items.length > previewLimit;
     const shown = overflowing && !isExpanded ? items.slice(0, previewLimit) : items;
 
-    // The whole divider (title, line, chevron) is the hitbox now, not just the chevron glyph
-    // itself — that used to be the only clickable part, a target a few pixels across. The chevron
-    // is purely decorative (a plain span) with the toggle living on this element instead;
+    // The whole divider (title, line, chevron) is the hitbox, rather than just the chevron glyph,
+    // which on its own is a target a few pixels across. The chevron is purely decorative, a plain
+    // span, with the toggle living on this element instead;
     // role="button"/tabindex/keydown are what a real <button> would have given it for free.
     const labelEl = document.createElement("div");
     labelEl.className = "dropdown-menu-group-label";
@@ -557,14 +536,10 @@ function removeContribution(slot, id) {
 }
 
 // ---------- Toast / notification history ----------
-// One system, not two — every toast IS a notification (Nolan: "The toast and notif system need to
-// be very integrated together. They are the same system."). showToast() below pushes into this
-// history unconditionally; a page with somewhere to show that history (editor.html's bell, so far
-// — see openNotificationPanel there) reads it back via getNotificationHistory()/onNotification(),
-// a page with nowhere to show it (index.html, settings.html, ...) just never looks, at the cost of
-// one array push per toast either way. Session-only — an in-memory array, not persisted — toasts
-// are inherently ephemeral status messages, so "what did I miss" only ever means "since this page
-// loaded," never forever. Capped so a very long session can't grow this unboundedly.
+// One system, not two: every toast IS a notification. showToast() pushes here unconditionally. A
+// page with a bell reads it back via getNotificationHistory() and onNotification(); a page without
+// one never looks, at the cost of an array push per toast. Session-only and capped, since a toast
+// is an ephemeral status message and "what did I miss" means since this page loaded.
 const NOTIFICATION_HISTORY_CAP = 200;
 const notificationHistory = [];
 let notificationAddedListener = null;
@@ -661,25 +636,17 @@ function reportError(err) {
 }
 
 // ---------- Popup (Base) ----------
-// A "popups" slot in the shared registry above, but unlike a persistent region
-// (sidebar/inspector/console in editor.html) it's a STACK, not a single mounted slot: showing one
-// doesn't replace another, a popup can open a second one on top of it, and nothing about it
-// persists — it exists only while shown. contribute("popups", {...}) just registers WHAT a popup
-// is; showPopup(id, target) is what actually opens an instance, fresh, every call — never cached
-// the way a region's mounted content is, since a popup has no reason to stay in the DOM once
-// closed and a nested open of the same id needs its own independent instance.
+// A "popups" slot in the registry above, but a STACK rather than a single mounted slot: showing
+// one does not replace another, and a popup can open a second on top of it. contribute() registers
+// what a popup IS; showPopup(id, target) opens a fresh instance every call, never cached, since a
+// nested open of the same id needs its own.
 //
-// Reuses .popup-backdrop/.popup/.popup-header/.popup-body/.popup-actions — this used to also be
-// shared with an older, simpler element-toggle system (openPopup(id)/closePopup(id) plus a
-// [data-popup]/[data-popup-close] markup convention), which is why visibility here has always been
-// a plain inline style.display rather than the "is-open" class that older system toggled. That
-// older system is gone now (every page that had it has migrated to this one), but the plain
-// style.display stays — it's not tied to the old system, just how this one has always worked.
+// Uses .popup-backdrop/.popup/.popup-header/.popup-body/.popup-actions, with visibility as a plain
+// inline style.display rather than a class toggle.
 //
 // Any page that wants this needs a `<div class="popup-stack" id="popup-stack"></div>` in its own
-// markup (a sibling of the page's main content, same "nothing can clip it" placement reasoning as
-// editor.html's #floating-menu) — see editor.html for the original, and settings.html/modules.html/
-// plugins.html for pages that adopted it afterward.
+// markup, as a sibling of the page's main content. Same "nothing can clip it" placement reasoning
+// as editor.html's #floating-menu; see editor.html, settings.html, modules.html or plugins.html.
 const popupStack = [];
 const POPUP_Z_FLOOR = 200; // above floating-menu (60), below tooltip (300) / toast-stack (500)
 
@@ -687,29 +654,19 @@ function topPopup() {
   return popupStack.length ? popupStack[popupStack.length - 1] : null;
 }
 
-// contribution: { id, sourceType: "host" | "plugin", pluginId, title (string, or
-// (target) => string for a title that depends on what showPopup() was called with), size (px
-// width — omit for .popup's own CSS default), large (bool — a near-fullscreen popup instead of a
-// small dialog, see .popup-large in primitives.css; for a page substantial enough to stay its own
-// separate document rather than a small confirm/form, see contributeIframePopup below),
+// contribution: { id, sourceType, pluginId, title (a string, or (target) => string), size (px
+// width; omit for the CSS default), large (a near-fullscreen popup rather than a dialog),
 // closeOnBackdrop (default true), closeOnEscape (default true), mount(container, ctx) }. mount
-// receives the .popup element itself — already containing the header/title/X, the Base's own
-// chrome — and appends whatever .popup-body/.popup-actions markup it needs, the same split every
-// popup already used before this existed, just no longer hand-copied per instance.
-// ctx = { close(result), target, header, onClose(fn) }. header is the .popup-header element
-// itself — mount() can append extra controls into it (tabs, buttons) alongside the title/X; see
-// contributeIframePopup's use of it to relay header content posted up from an embedded iframe, and
-// primitives.css's .popup-header-extras for how that content is expected to lay out. onClose
-// registers cleanup that runs exactly once, whenever this popup instance actually closes —
-// REGARDLESS of what triggered it (the X, backdrop click, Escape, or mount()'s own close(result)
-// call) — for content that set up something needing teardown (see contributeIframePopup's message
-// listener).
+// receives the .popup element, already carrying the header, title and X, and appends its own
+// .popup-body and .popup-actions.
 //
-// A plugin's own content is already safe if its mount() (really just its declared existence — no
-// plugin contributes a popup yet) misbehaves, since nothing here calls INTO a plugin's iframe
-// directly; a HOST contribution's mount() runs in this same script, though, so it's wrapped in
-// try/catch below — the same reasoning already applied to a host sidebar panel's mount() in
-// editor.html.
+// ctx = { close(result), target, header, onClose(fn) }. header is the .popup-header element, so
+// mount() can append tabs or buttons beside the title; see .popup-header-extras for the layout.
+// onClose runs exactly once whenever the instance closes, whatever triggered it, for content that
+// needs teardown.
+//
+// A host contribution's mount() runs in this script, so it is wrapped in try/catch below. A
+// plugin's cannot break anything here, since nothing calls into a plugin iframe directly.
 const FOCUSABLE_SELECTOR = "input, textarea, select, button, [tabindex]";
 
 // Every element inside `el` that's actually reachable by Tab right now — used both to pick the
@@ -1040,53 +997,28 @@ function renderSettingRow(entry, value, onCommit) {
   return row;
 }
 
-// For a page substantial enough to stay its own separate, unsandboxed document (Settings/Modules/
-// Plugins use real Tauri APIs directly, unlike a plugin's own sandboxed panel) rather than being
-// folded inline — registers a large popup (see the `large` contribution flag above) whose body is
-// just an <iframe>. Call once per page that can trigger it (each page has its own separate
-// contribute()/getSlot() registry — see the slot-registry section above — so a page needs its own
-// registration even though the logic lives here, shared). showPopup(id, { url }) is what actually
-// opens it — url is per-call, not fixed at registration time, so e.g. settings.html's own
-// ?tab=appearance variant is just a different url on the same "settings" id, not a second popup.
+// Registers a large popup whose body is an <iframe>, for a page substantial enough to stay its own
+// unsandboxed document (Settings, Modules and Plugins call real Tauri APIs directly). Call once per
+// page that can trigger it, since each page has its own slot registry. The url is per-call, not
+// fixed at registration, so settings.html?tab=appearance is a different url on the same "settings"
+// id rather than a second popup.
 //
-// These pages exist ONLY as popup content now (Nolan: "those pages will only exist as popups, so
-// they need to fit the popup, not be exceptions to the standard") — their own titlebar/page-title/
-// close button were removed from their markup entirely, not conditionally hidden at runtime. The
-// popup shell's own header/X (built by showPopup) is the only chrome; closing is entirely its job.
+// The embedded page's own tabs and toolbar buttons have to render in the popup header, which is a
+// different document, so they cannot be appended into ctx.header directly. setPopupHeaderControls()
+// and onPopupHeaderAction() below are the page's half of that relay: it posts up what to render,
+// this draws it, and clicks post back down. Only where the buttons are drawn moves; the page keeps
+// its own logic.
 //
-// A page's own tabs/toolbar buttons (Modules/Plugins' Installed-vs-Marketplace + "Add …") still
-// need to render SOMEWHERE, though, and the popup's header is the one place left for them — but
-// they're built by the embedded page's own script, in a different document, so they can't just be
-// appended into ctx.header directly the way a same-document mount() could. setPopupHeaderControls()/
-// onPopupHeaderAction() (below) are the embedded page's own half of this relay: it posts up what to
-// render, this renders real controls into ctx.header, and posts clicks back down for the page's own
-// existing handlers to react to — the page's tab/button LOGIC never moves out of its own script,
-// only where the buttons themselves are drawn.
-// forwardEvents (optional): names of backend (Tauri) events this popup's iframe needs to react to
-// while it's open — e.g. a long-running export's progress. Every OTHER Tauri event listener in
-// this app lives in a top-level document (editor.html itself); an iframe is a separate document,
-// and relying on it to receive window.__TAURI__.event.listen() directly there is untested,
-// unproven territory this app has never actually relied on anywhere else. Relaying through
-// postMessage sidesteps that entirely — it's the exact same mechanism popup-tab-change/
-// popup-button-click already use below, proven to reach the iframe reliably, so a page's own
-// script just listens for `window.addEventListener("message", ...)` instead of a raw Tauri event.
+// forwardEvents (optional): backend event names this popup's iframe needs while it is open, relayed
+// by postMessage rather than the iframe listening for Tauri events itself.
+
 // ---------- Tauri call relay (for an iframe-hosted popup page) ----------
-// window.__TAURI__.core.invoke() (and every plugin API built on the same transport, e.g.
-// dialog.open()) never resolves OR rejects when called from inside an iframe on Windows/WebView2
-// — confirmed live: it hangs forever, no error, nothing. This is a known Tauri limitation
-// (https://github.com/tauri-apps/tauri/issues/6204): the response callback lands on the PARENT
-// window instead of the iframe that registered it, so the iframe's own promise just never settles.
-// Settings/Modules/Plugins/Export (contributeIframePopup below) all call these Tauri APIs directly
-// from their OWN document, which is exactly this situation — every one of them was silently
-// broken until this existed. relayableInvoke/relayableOpenDialog are drop-in replacements for
-// `const { invoke } = window.__TAURI__.core` / `const { open } = window.__TAURI__.dialog`: on a
-// genuine top-level document (this file is shared, so it's ALSO loaded there) they just call the
-// real thing straight through; from inside an iframe they relay the call to window.parent over
-// postMessage instead — the exact same "proven to reach the iframe reliably" mechanism
-// popup-tab-change/forwardEvents below already use, just in the other direction. The parent-side
-// half of this (listening for "relay-call" and replying) lives in contributeIframePopup's mount()
-// just below, scoped to only the popup iframes it itself created — never a plugin iframe, which
-// must stay unable to reach real Tauri commands directly regardless of this existing.
+// invoke() called from inside an iframe on WebView2 never resolves OR rejects. It hangs forever
+// with no error, because the response callback lands on the parent window rather than the iframe
+// that registered it (tauri-apps/tauri#6204). relayableInvoke and relayableOpenDialog are drop-in
+// replacements: from a top-level document they call the real thing, and from an iframe they relay
+// to window.parent over postMessage. The parent half lives in contributeIframePopup's mount()
+// below, scoped to the popup iframes it created and never a plugin iframe.
 let nextRelayCallId = 1;
 const pendingRelayCalls = new Map();
 window.addEventListener("message", (e) => {
@@ -1117,9 +1049,8 @@ function relayableOpenDialog(opts) {
 }
 
 /// Re-resolves and re-applies the theme in THIS document. theme.js sets its CSS custom properties on
-/// its own documentElement and nothing else, so a page that changes the theme only restyles itself —
-/// which is why switching light/dark in Settings used to leave the editor behind it unchanged until
-/// a reload. The Settings page is an iframe, so it relays this to its parent (see relayCall's
+/// its own documentElement and nothing else, so a page that changes the theme only restyles
+/// itself. The Settings page is an iframe, so it relays this to its parent (see relayCall's
 /// "theme-changed" kind) rather than reaching into it directly.
 ///
 /// Guarded because primitives.js is loaded by pages that may not have loaded theme.js; a page with
@@ -1415,22 +1346,16 @@ async function loadItemIconSvg(invoke, item) {
 }
 
 // ---------- Manager page (Modules/Plugins' Installed tab) ----------
-// modules.html and plugins.html are two deliberately SEPARATE pages/popups — different concepts
-// (game-runtime deps vs. sandboxed editor plugins, see installs.rs), never merged into one — that
-// happen to need the exact same two-pane list+detail UI shape (.manage-list/.manage-detail,
-// primitives.css) wrapping the same four-command shape (list/enable/remove/install). This factory
-// is what's actually shared: each page calls it once with its own config and nothing else, instead
-// of hand-rolling ~180 near-identical lines apiece. Mirrors how editor.html's own
-// createManagerPanel() does the same thing for its narrower accordion-style in-editor panels — a
-// different visual shape (this needs the two-pane width neither the sidebar nor a popup's header
-// has room for), same underlying idea, so deliberately not the same function.
+// modules.html and plugins.html stay separate pages for separate concepts, but need the same
+// two-pane list-and-detail shape over the same four commands. This factory is what they share.
+// editor.html's createManagerPanel() does the same job for the narrower in-editor accordions, and
+// is deliberately a different function: the two-pane layout needs width the sidebar has not got.
 //
 // config: { nounSingular, nounPlural, listCommand, enableCommand, removeCommand, installCommand,
-// installDialogTitle, addButtonLabel, detailFields(item) -> [{label, value, mono?}] (the narrower
-// metadata column), contributionFields(item) -> [{label, value}] (the Contributions tab — what
-// VSCode calls "Feature Contributions": what this item actually plugs into the app with) }. Self-
-// initializing — call it once at page load; it wires everything (including the popup-header relay
-// and the shared remove-confirm popup) and loads the list itself, nothing else needs to run after.
+// installDialogTitle, addButtonLabel, detailFields(item) -> [{label, value, mono?}] for the
+// metadata column, contributionFields(item) -> [{label, value}] for the Contributions tab }.
+// Self-initializing: call it once at page load and it wires everything, including the popup-header
+// relay and the remove-confirm popup, and loads the list itself.
 function createManagerPage(config) {
   const invoke = relayableInvoke;
   const openDialog = relayableOpenDialog;

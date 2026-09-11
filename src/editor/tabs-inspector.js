@@ -93,14 +93,13 @@
       }
 
       // ---------- Inspector: context-based, empty until claimed ----------
-      // Unlike the sidebar/console, the Inspector has no permanent icon or tab of its own for a
-      // person to click — nothing mounts here and nothing is visible until some plugin actually
-      // asks for it (window.lowarc.openInspector(), see the "openInspector" host-action handler
-      // below), which is exactly what showSlotTab's own lazy-mount-on-first-show already does for
-      // the sidebar and console — this just reuses that instead of the old single-slot, eager-
-      // mount-at-startup path Inspector used to have to itself. Multiple plugins can register an
-      // inspector contribution; activeInspectorKey is just "whichever one is currently showing",
-      // the same role activeConsoleTabKey already plays for the console.
+      // Unlike the sidebar and console, the Inspector has no permanent icon or tab of its own for
+      // a person to click. Nothing mounts here and nothing is visible until some plugin asks for
+      // it (window.lowarc.openInspector(), see the "openInspector" host-action handler below),
+      // which is the same lazy-mount-on-first-show that showSlotTab already does for the sidebar
+      // and console. Multiple plugins can register an inspector contribution; activeInspectorKey
+      // is just whichever one is currently showing, the role activeConsoleTabKey plays for the
+      // console.
       let activeInspectorKey = null;
 
       // onlyIfOpen: skip entirely (don't switch content, don't open the panel) unless the panel is
@@ -187,19 +186,14 @@
         return dot === -1 ? "" : name.slice(dot).toLowerCase();
       }
 
-      // #tab-bar-tabs-0/#tab-bar-tabs-1 are each their own "center-0"/"center-1" slot (see
-      // contribute()/getSlot() in primitives.js) — a file's contribution is registered in
-      // openFile() and removed in closeFile()/setSplitOpen(), both alongside (not instead of) the
-      // matching openFiles.set()/delete(), since openFiles stays the authoritative store for the
-      // MUTABLE per-file state (dirty/missing/hasErrors) a contribution deliberately doesn't carry
-      // — decorate() below reads that live, straight from openFiles, on every render. groupId
-      // selects which group's tab bar (and slot) to render; renderTabStrip is what actually builds
-      // the tab elements, close buttons included (contribution.closeable:true is what triggers
-      // those — see openFile()'s contribute() call).
-      // Right-click on one open file's own tab — value handling shares closeGroupFiles/
-      // closeSavedFiles with the tab-BAR's own context menu below (right-click on the empty strip
-      // itself), since "close everything but this one"/"close everything already saved" mean the
-      // same thing from either trigger.
+      // Each tab bar is its own "center-0" or "center-1" slot. A file's contribution is registered
+      // in openFile() and removed in closeFile(), alongside rather than instead of the matching
+      // openFiles entry: openFiles stays authoritative for the MUTABLE per-file state (dirty,
+      // missing, hasErrors) that a contribution does not carry, and decorate() reads it live on
+      // every render.
+      //
+      // Right-click on a file tab shares closeGroupFiles and closeSavedFiles with the tab bar's own
+      // context menu below, since those mean the same thing from either trigger.
       function showFileTabContextMenu(path, groupId, x, y) {
         openMenuOverlay(
           [
@@ -358,27 +352,18 @@
         })();
       }
 
-      // Tells a plugin instance to drop what it was tracking for one path (Monaco disposes that
-      // file's model, its undo history and its view state) — but leaves the instance itself
-      // mounted, even once its last file is gone. showActiveFile() has already taken the
-      // .is-active class off it by the time anyone looks, so an instance with nothing open is
-      // simply an idle hidden iframe behind the "Nothing to display" panel.
+      // Tells a plugin instance to drop what it was tracking for one path: Monaco disposes that
+      // file's model, its undo history and its view state. The instance itself stays mounted even
+      // once its last file closes, so reopening reuses a loaded editor rather than building one.
+      // An instance with nothing open is an idle hidden iframe behind the "Nothing to display"
+      // panel, which is its resting state, not a leak. Tearing it down instead would mean
+      // rebuilding the whole editor on the next open.
       //
-      // It used to remove the iframe here, which meant closing the last tab threw away a fully
-      // loaded editor and the next open rebuilt it from nothing: re-fetch 4.4MB across 21 files,
-      // re-parse it, re-register every language, re-measure the font. That is the "reopen a file
-      // and wait" behaviour, and it is entirely self-inflicted — this plugin is already built to
-      // outlive any one file (see monaco.js's docs map), so the instance was always safe to keep.
-      // Keeping it is also what every editor with tabs does; a mounted editor with no document is
-      // the normal resting state, not a leak.
+      // The cost is one idle instance per (group, viewer plugin) used this session, held until the
+      // page reloads, which is also when enabling or disabling a plugin takes effect.
       //
-      // The cost is one idle instance per (group, viewer plugin) actually used this session, held
-      // until the page reloads — which is also when a plugin being enabled or disabled takes
-      // effect (View > Reload), so a retained iframe can never outlive the plugin that owns it.
-      //
-      // Callers run this BEFORE removing their own openFiles entry for `path` (closeFile) or before
-      // reassigning it to the new iframe (moveFileToGroup) — excluding `path` itself from the
-      // "still used" check is what keeps that from always finding itself.
+      // Callers run this BEFORE removing their own openFiles entry for `path`, since excluding
+      // `path` from the "still used" check is what stops it finding itself.
       function unmountFileFromGroup(path, iframe) {
         if (!iframe) return;
         iframe.contentWindow.postMessage({ type: "emit", event: "lowarc:closeFile", payload: { path } }, "*");
@@ -569,16 +554,17 @@
         for (const p of paths) await closeFile(p);
       }
 
-      // Moves an ALREADY-open file into a different group. Used to reparent the same iframe node
-      // outright when one instance = one file; now that an instance can hold several files at
-      // once, moving just ONE of them can't simply drag the whole iframe along (that would move
-      // every OTHER file sharing it too) — instead this asks the source instance for the file's
-      // current content (possibly with unsaved edits re-reading from disk would silently lose),
-      // unmounts it there, and mounts that same content into whatever instance already exists (or
-      // gets created) in the target group. Unlike setSplitOpen's bulk merge (which deliberately
-      // leaves whichever tab was already active in the destination group alone), this is always a
-      // direct response to the user acting on this ONE file — dragging its tab across, or "Open in
-      // Split View" — so it always becomes the active tab in its new group.
+      // Moves an ALREADY-open file into a different group. An instance can hold several files at
+      // once, so moving one of them cannot drag the whole iframe along without taking every other
+      // file sharing it. Instead this asks the source instance for the file's current content
+      // (which may hold unsaved edits that re-reading from disk would silently lose), unmounts it
+      // there, and mounts that content into whatever instance already exists, or gets created, in
+      // the target group.
+      //
+      // Unlike setSplitOpen's bulk merge, which leaves whichever tab was already active in the
+      // destination alone, this is always a direct response to the user acting on this ONE file,
+      // by dragging its tab across or picking "Open in Split View". So it always becomes the
+      // active tab in its new group.
       async function moveFileToGroup(path, targetGroupId) {
         const file = openFiles.get(path);
         if (!file || file.groupId === targetGroupId) return;
@@ -601,10 +587,9 @@
         try {
           file.iframe = await mountFileInGroup(path, contents ?? "", viewer, targetGroupId);
         } catch (err) {
-          // The old iframe (and its center-${fromGroupId} contribution) is already gone above —
-          // closing the file outright, rather than leaving it half-moved with a stale iframe
-          // reference and no tab in either group, is the least surprising outcome of a failed
-          // remount, same reasoning as openFile's own catch around this same call.
+          // The source iframe and its center-${fromGroupId} contribution are already gone by here,
+          // so closing the file outright is the least surprising outcome of a failed remount. The
+          // alternative leaves it half-moved: a stale iframe reference and no tab in either group.
           showToast({ variant: "error", message: String(err) });
           openFiles.delete(path);
           renderTabBar(fromGroupId);

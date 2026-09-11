@@ -22,14 +22,12 @@ pub struct Dependency {
     /// Mutually exclusive with `id` in practice; `id` wins if a manifest somehow sets both.
     pub contract: String,
     pub version: String,
-    /// False (the default) means what it always has: project::resolve() fails the whole run if
-    /// this id isn't installed. True means the opposite — a module that cooperates with another
-    /// IF it happens to be present (reads its published state, see runtime::process_module's
-    /// shared/publish design) but has no structural need for it to exist at all; resolve() simply
-    /// leaves it out rather than erroring. Only meaningful on a MODULE's own manifest.requires —
-    /// a project's own top-level requires (ProjectPreset.requires) is always treated as mandatory
-    /// regardless of this field, since a project author listing something there already means
-    /// "I want this," there's no reason for them to list something they don't.
+    /// False (the default): project::resolve() fails the run if this is not installed. True: a
+    /// module that cooperates with another IF present, reading its published state, but has no
+    /// structural need for it, so resolve() leaves it out rather than erroring.
+    ///
+    /// Only meaningful on a MODULE's requires. A project's own top-level requires is always
+    /// mandatory, since listing something there already means the author wants it.
     pub optional: bool,
 }
 

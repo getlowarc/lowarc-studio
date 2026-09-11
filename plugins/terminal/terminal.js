@@ -15,9 +15,8 @@ let instanceCounter = 0;
 // `settings` declaration) — read once at load via window.lowarc.getSettings(), the generic
 // per-plugin settings mechanism; like every setting read this way, a change while a terminal is
 // already open takes effect on its next instance, not live. configuredShell is only used when an
-// instance isn't given an explicit per-instance override (the console header's "..." menu); the
-// host itself no longer knows or cares about any of these three values, unlike before shell was
-// moved here.
+// instance isn't given an explicit per-instance override (the console header's "..." menu). The
+// host knows nothing about any of these three values.
 let configuredShell = null;
 let configuredFontSize = 13;
 let configuredScrollback = 1000;
