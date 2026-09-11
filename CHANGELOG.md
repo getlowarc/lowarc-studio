@@ -23,6 +23,10 @@ means reading back through the commit log.
   a `kind` that is neither `"contract"` nor absent.
 - Apache-2.0 licence, a `NOTICE` covering the five bundled third-party libraries, `SECURITY.md` and
   `CONTRIBUTING.md`.
+- Requirement ranges are enforced. `resolve()` matches every requirement against the version of
+  whatever resolved to satisfy it, with real semver rather than a hand-rolled comparator. `"*"`
+  still accepts anything, including a module that declares no version, since that is what a
+  requirement written before ranges meant anything says.
 
 ### Changed
 

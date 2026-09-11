@@ -61,7 +61,7 @@ fn write_test_tone(path: &std::path::Path) {
 fn write_contract_module(modules_dir: &std::path::Path, id: &str) {
     let dir = modules_dir.join(id);
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("manifest.json"), format!(r#"{{"id":"{id}","kind":"contract","name":"{id}","priority":0,"requires":[]}}"#)).unwrap();
+    std::fs::write(dir.join("manifest.json"), format!(r#"{{"id":"{id}","kind":"contract","name":"{id}","version":"1.0.0","requires":[]}}"#)).unwrap();
 }
 
 fn write_audio_module(modules_dir: &std::path::Path) {
@@ -80,7 +80,7 @@ fn write_audio_module(modules_dir: &std::path::Path) {
 fn write_director_module(modules_dir: &std::path::Path, tone_path: &std::path::Path) {
     let dir = modules_dir.join("director");
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("manifest.json"), r#"{"id":"director","name":"Test Director","priority":1,"requires":[],"provides":[{"contract":"audio-cues","version":"^1"}]}"#).unwrap();
+    std::fs::write(dir.join("manifest.json"), r#"{"id":"director","name":"Test Director","priority":1,"requires":[],"provides":[{"contract":"audio-cues","version":"1.0.0"}]}"#).unwrap();
     std::fs::write(
         dir.join("process.json"),
         r#"{"command":"powershell","args":["-NoProfile","-ExecutionPolicy","Bypass","-File","module.ps1"],"wantsFrames":true}"#,
@@ -116,7 +116,7 @@ while ($line = [Console]::In.ReadLine()) {{
 fn write_pausing_director_module(modules_dir: &std::path::Path, tone_path: &std::path::Path, paused_frames: u32) {
     let dir = modules_dir.join("director");
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("manifest.json"), r#"{"id":"director","name":"Test Director","priority":1,"requires":[],"provides":[{"contract":"audio-cues","version":"^1"}]}"#).unwrap();
+    std::fs::write(dir.join("manifest.json"), r#"{"id":"director","name":"Test Director","priority":1,"requires":[],"provides":[{"contract":"audio-cues","version":"1.0.0"}]}"#).unwrap();
     std::fs::write(
         dir.join("process.json"),
         r#"{"command":"powershell","args":["-NoProfile","-ExecutionPolicy","Bypass","-File","module.ps1"],"wantsFrames":true}"#,

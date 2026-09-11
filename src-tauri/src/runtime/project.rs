@@ -47,8 +47,7 @@ impl ProjectPreset {
 /// resolved module requires. Every error is collected and returned together rather than just the
 /// first, so a user sees the whole picture instead of fixing one conflict only to hit the next.
 ///
-/// Matches by id only. `Dependency.version` is not checked for satisfaction yet; that needs real
-/// semver range logic rather than a hand-rolled comparator, and is an acknowledged gap.
+/// Resolution walks by id; the ranges are then checked in one pass at the end, by check_versions.
 pub fn resolve(preset: &ProjectPreset, modules_dir: &Path) -> Result<Vec<ModuleInfo>, Vec<String>> {
     let by_id = scan_store(modules_dir);
 
@@ -143,11 +142,60 @@ pub fn resolve(preset: &ProjectPreset, modules_dir: &Path) -> Result<Vec<ModuleI
         }
     }
 
+    errors.extend(check_versions(preset, &resolved));
+
     if errors.is_empty() {
         Ok(resolved)
     } else {
         Err(errors)
     }
+}
+
+/// Every requirement's range against the version of whatever resolved to satisfy it.
+///
+/// A second pass rather than part of the walk above, because the walk visits each id ONCE: a
+/// module wanted by three others at three different ranges would only ever have the first checked.
+/// Here every demand is visible, so all three are, and a module that satisfies nobody says so
+/// once per unsatisfied requirer rather than once in total.
+fn check_versions(preset: &ProjectPreset, resolved: &[ModuleInfo]) -> Vec<String> {
+    let by_id: HashMap<&str, &ModuleInfo> = resolved.iter().map(|i| (i.manifest.id.as_str(), i)).collect();
+    let mut errors = Vec::new();
+
+    // (who is asking, what they asked for). The project itself asks under its own name, so an
+    // error can say whether the demand came from a module or from project.json.
+    let demands = preset.requires.iter().map(|d| ("this project", d)).chain(
+        resolved.iter().flat_map(|i| i.manifest.requires.iter().map(move |d| (i.manifest.id.as_str(), d))),
+    );
+
+    for (who, dep) in demands {
+        let range = match dep.range() {
+            Ok(r) => r,
+            Err(why) => {
+                errors.push(format!("{who} requires \"{}\", but {why}", dep.store_id()));
+                continue;
+            }
+        };
+        // Nothing resolved under this id means it was optional and absent, which the walk above
+        // already decided is fine. A range cannot object to something that is not there.
+        let Some(target) = by_id.get(dep.store_id()) else { continue };
+        if range == semver::VersionReq::STAR {
+            continue;
+        }
+        match target.manifest.declared_version() {
+            Some(have) if range.matches(&have) => {}
+            Some(have) => errors.push(format!(
+                "{who} requires \"{}\" {}, but the installed one is {have}.",
+                dep.store_id(),
+                dep.version
+            )),
+            None => errors.push(format!(
+                "{who} requires \"{}\" {}, but that module declares no usable version, so nothing can be checked against it.",
+                dep.store_id(),
+                dep.version
+            )),
+        }
+    }
+    errors
 }
 
 /// folder-name -> manifest.json read from every immediate subdirectory of the global store,
@@ -233,6 +281,88 @@ mod tests {
             errors.iter().any(|e| e.contains("some-module") && e.contains("some-contract")),
             "error should name both halves so the author can split them, got {errors:?}"
         );
+    }
+
+    /// A module with a declared version and arbitrary requirement entries.
+    fn write_versioned(modules_dir: &Path, id: &str, version: &str, requires: &[(&str, &str)]) {
+        let dir = modules_dir.join(id);
+        std::fs::create_dir_all(&dir).unwrap();
+        let reqs: Vec<String> = requires.iter().map(|(dep, range)| format!(r#"{{"id":"{dep}","version":"{range}"}}"#)).collect();
+        std::fs::write(
+            dir.join("manifest.json"),
+            format!(r#"{{"id":"{id}","name":"{id}","version":"{version}","requires":[{}]}}"#, reqs.join(",")),
+        )
+        .unwrap();
+    }
+
+    fn preset_for(id: &str, range: &str) -> ProjectPreset {
+        ProjectPreset { requires: vec![Dependency { id: id.into(), version: range.into(), ..Dependency::default() }], ..Default::default() }
+    }
+
+    #[test]
+    fn a_range_that_the_installed_version_satisfies_resolves() {
+        let modules_dir = temp_dir("ver_ok");
+        write_versioned(&modules_dir, "lib", "1.4.2", &[]);
+        assert!(resolve(&preset_for("lib", "^1"), &modules_dir).is_ok());
+        assert!(resolve(&preset_for("lib", ">=1.2, <2"), &modules_dir).is_ok());
+    }
+
+    #[test]
+    fn a_range_the_installed_version_misses_is_an_error_naming_both() {
+        let modules_dir = temp_dir("ver_bad");
+        write_versioned(&modules_dir, "lib", "2.0.0", &[]);
+
+        let errors = resolve(&preset_for("lib", "^1"), &modules_dir).expect_err("2.0.0 does not satisfy ^1");
+        let joined = errors.join(" ");
+        assert!(joined.contains("^1") && joined.contains("2.0.0"), "say what was wanted and what is there, got {errors:?}");
+    }
+
+    #[test]
+    fn star_still_accepts_a_module_that_declares_no_version() {
+        // 29 of the requirements in this repo say "*", and most fixture manifests declare no
+        // version at all. Enforcement must not turn that into an error.
+        let modules_dir = temp_dir("ver_star");
+        write_module(&modules_dir, "m", "mod-m", &[]);
+        assert!(resolve(&preset_for("mod-m", "*"), &modules_dir).is_ok());
+        assert!(resolve(&preset_for("mod-m", ""), &modules_dir).is_ok(), "an empty range means the same as *");
+    }
+
+    #[test]
+    fn a_real_range_against_a_module_with_no_version_is_an_error() {
+        let modules_dir = temp_dir("ver_none");
+        write_module(&modules_dir, "m", "mod-m", &[]);
+
+        let errors = resolve(&preset_for("mod-m", "^1"), &modules_dir).expect_err("nothing to check ^1 against");
+        assert!(errors.iter().any(|e| e.contains("declares no usable version")), "got {errors:?}");
+    }
+
+    #[test]
+    fn every_requirer_of_one_module_is_checked_not_just_the_first() {
+        // The whole reason this is a second pass. The resolve walk visits "lib" once, so a
+        // single-pass check would only ever have seen whichever requirer reached it first.
+        let modules_dir = temp_dir("ver_many");
+        write_versioned(&modules_dir, "lib", "1.0.0", &[]);
+        write_versioned(&modules_dir, "happy", "1.0.0", &[("lib", "^1")]);
+        write_versioned(&modules_dir, "unhappy", "1.0.0", &[("lib", "^3")]);
+
+        let preset = ProjectPreset {
+            requires: vec![
+                Dependency { id: "happy".into(), version: "*".into(), ..Dependency::default() },
+                Dependency { id: "unhappy".into(), version: "*".into(), ..Dependency::default() },
+            ],
+            ..Default::default()
+        };
+        let errors = resolve(&preset, &modules_dir).expect_err("unhappy wants ^3 and gets 1.0.0");
+        assert!(errors.iter().any(|e| e.contains("unhappy") && e.contains("^3")), "got {errors:?}");
+    }
+
+    #[test]
+    fn a_range_that_is_not_a_range_is_reported_rather_than_ignored() {
+        let modules_dir = temp_dir("ver_garbage");
+        write_versioned(&modules_dir, "lib", "1.0.0", &[]);
+
+        let errors = resolve(&preset_for("lib", "newest please"), &modules_dir).expect_err("not a range");
+        assert!(errors.iter().any(|e| e.contains("is not a version range")), "got {errors:?}");
     }
 
     #[test]

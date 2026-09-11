@@ -279,10 +279,16 @@ Deliberately additive: nothing has to change at once.
    thing. Both are manifest edits; neither module's code changes, beyond reading its op list from
    the gathered set rather than from one fixed key.
 
-**Versions are recorded but still not enforced.** `resolve()` has never checked a `version` on any
-requirement and still doesn't; contracts make that gap matter more, because a vocabulary version is
-the thing a producer and a consumer actually need to agree on. Writing `"version": "^1"` today
-documents intent and nothing else. Enforcing it is a separate, self-contained piece of work.
+**Requirement ranges are enforced.** `resolve()` matches every requirement's range against the
+version of whatever resolved to satisfy it, using real semver rather than a hand-rolled comparator.
+`"*"` still accepts anything, including a module that declares no version, since that is what every
+requirement written before ranges meant anything says.
+
+**What is not yet checked is the pairing that matters most for contracts**: whether a PROVIDER's
+declared contract version satisfies a CONSUMER's range. A module requiring `draw-commands ^1` is
+currently handed the commands of a provider speaking `2.0.0` without complaint. `shared` holds one
+array per contract, read by every consumer, so filtering it per consumer is a real design question
+rather than a missing `if`.
 
 ## What this deliberately does not do
 

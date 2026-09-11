@@ -2872,6 +2872,7 @@ dependencies = [
  "parking_lot",
  "portable-pty",
  "rodio",
+ "semver",
  "serde",
  "serde_json",
  "similar",

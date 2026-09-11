@@ -17,6 +17,11 @@ tauri-build = { version = "2.6.3", features = [] }
 
 [dependencies]
 serde_json = "1.0"
+# Range matching for module and contract requirements. Already in the tree via
+# tauri-plugin-updater, so this is a direct name for something the binary already links, not a new
+# dependency. Not hand-rolled: caret ranges, comparator sets and pre-release ordering are exactly
+# the rules a hand-rolled comparator gets subtly wrong.
+semver = "1"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
 tauri = { version = "2.11.3", features = [] }
