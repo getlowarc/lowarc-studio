@@ -28,6 +28,27 @@ use std::sync::Arc;
 /// can handle the resolved set, and runs `entry_file` through it. Blocking: call this on its own
 /// thread, not the Tauri main thread. Returns once the run ends, for any reason: the loader's own
 /// completion, `stop_flag` being set (a module's own request, or an external Stop), or an error.
+/// A field nothing reads is almost always a misspelling of one that is read, and the run that
+/// follows looks healthy while quietly missing whatever that field was meant to declare. Warned
+/// rather than refused: the same shape is what a manifest written for a newer LowArc looks like
+/// from here, and refusing to run those would make every module release a breaking one.
+fn warn_about_unknown_fields(modules: &[ModuleInfo], log: &LogFn) {
+    for info in modules {
+        let unknown = info.manifest.unknown_fields();
+        if unknown.is_empty() {
+            continue;
+        }
+        log(
+            runtime_loader::LogLevel::Warn,
+            &format!(
+                "Module \"{}\" has manifest fields nothing reads: {}. Check the spelling, or ignore this if they are meant for a newer LowArc.",
+                info.manifest.id,
+                unknown.join(", ")
+            ),
+        );
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn start_run(
     entry_file: &Path,
@@ -41,6 +62,8 @@ pub fn start_run(
 ) -> Result<(), Vec<String>> {
     let preset = project::ProjectPreset::load(project_dir).map_err(|e| vec![e])?;
     let modules = project::resolve(&preset, modules_dir)?;
+
+    warn_about_unknown_fields(&modules, &log);
 
     let source_code = std::fs::read_to_string(entry_file)
         .map_err(|e| vec![format!("Could not read {}: {e}", entry_file.display())])?;
@@ -96,10 +119,11 @@ pub fn run_from_launch_dir(dir: &Path, stop_flag: Arc<AtomicBool>, log: LogFn, d
     let mut infos = Vec::with_capacity(launch.modules.len());
     for rel in &launch.modules {
         let folder = dir.join(rel);
-        let manifest = Manifest::read(&folder).ok_or_else(|| vec![format!("{} has no readable manifest.json.", folder.display())])?;
+        let manifest = Manifest::read(&folder).map_err(|e| vec![e])?;
         infos.push(ModuleInfo { folder, manifest });
     }
     let modules = manifest::in_run_order(infos);
+    warn_about_unknown_fields(&modules, &log);
 
     let loaders = runtime_loader::default_loaders();
     let loader = loaders.iter().find(|l| l.can_handle(&modules)).ok_or_else(|| {

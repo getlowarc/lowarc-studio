@@ -104,6 +104,50 @@ fn runs_a_process_module_end_to_end_via_its_own_request_stop() {
     );
 }
 
+/// Both halves of the unknown-field decision, on a real run: the typo is reported by name, and the
+/// run still happens. Warning rather than refusing is what lets a manifest written for a newer
+/// LowArc load in an older one, so a run that ABORTS here would be the actual regression.
+#[test]
+fn a_manifest_field_nothing_reads_is_warned_about_without_stopping_the_run() {
+    if !cfg!(windows) {
+        return;
+    }
+
+    let modules_dir = temp_dir("unknown_field_modules");
+    write_fixture_module(&modules_dir, 3);
+    // Same fixture, with "provides" misspelled and a field from no version of anything.
+    std::fs::write(
+        modules_dir.join("echo").join("manifest.json"),
+        r#"{"id":"echo","name":"Echo Module","priority":1,"requires":[],"provdies":[{"contract":"draw-commands","version":"1.0.0"}],"soundsFrom":"nowhere"}"#,
+    )
+    .unwrap();
+
+    let project_dir = temp_dir("unknown_field_project");
+    std::fs::write(project_dir.join("project.json"), r#"{"requires":[{"id":"echo","version":"*"}]}"#).unwrap();
+    let uc_dir = project_dir.join("uc");
+    std::fs::create_dir_all(&uc_dir).unwrap();
+    let entry = uc_dir.join("main.txt");
+    std::fs::write(&entry, "hello").unwrap();
+
+    let (log, messages) = collecting_logger();
+    let result = runtime::start_run(
+        &entry,
+        &project_dir,
+        &modules_dir,
+        30,
+        serde_json::json!({}),
+        Arc::new(AtomicBool::new(false)),
+        log,
+        runtime::runtime_loader::DebugHooks::disabled(),
+    );
+
+    assert!(result.is_ok(), "an unknown field must not stop a run, got {result:?}");
+    let messages = messages.lock();
+    let warned = messages.iter().find(|m| m.contains("nothing reads")).unwrap_or_else(|| panic!("no warning reached the console, got {messages:?}"));
+    assert!(warned.contains("provdies"), "the warning has to name the typo, got {warned}");
+    assert!(warned.contains("soundsFrom"), "and every unknown field, not just the first, got {warned}");
+}
+
 #[test]
 fn an_external_stop_flag_ends_a_run_that_never_asks_to_stop_itself() {
     if !cfg!(windows) {

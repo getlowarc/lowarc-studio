@@ -3,7 +3,9 @@
 // module's "requires" are literally the same schema at two different levels.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use serde_json::Value;
 
 /// Where a module with no stated priority sorts. Middling on purpose, so an unset module can be
 /// pushed either side of by one that does state a priority.
@@ -40,6 +42,12 @@ pub struct Dependency {
     /// Only meaningful on a MODULE's requires. A project's own top-level requires is always
     /// mandatory, since listing something there already means the author wants it.
     pub optional: bool,
+    /// Anything in the JSON this struct has no field for. Captured rather than dropped so a
+    /// misspelling ("verison" for "version") can be reported: silently parsing to a default is how a manifest ends
+    /// up looking correct while doing nothing. Kept permissive rather than rejected outright so a
+    /// manifest written for a newer Studio still loads here.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
 }
 
 impl Dependency {
@@ -83,6 +91,12 @@ pub struct Provision {
     /// accept. Matching one against the other is what version enforcement will mean when it
     /// arrives, and it only works if these two are different kinds of thing.
     pub version: String,
+    /// Anything in the JSON this struct has no field for. Captured rather than dropped so a
+    /// misspelling ("contarct" for "contract") can be reported: silently parsing to a default is how a manifest ends
+    /// up looking correct while doing nothing. Kept permissive rather than rejected outright so a
+    /// manifest written for a newer Studio still loads here.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -116,6 +130,12 @@ pub struct Manifest {
     /// is (see plugin_assets/loadRailIconSvg): a missing/absent icon falls back to a generic
     /// placeholder on the frontend rather than this field being required.
     pub icon: Option<String>,
+    /// Anything in the JSON this struct has no field for. Captured rather than dropped so a
+    /// misspelling ("provdies" for "provides") can be reported: silently parsing to a default is how a manifest ends
+    /// up looking correct while doing nothing. Kept permissive rather than rejected outright so a
+    /// manifest written for a newer Studio still loads here.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
 }
 
 impl Default for Manifest {
@@ -131,14 +151,44 @@ impl Default for Manifest {
             description: None,
             website: None,
             icon: None,
+            extra: HashMap::new(),
         }
     }
 }
 
 impl Manifest {
-    pub fn read(folder: &Path) -> Option<Self> {
-        let text = std::fs::read_to_string(folder.join("manifest.json")).ok()?;
-        serde_json::from_str(&text).ok()
+    /// Err carries the reason, which serde already knows down to the line and column. Returning
+    /// Option threw that away and left every caller saying "unreadable", which is true and useless
+    /// to whoever has to go fix the file.
+    pub fn read(folder: &Path) -> Result<Self, String> {
+        let path = folder.join("manifest.json");
+        let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+        serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))
+    }
+
+    /// The one value `kind` may hold, besides being absent. An unrecognised kind is an error
+    /// rather than a shrug: unknown FIELDS are safe to ignore, but an unknown kind decides whether
+    /// this thing gets run, and guessing "ordinary module" for something that calls itself
+    /// something else can spawn a process that was never meant to be one.
+    pub fn invalid_kind(&self) -> Option<&str> {
+        match self.kind.as_deref() {
+            None | Some("contract") => None,
+            Some(other) => Some(other),
+        }
+    }
+
+    /// Every field in this manifest that nothing reads, labelled by where it sits. Empty for a
+    /// manifest with no typos in it, which is the normal case.
+    pub fn unknown_fields(&self) -> Vec<String> {
+        let mut found: Vec<String> = self.extra.keys().map(|k| k.to_string()).collect();
+        for (i, dep) in self.requires.iter().enumerate() {
+            found.extend(dep.extra.keys().map(|k| format!("requires[{i}].{k}")));
+        }
+        for (i, prov) in self.provides.iter().enumerate() {
+            found.extend(prov.extra.keys().map(|k| format!("provides[{i}].{k}")));
+        }
+        found.sort();
+        found
     }
 
     /// A definition rather than an implementation: resolved and version-checked, never run.
@@ -326,6 +376,46 @@ mod tests {
         let infos = vec![contract_consumer("canvas", 1, "draw-commands")];
         let ordered = in_run_order(infos);
         assert_eq!(ordered.len(), 1);
+    }
+
+    #[test]
+    fn a_misspelled_field_is_captured_rather_than_silently_dropped() {
+        // The whole point: this parses, and before `extra` existed it parsed into a module that
+        // provided nothing, with nothing anywhere saying why the role never got filled.
+        let m: Manifest =
+            serde_json::from_str(r#"{"id":"m","name":"M","provdies":[{"contract":"draw-commands","version":"1.0.0"}]}"#).unwrap();
+        assert!(m.provides.is_empty(), "the typo really does mean nothing was provided");
+        assert_eq!(m.unknown_fields(), vec!["provdies"]);
+    }
+
+    #[test]
+    fn a_misspelled_field_inside_requires_or_provides_is_found_too() {
+        let m: Manifest = serde_json::from_str(
+            r#"{"id":"m","name":"M","requires":[{"contract":"c","verison":"^1"}],"provides":[{"contract":"d","version":"1.0.0","optionl":true}]}"#,
+        )
+        .unwrap();
+        assert_eq!(m.unknown_fields(), vec!["provides[0].optionl", "requires[0].verison"]);
+    }
+
+    #[test]
+    fn a_clean_manifest_reports_no_unknown_fields() {
+        let m: Manifest = serde_json::from_str(
+            r#"{"id":"m","name":"M","version":"1.0.0","priority":3,"kind":"contract","description":"d","website":"w","icon":"i","requires":[{"contract":"c","version":"^1","optional":true}],"provides":[{"contract":"d","version":"1.0.0"}]}"#,
+        )
+        .unwrap();
+        assert!(m.unknown_fields().is_empty(), "got {:?}", m.unknown_fields());
+        assert_eq!(m.priority, Some(3));
+        assert!(m.invalid_kind().is_none());
+    }
+
+    #[test]
+    fn an_unrecognised_kind_is_reported_rather_than_treated_as_an_ordinary_module() {
+        let typo: Manifest = serde_json::from_str(r#"{"id":"c","name":"C","kind":"contracts"}"#).unwrap();
+        assert_eq!(typo.invalid_kind(), Some("contracts"));
+        assert!(!typo.is_contract(), "which is exactly why it has to be caught: it would have been run");
+
+        let absent: Manifest = serde_json::from_str(r#"{"id":"m","name":"M"}"#).unwrap();
+        assert!(absent.invalid_kind().is_none(), "no kind at all is an ordinary module, not an error");
     }
 
     #[test]

@@ -91,11 +91,14 @@ pub fn resolve(preset: &ProjectPreset, modules_dir: &Path) -> Result<Vec<ModuleI
             }
             Some(folders) => {
                 let folder = folders[0].clone();
-                let Some(manifest) = Manifest::read(&folder) else {
-                    if errored_ids.insert(id.clone()) {
-                        errors.push(format!("Module \"{id}\" at {} has an unreadable manifest.json.", folder.display()));
+                let manifest = match Manifest::read(&folder) {
+                    Ok(m) => m,
+                    Err(why) => {
+                        if errored_ids.insert(id.clone()) {
+                            errors.push(format!("Module \"{id}\" has an unreadable manifest. {why}"));
+                        }
+                        continue;
                     }
-                    continue;
                 };
                 resolved_ids.insert(id);
 
@@ -107,6 +110,13 @@ pub fn resolve(preset: &ProjectPreset, modules_dir: &Path) -> Result<Vec<ModuleI
                         "Module \"{}\" is declared kind \"contract\" but ships a process.json. A contract \
                          defines a vocabulary and never runs, so that process would be silently ignored. \
                          Drop one of the two.",
+                        manifest.id
+                    ));
+                }
+                if let Some(kind) = manifest.invalid_kind() {
+                    errors.push(format!(
+                        "Module \"{}\" declares kind \"{kind}\", which this version of LowArc does not know. \
+                         The only kind is \"contract\"; leave it out for an ordinary module.",
                         manifest.id
                     ));
                 }
@@ -154,7 +164,7 @@ pub(crate) fn scan_store(modules_dir: &Path) -> HashMap<String, Vec<PathBuf>> {
         if !folder.is_dir() {
             continue;
         }
-        if let Some(manifest) = Manifest::read(&folder) {
+        if let Ok(manifest) = Manifest::read(&folder) {
             if !manifest.id.is_empty() {
                 by_id.entry(manifest.id).or_default().push(folder);
             }

@@ -64,7 +64,7 @@ pub fn list_modules(modules_dir: &Path, disabled: &HashSet<String>) -> Vec<Modul
         .into_values()
         .flatten()
         .filter_map(|folder| {
-            let manifest = Manifest::read(&folder)?;
+            let manifest = Manifest::read(&folder).ok()?;
             Some(ModuleListItem {
                 disabled: disabled.contains(&manifest.id),
                 id: manifest.id,
@@ -125,7 +125,7 @@ pub fn list_plugins(plugins_dir: &Path, disabled: &HashSet<String>) -> Vec<Plugi
 /// usually small enough this never even needs to be seen, but nothing enforces that, so this
 /// doesn't assume it.
 pub fn install_module(modules_dir: &Path, source_dir: &Path, on_progress: &mut dyn FnMut(u64, u64)) -> Result<String, String> {
-    let manifest = Manifest::read(source_dir).ok_or_else(|| format!("{} has no readable manifest.json.", source_dir.display()))?;
+    let manifest = Manifest::read(source_dir).map_err(|e| format!("No readable manifest.json. {e}"))?;
     if manifest.id.is_empty() {
         return Err("That module's manifest.json has no id.".to_string());
     }

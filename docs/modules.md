@@ -144,6 +144,15 @@ RANGE (`^1`, `*`): what this module will accept. On a **provision** it is a sing
 version (`1.0.0`): what this module actually speaks. Matching one against the other is what
 version enforcement will mean, and it only works because they are not the same shape.
 
+`kind` may only be `"contract"` or absent. Any other value is an error naming it, because an
+unrecognised kind decides whether the thing gets RUN, and guessing "ordinary module" for something
+calling itself something else spawns a process nobody asked for.
+
+A field this version of LowArc does not read is a **warning**, not an error, and names every
+offender. That covers the common case (`provdies` for `provides`, which otherwise parses fine and
+silently fills no role) without making a manifest written for a newer LowArc unloadable in an older
+one. Every module release would be a breaking one if it were an error.
+
 There is no `priority` in the example because most manifests should not have one. It is a tiebreak
 between modules that nothing else orders, and `requires` always wins over it, so writing one when
 no tie exists states nothing. A contract never has one at all, since a contract never runs.
