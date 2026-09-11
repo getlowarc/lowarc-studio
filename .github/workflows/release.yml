@@ -70,6 +70,37 @@ jobs:
           }
           Write-Host "CHANGELOG.md documents $tag"
 
+      # The release body is what everyone who starred the repo actually reads: GitHub mails a
+      # release digest to stargazers, and the body is what it shows. Taken from the changelog
+      # section rather than written twice, and rather than left to a generic "see the assets".
+      # The major's name comes from the NAMES table in version.rs, the one place it lives.
+      - name: Build the release name and body from what is already written down
+        id: notes
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}" -replace '^v', ''
+          $escaped = [regex]::Escape($tag)
+
+          # The section for this version, up to the next "## " heading.
+          $lines = Get-Content CHANGELOG.md
+          $start = ($lines | Select-String -Pattern "^##\s+\[?$escaped\]?(\s|$)").LineNumber
+          $rest = $lines[$start..($lines.Count - 1)]
+          $end = ($rest | Select-String -Pattern '^##\s' | Select-Object -First 1).LineNumber
+          $body = if ($end) { $rest[0..($end - 2)] } else { $rest }
+          $body = ($body -join "`n").Trim()
+
+          # "0.59.0" -> major 0 -> the name in version.rs's NAMES table, if that major has one.
+          $major = $tag.Split('.')[0]
+          $named = Select-String -Path src-tauri/src/version.rs -Pattern "\($major,\s*""([^""]+)""\)"
+          $name = if ($named) { " " + $named.Matches[0].Groups[1].Value } else { "" }
+
+          "releaseName=LowArc Studio $tag$name" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "body<<NOTES_EOF" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          $body | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "NOTES_EOF" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "Release name: LowArc Studio $tag$name"
+          Write-Host "Body is $($body.Length) characters"
+
       # Everything CI already runs. A release should never be the first time these are checked, but
       # a tag can be pushed to a commit CI hasn't finished, so they run again here rather than being
       # assumed.
@@ -87,6 +118,11 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: "LowArc Studio ${{ github.ref_name }}"
+          releaseName: ${{ steps.notes.outputs.releaseName }}
+          releaseBody: ${{ steps.notes.outputs.body }}
+          # Left as a draft on purpose. Publishing is what mails the release digest to everyone who
+          # starred the repo, so that stays a deliberate click rather than a side effect of pushing
+          # a tag. The build, the signing and the artifacts all happen here; only the announcement
+          # waits.
           releaseDraft: true
           prerelease: false

@@ -29,7 +29,12 @@ The major's **name** is the one thing Cargo cannot hold, so it lives in `NAMES` 
 5. Commit, then `git tag vx.y.z` and push the tag.
 
 The release workflow refuses to publish if the tag and `Cargo.toml` disagree, or if the changelog
-has no section for the version being tagged.
+has no section for the version being tagged. It builds the release title from the number and the
+major's name, and the release body from that changelog section, so neither is written twice.
+
+**The release is created as a draft.** Pushing a tag builds, signs and uploads everything, but
+announces nothing. GitHub mails a release digest to everyone who has starred the repo when a
+release is PUBLISHED, so that stays a deliberate click.
 
 A version moves **only** at step 3. Work lands on `main` with the number untouched, which is why
 the changelog is the thing that has to be kept current.
