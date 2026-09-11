@@ -174,9 +174,11 @@
         openUrl("https://github.com/NolanLT/lowarc-studio/issues");
       });
 
+      // version::label() rather than __TAURI__.app.getVersion(), which returns the number without
+      // the major's name. Both ultimately read Cargo.toml, so there is nothing to keep in sync.
       async function getAppVersionLabel() {
         try {
-          return `Version ${await window.__TAURI__.app.getVersion()}`;
+          return `Version ${await invoke("app_version")}`;
         } catch (err) {
           return "";
         }

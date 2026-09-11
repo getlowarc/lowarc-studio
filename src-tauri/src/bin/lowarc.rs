@@ -168,7 +168,7 @@ fn main() {
             Err(e) => fail(&format!("{e}\n\n{USAGE}")),
         },
         Some("-h") | Some("--help") | Some("help") => println!("{USAGE}"),
-        Some("-V") | Some("--version") => println!("lowarc {}", env!("CARGO_PKG_VERSION")),
+        Some("-V") | Some("--version") => println!("lowarc {}", lowarc_studio_lib::version::label()),
         Some(other) => fail(&format!("unknown command \"{other}\"\n\n{USAGE}")),
         None => fail(USAGE),
     }

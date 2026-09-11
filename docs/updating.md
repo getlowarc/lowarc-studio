@@ -83,7 +83,7 @@ becomes one, that needs its own design; it's the only case where the "one channe
 - `updater:default` permission in `capabilities/default.json`.
 - `"createUpdaterArtifacts": true` in `tauri.conf.json`, so a bundle produces signed update artifacts.
 - **Version single-sourced.** `tauri.conf.json` no longer carries `"version"`; it inherits from
-  `Cargo.toml`. Verified: the built exe reports `0.1.0` in its file metadata. This matters because
+  `Cargo.toml`. Verified: the built exe reports the Cargo.toml version in its file metadata. This matters because
   the updater compares versions: two copies that can disagree is a correctness bug in waiting, and
   the git tag made a third.
 - `.github/workflows/release.yml`, tag-triggered, which checks the tag against `Cargo.toml` before
@@ -138,11 +138,11 @@ Note this needs nothing from the webview's CSP. The updater performs its request
 #### The contract lowarc.com has to satisfy
 
 The configured endpoint is a URL template. With `endpoints` set to
-`https://lowarc.com/updates/{{target}}/{{arch}}/{{current_version}}`, a Windows machine on 0.1.0
+`https://lowarc.com/updates/{{target}}/{{arch}}/{{current_version}}`, a Windows machine on 0.58.6
 requests exactly:
 
 ```
-GET https://lowarc.com/updates/windows/x86_64/0.1.0
+GET https://lowarc.com/updates/windows/x86_64/0.58.6
 ```
 
 `{{target}}` is `windows` | `darwin` | `linux`; `{{arch}}` is `x86_64` | `aarch64` | `i686` |

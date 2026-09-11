@@ -14,6 +14,7 @@ mod projects;
 pub mod runtime;
 mod settings;
 mod theme;
+pub mod version;
 
 use app_paths::AppPaths;
 use installs::{ModuleListItem, PluginListItem};
@@ -861,6 +862,14 @@ fn set_plugin_enabled(id: String, enabled: bool) -> Result<(), String> {
 /// a plugin with no saved values yet (including one that's never declared any settings at all);
 /// the schema itself lives in plugin.json, not here, so there's nothing to validate a key against
 /// on this side: a plugin only ever asks for its own values back, never another plugin's.
+/// "0.58.6 Daedalus", for the About box and the logo tooltip. The frontend could read the number
+/// alone from window.__TAURI__.app.getVersion(), but not the name, and two surfaces reading the
+/// version two different ways is how they end up disagreeing.
+#[tauri::command]
+fn app_version() -> String {
+    version::label()
+}
+
 #[tauri::command]
 fn get_plugin_settings(id: String) -> std::collections::HashMap<String, String> {
     settings::load().plugin_settings.get(&id).cloned().unwrap_or_default()
@@ -935,6 +944,7 @@ pub fn run() {
       open_project,
       set_recent_pinned,
       remove_recent_project,
+      app_version,
       get_settings,
       save_settings,
       list_theme_presets,
