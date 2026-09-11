@@ -1,8 +1,8 @@
       // ---------- Plugin UI hosting ----------
       // A plugin declares its panels statically (PluginDescriptor.contributes, read at scan time
-      // by list_installed_plugins) — the shell builds rail icons/console tabs straight from that,
+      // by list_installed_plugins): the shell builds rail icons/console tabs straight from that,
       // eagerly, whether or not the plugin has actually finished starting yet. Panel *content*
-      // (the iframe) is mounted lazily, the first time it's actually shown — the plugin process is
+      // (the iframe) is mounted lazily, the first time it's actually shown: the plugin process is
       // already started at app launch (setup() in lib.rs) by the time anyone could click a rail
       // icon, so there's no real need to gate on the live registerPanel confirmation as well; that
       // event is still listened for below, just for visibility/logging rather than as a gate.
@@ -11,7 +11,7 @@
       // windowToPlugin: an iframe's contentWindow -> pluginId, so the message-relay listener below
       // can trust *which* plugin a postMessage actually came from instead of the message's own
       // (self-reported, therefore untrustworthy) claim. Open-file viewer iframes (see the
-      // tab-bar/open-files block further down) register in this same map — one trust mechanism,
+      // tab-bar/open-files block further down) register in this same map: one trust mechanism,
       // shared by both kinds of plugin-hosted iframe.
       const pluginPanels = new Map();
       const windowToPlugin = new Map();
@@ -68,11 +68,11 @@
       function showSlotTab(slot, containerId, id) {
         const container = document.getElementById(containerId);
         container.classList.add("hosts-plugin");
-        // Only the per-tab WRAPPER's own is-active is cleared here — never a mounted plugin
+        // Only the per-tab WRAPPER's own is-active is cleared here: never a mounted plugin
         // iframe's own .plugin-panel-frame.is-active nested inside one, which mount() sets exactly
         // once and never touches again (see the wrapper comment above). Clearing it here too would
         // un-set it permanently, since nothing would ever re-add it on a later show (mount() only
-        // runs the first time) — the panel would come back empty on the second visit.
+        // runs the first time): the panel would come back empty on the second visit.
         container.querySelectorAll(".host-panel-frame").forEach((f) => f.classList.remove("is-active"));
 
         const contribution = getSlot(slot).find((c) => c.id === id);
@@ -104,7 +104,7 @@
       // A quality-of-life alternative to the standalone Modules/Plugins pages (see file-modules-item/
       // file-plugins-item below) that never leaves the editor — deliberately separate surfaces, not
       // one replacing the other (Nolan: "those will be separate things"). Both wrap the exact same
-      // Tauri commands the standalone pages already use — nothing new on the backend, just a
+      // Tauri commands the standalone pages already use: nothing new on the backend, just a
       // narrower-sidebar-shaped front end (single-column accordion instead of those pages' wide
       // two-pane list+detail layout, which needs more width than the sidebar's 240px default has).
       // One factory instead of two near-duplicate blocks, since a module manager and a plugin
@@ -112,7 +112,7 @@
       // row shows — config.extraFields(item) is the only part that actually differs between them.
       function createManagerPanel(config) {
         const CHEVRON_SVG = '<svg viewBox="0 0 10 10" fill="none"><path d="M3 1l4 4-4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-        // Settings.tabOrder key — same persisted-order mechanism the rail/console/file tab strips
+        // Settings.tabOrder key: same persisted-order mechanism the rail/console/file tab strips
         // already use (see saveTabOrder/loadedSettings in panels.js, loaded earlier in this same
         // document), just applied to this list's own `items` array (see applySavedItemOrder)
         // instead of reordering already-rendered DOM, since render() rebuilds the list from
@@ -169,7 +169,7 @@
           }
         }
 
-        // Right-click menu — same openMenuOverlay primitive (menus.js) the rail/file-tab-bar
+        // Right-click menu: same openMenuOverlay primitive (menus.js) the rail/file-tab-bar
         // context menus already use, anchored at the raw pointer position rather than a trigger
         // element's rect (see showFileTabContextMenu in tabs-inspector.js for the closest existing
         // analog: a per-row menu with a toggle-style item plus a destructive one).
@@ -233,7 +233,7 @@
         function renderRow(item) {
           const row = document.createElement("div");
           row.className = "plugin-manager-row";
-          // initReorderable's default itemSelector/keyAttr ([data-tab-value] / .tabValue) — same
+          // initReorderable's default itemSelector/keyAttr ([data-tab-value] / .tabValue): same
           // identity attribute every other reorderable strip in this app already uses, so this
           // list needs no custom itemSelector/keyAttr passed to initReorderable below.
           row.dataset.tabValue = item.id;
@@ -346,7 +346,7 @@
 
           // This panel lives in editor.html's own top-level document (not an iframe, unlike the
           // standalone Modules/Plugins pages), so listening for the raw Tauri event directly here
-          // is the proven pattern — no postMessage relay needed, same as dev-run-log/dev-run-ended.
+          // is the proven pattern: no postMessage relay needed, same as dev-run-log/dev-run-ended.
           window.__TAURI__.event.listen("install-progress", (event) => {
             if (event.payload.kind !== config.nounSingular.toLowerCase()) return;
             setProgress(progressEl, event.payload.totalBytes ? event.payload.bytesDone / event.payload.totalBytes : 0);
@@ -384,7 +384,7 @@
           el.appendChild(listEl);
 
           // mount() runs exactly once per app session (see showSlotTab's own "mounting it once,
-          // ever" comment) — listEl itself is never recreated after this, only its children
+          // ever" comment). ListEl itself is never recreated after this, only its children
           // (render() rebuilds those from `items` on every load()/search keystroke), so a single
           // initReorderable call here covers every future render: it delegates from listEl itself
           // rather than binding per-row, the same way every other reorderable strip in this app
@@ -462,7 +462,7 @@
       // inlining it as a real <svg> lets it inherit currentColor for free, the same as the
       // fallback icon already does, which a rasterized <img> never could. Parsing + sanitizing
       // (strip anything that could execute if this ends up in the HOST's own document) is
-      // primitives.js's shared parseSanitizedSvg — same treatment the Modules/Plugins manage
+      // primitives.js's shared parseSanitizedSvg: same treatment the Modules/Plugins manage
       // pages' own item icon uses, since both need identical "a plugin/module-supplied SVG can't
       // be trusted blindly" handling.
       async function loadRailIconSvg(pluginId, railIcon) {
@@ -474,7 +474,7 @@
         }
       }
 
-      // "__run" is the one console tab the app itself owns (dev-run + plugin log output) — every
+      // "__run" is the one console tab the app itself owns (dev-run + plugin log output): every
       // other key is a plugin-contributed tab, both registered via contribute("console", ...) and
       // shown through the same showSlotTab() every other tab-strip region uses. activeConsoleTabKey
       // is still tracked separately (rather than always re-querying the DOM for it) since
@@ -543,7 +543,7 @@
         consoleMaximized = maximized;
         document.getElementById("console-expand").classList.toggle("is-active", maximized);
         if (maximized) {
-          // Not calc(100vh - Npx) — CSS Grid doesn't shrink the *other* explicit/auto rows to
+          // Not calc(100vh - Npx). CSS Grid doesn't shrink the *other* explicit/auto rows to
           // make room for one row that would overflow the container, it just lets the grid
           // overflow instead (confirmed live: the CSS var applied correctly but nothing visually
           // grew). Computing the real leftover pixels here, from the shell's own actual height

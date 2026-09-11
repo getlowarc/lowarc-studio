@@ -1,11 +1,11 @@
-// Mirrors Bootstrap's runtime_loader.rs — same discipline as Contracts/IModuleLoader.cs, applied
+// Mirrors Bootstrap's runtime_loader.rs: same discipline as Contracts/IModuleLoader.cs, applied
 // here too: which runtime a set of modules needs is not the caller's business, it's a registered,
 // ordered slot, asked in turn until one says yes. ProcessLoader and NativeLoader are equal
 // implementations; nothing in this crate is privileged over the other.
 //
 // Real, deliberate difference from Bootstrap's version: `run()` here returns instead of exiting
-// the process. Bootstrap IS the run — when it ends, the process is supposed to end. The IDE is
-// not the run — it has to stay alive afterward, ready for the next one, and a user has to be able
+// the process. Bootstrap IS the run. When it ends, the process is supposed to end. The IDE is
+// not the run. It has to stay alive afterward, ready for the next one, and a user has to be able
 // to hit Stop mid-run rather than only ever waiting for a module to end itself. So `RunContext`
 // carries a stop flag either side can set (a module's own request, or an external Stop command),
 // and every loader's `run` is expected to return once that flag is observed, not exit anything.
@@ -46,7 +46,7 @@ pub enum Breakpoint {
     /// "/state/hp") equal to `equals`. The one genuinely conditional kind — inspects whatever a
     /// module chooses to put in its own frame reply, without the engine needing to understand
     /// what that data means. `path`/`equals` are meaningless for a module that never puts
-    /// anything interesting in its reply — that's an honest limit of a module-agnostic design,
+    /// anything interesting in its reply: that's an honest limit of a module-agnostic design,
     /// not a bug.
     JsonMatch { module: String, path: String, equals: Value },
 }
@@ -66,18 +66,18 @@ pub struct FrameModuleTrace {
     pub duration_ms: f64,
 }
 
-/// Sent to the frontend once per tick that's actually worth showing a human — never on every tick
+/// Sent to the frontend once per tick that's actually worth showing a human: never on every tick
 /// of a free-running loop (that would flood the IPC channel with JSON nobody's watching). See
 /// `process_module::spawn_and_run`'s tick closure for exactly when that is: any tick that fires
 /// while `DebugHooks::pause_flag` is true, which covers both a manual step and a breakpoint that
-/// just fired mid-tick — one push mechanism doing both jobs, not two.
+/// just fired mid-tick: one push mechanism doing both jobs, not two.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FrameTrace {
     pub frame_index: u64,
     pub delta_seconds: f64,
     pub modules: Vec<FrameModuleTrace>,
-    /// Only set on the tick where a breakpoint condition newly became true — a step the user
+    /// Only set on the tick where a breakpoint condition newly became true: a step the user
     /// asked for has no "triggered" breakpoint, it's just the frame they requested.
     pub triggered: Option<Breakpoint>,
 }
@@ -88,7 +88,7 @@ pub struct FrameTrace {
 /// list ballooning for what's really one cohesive feature.
 #[derive(Clone)]
 pub struct DebugHooks {
-    /// The frame loop blocks between ticks while this is true — checked once per would-be tick in
+    /// The frame loop blocks between ticks while this is true. Checked once per would-be tick in
     /// `driver::run`, not per-module, since pausing (like stopping) is a whole-run action.
     pub pause_flag: Arc<AtomicBool>,
     /// While paused, the driver lets exactly this many more ticks through before re-blocking, then
@@ -101,12 +101,12 @@ pub struct DebugHooks {
     /// configured before a run starts are still honored from the very first frame, and survive
     /// across separate runs the same way a real debugger's breakpoints do.
     pub breakpoints: Arc<Mutex<Vec<Breakpoint>>>,
-    /// Fired per FrameTrace — see FrameTrace's own doc comment for exactly when.
+    /// Fired per FrameTrace. See FrameTrace's own doc comment for exactly when.
     pub on_frame: Arc<dyn Fn(FrameTrace) + Send + Sync>,
 }
 
 impl DebugHooks {
-    /// A no-op bundle for a caller that doesn't want the debugger at all — an export build, or a
+    /// A no-op bundle for a caller that doesn't want the debugger at all: an export build, or a
     /// test exercising the run loop itself rather than the debugger. Never pauses, so `on_frame`
     /// is never actually called; still needs to be a real callable, not `None`, since spawn_and_run
     /// calls it unconditionally when `pause_flag` happens to be true.
@@ -120,7 +120,7 @@ impl DebugHooks {
     }
 }
 
-/// Checks a just-produced (module, reply) pair against ModuleError/JsonMatch breakpoints — the
+/// Checks a just-produced (module, reply) pair against ModuleError/JsonMatch breakpoints: the
 /// two kinds with a per-module frame reply to inspect. FrameCount/ModuleStart/LogLevel are
 /// evaluated at their own natural point instead (see spawn_and_run and spawn_stdout_reader), since
 /// none of those three have a frame reply at all.
@@ -173,7 +173,7 @@ pub trait RuntimeLoader: Send + Sync {
     /// Asked in registration order; the first `true` owns the whole run.
     fn can_handle(&self, modules: &[ModuleInfo]) -> bool;
     /// Runs the modules until `ctx.stop_flag` is observed or every module ends on its own.
-    /// Returns once the run is over — never exits the process, unlike Bootstrap's version.
+    /// Returns once the run is over: never exits the process, unlike Bootstrap's version.
     fn run(&self, modules: Vec<ModuleInfo>, ctx: &RunContext) -> Result<(), String>;
 }
 

@@ -1,14 +1,14 @@
 // Folder-mode export: stages a project's resolved modules + source + a launch.json into a fresh,
 // non-colliding subfolder of a chosen output directory, alongside a copy of the runtime
-// executable (bin/lowarc_runtime.rs — see runtime_source.rs for how that gets located). No
-// packaging trickery — no zip, no appended payload; just a flat, self-contained folder
+// executable (bin/lowarc_runtime.rs; see runtime_source.rs for how that gets located). No
+// packaging trickery: no zip, no appended payload; just a flat, self-contained folder
 // lowarc_runtime reads straight from its own directory. Single-file/bundle packaging is a
 // separate, later addition — it wraps this same staged folder differently per OS, it doesn't
 // replace the staging this file does.
 //
 // Deliberately excludes: which modules to include isn't a user choice here. export_folder reuses
 // runtime::project::resolve() exactly as dev-run does, which already resolves the project's own
-// transitive `requires` closure — a module merely installed (or enabled) globally but not actually
+// transitive `requires` closure: a module merely installed (or enabled) globally but not actually
 // required never enters that set. There is no "lean" toggle because there's no scenario where
 // bundling something the project doesn't need would ever be wanted; this is just what resolving
 // correctly already gets you, not an optimization layered on top.
@@ -90,7 +90,7 @@ pub fn export_folder(options: &ExportOptions, runtime_exe: &Path, log: &dyn Fn(&
     Ok(target_dir)
 }
 
-/// Copies everything in `project_dir` into `target_dir` except project.json — that file is this
+/// Copies everything in `project_dir` into `target_dir` except project.json: that file is this
 /// IDE's own bookkeeping (module preset, entry path), not something the exported app should ship
 /// or lowarc_runtime would ever read. Preserves the project's relative layout exactly, so
 /// `preset.entry` (relative to the project root) resolves identically relative to `target_dir`.
@@ -130,7 +130,7 @@ fn runtime_dest_file_name(app_name: &str) -> String {
 
 /// Strips characters that are illegal (or awkward) in a file/folder name on some platform, so one
 /// name works everywhere rather than needing per-OS validation later. Falls back to a fixed name
-/// rather than an empty string — an export always needs *some* name on disk.
+/// rather than an empty string: an export always needs *some* name on disk.
 fn sanitize_name(name: &str) -> String {
     let cleaned: String = name.chars().filter(|c| !r#"<>:"/\|?*"#.contains(*c)).collect();
     let trimmed = cleaned.trim().trim_matches('.');
@@ -201,7 +201,7 @@ mod tests {
         let module_dir = modules_dir.join("echo-module");
         std::fs::create_dir_all(&module_dir).unwrap();
         std::fs::write(module_dir.join("manifest.json"), r#"{"id":"echo","name":"Echo","loadOrder":1,"requires":[]}"#).unwrap();
-        // Deliberately no native.json — this fixture isn't testing native_module_host bundling
+        // Deliberately no native.json: this fixture isn't testing native_module_host bundling
         // (that has no test seam of its own yet; see export_folder's own comment on it), and
         // native_module_host_path()'s real filesystem lookups would make this flaky depending on
         // what happens to already be on disk.

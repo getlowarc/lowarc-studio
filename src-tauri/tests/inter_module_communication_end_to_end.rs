@@ -1,6 +1,6 @@
 // Proves the "shared"/"publish" wire-protocol extension (see process_module.rs's own header
 // comment for the design) actually works between two real process modules, not just that it
-// type-checks — same standard as runtime_end_to_end.rs's other smoke tests.
+// type-checks: same standard as runtime_end_to_end.rs's other smoke tests.
 
 use lowarc_studio_lib::runtime;
 use lowarc_studio_lib::runtime::runtime_loader::LogFn;

@@ -17,7 +17,7 @@ Every frame, it reads that gathered, declarative "what should be playing right n
 [{ "handle": "music", "file": "bgm.mp3", "volume": 0.8, "loop": true, "paused": false }]
 ```
 
-This is reconciled against what's currently playing, not a one-shot command queue — a director
+This is reconciled against what's currently playing, not a one-shot command queue: a director
 re-publishing the same list every frame (the normal case) never restarts anything already
 playing. Volume and paused state can both change live, in either direction, without restarting a
 sound or losing its position; changing the file or loop flag restarts it fresh. It publishes back

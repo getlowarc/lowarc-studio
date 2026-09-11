@@ -1,4 +1,4 @@
-// The file-explorer plugin's backend — a standalone binary, invoked fresh per call, same wire
+// The file-explorer plugin's backend: a standalone binary, invoked fresh per call, same wire
 // protocol as any other plugin (see plugin_host/protocol.rs): one JSON line in on stdin
 // (`{"method":..,"params":..}`), one JSON line out on stdout (`{"ok":bool,"result"?:..,
 // "error"?:string}`). Deliberately self-contained — no dependency on lowarc_studio_lib — a real
@@ -7,10 +7,10 @@
 // like."
 //
 // Every call carries "root" (the project directory) alongside its own arguments and gets
-// canonicalize-checked against it before touching disk — same reasoning as plugin_assets.rs's
+// canonicalize-checked against it before touching disk: same reasoning as plugin_assets.rs's
 // path-traversal check for served assets: never trust a path without confirming it's still inside
 // the boundary it's supposed to be confined to, regardless of who's asking. The Draft Tool methods
-// below (openDraft/captureBaseline/diffStatus/revertAll/commit) are the one exception — their
+// below (openDraft/captureBaseline/diffStatus/revertAll/commit) are the one exception: their
 // paths come from the host's own already-validated lowarc:beforeSave broadcast, not user input
 // into this plugin, so they don't need a second root check of their own.
 //
@@ -25,7 +25,7 @@
 // wipes it once on every launch (see lib.rs's setup()) so "session-only" is a real guarantee
 // rather than "OS temp-dir cleanup eventually happens." One folder per open Draft:
 //   <temp_dir>/lowarc-offshoot/<draft_id>/manifest.json   — { "<real path>": {"index":0,"existed":true} }
-//   <temp_dir>/lowarc-offshoot/<draft_id>/snapshots/<index>.txt   — that path's original content
+//   <temp_dir>/lowarc-offshoot/<draft_id>/snapshots/<index>.txt: that path's original content
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -302,10 +302,10 @@ fn write_draft_manifest(draft_id: &str, manifest: &DraftManifest) -> Result<(), 
     std::fs::write(draft_manifest_path(draft_id), text).map_err(|e| format!("could not save Draft state: {e}"))
 }
 
-/// Which Draft (if any) is currently open — a single well-known file, not per-draft, since this
+/// Which Draft (if any) is currently open: a single well-known file, not per-draft, since this
 /// UI only ever has one open at a time. Exists entirely so a page refresh (which wipes every bit
 /// of the plugin iframe's own JS state, but neither this backend process nor its disk storage) has
-/// something to ask "was a Draft actually open?" on reload — see getActiveDraft below. Restarting
+/// something to ask "was a Draft actually open?" on reload. See getActiveDraft below. Restarting
 /// the whole app still forgets it, same as everything else under scratch_root(): lib.rs's setup()
 /// wipes that entire folder wholesale on every launch.
 #[derive(Debug, Serialize, Deserialize)]
@@ -329,7 +329,7 @@ fn open_draft(draft_id: &str, label: &str, description: &str) -> Result<Value, S
         write_draft_manifest(draft_id, &DraftManifest::new())?;
     }
     let active = ActiveDraft { draft_id: draft_id.to_string(), label: label.to_string(), description: description.to_string() };
-    // Best-effort — a failure to write the "resume after refresh" pointer shouldn't fail opening
+    // Best-effort: a failure to write the "resume after refresh" pointer shouldn't fail opening
     // the Draft itself, it just means a refresh won't be able to rediscover it.
     let _ = serde_json::to_string(&active).map(|text| std::fs::write(active_draft_path(), text));
     Ok(Value::Null)
@@ -348,7 +348,7 @@ fn get_active_draft() -> Result<Value, String> {
     }
 }
 
-/// First-write-wins per path — a second (or third, ...) save of the same file after its baseline
+/// First-write-wins per path: a second (or third, ...) save of the same file after its baseline
 /// is already captured is a no-op here, which is exactly the point: the ORIGINAL content is what
 /// Revert needs to restore, not whatever the file looked like a moment before the most recent save.
 fn capture_baseline(draft_id: &str, path: &str, previous_content: Option<&str>) -> Result<Value, String> {
@@ -412,7 +412,7 @@ fn revert_all(draft_id: &str) -> Result<Value, String> {
     discard_draft(draft_id)
 }
 
-/// Current disk content is already what it should be — Commit's only job is forgetting the
+/// Current disk content is already what it should be. Commit's only job is forgetting the
 /// baselines so they stop being tracked.
 fn commit(draft_id: &str) -> Result<Value, String> {
     discard_draft(draft_id)
@@ -437,7 +437,7 @@ mod tests {
     use super::*;
 
     // open_draft/commit/revert_all all touch the ONE shared active_draft_path() now (not
-    // anything keyed by draft_id) — cargo test runs tests in parallel by default, so without this
+    // anything keyed by draft_id). Cargo test runs tests in parallel by default, so without this
     // every test calling any of the three would otherwise stomp on another's active-pointer
     // expectations, which shows up as intermittent failures.
     // parking_lot, not std::sync: a std Mutex poisons permanently on a panicking test, which

@@ -30,7 +30,7 @@ bundler in front of it), and first launch from a fresh clone takes care of its o
 (`file_explorer_backend`, `terminal_backend`) into their plugin folders automatically.
 
 Running from a source checkout keeps all of that per-user state inside the repo itself (at the
-repo root — see `.gitignore`) rather than scattering it into a hidden per-user app-data folder, so
+repo root; see `.gitignore`) rather than scattering it into a hidden per-user app-data folder, so
 a dev checkout never touches anything outside its own directory.
 
 ## Testing
@@ -49,7 +49,7 @@ cargo clippy --all-targets -- -D warnings
 ```
 
 Clean as of this writing — CI (`.github/workflows/ci.yml`) runs both this and `cargo test` on
-every push/PR. There's no `rustfmt.toml` yet, so `cargo fmt` isn't enforced — this codebase
+every push/PR. There's no `rustfmt.toml` yet, so `cargo fmt` isn't enforced: this codebase
 deliberately runs wider than rustfmt's 100-char default on long, well-commented single-line
 statements.
 
@@ -61,7 +61,7 @@ cd src-tauri
 cargo tauri build
 ```
 
-This is the one thing plain `cargo build`/`cargo run` doesn't cover — packaging needs the actual
+This is the one thing plain `cargo build`/`cargo run` doesn't cover. Packaging needs the actual
 Tauri CLI, which drives `prepare-bundle.ps1` (stages the backend binaries the bundler needs to
 find) before invoking the platform bundler.
 
@@ -71,18 +71,18 @@ find) before invoking the platform bundler.
   split across files in load order), `primitives.js`/`primitives.css` (shared host-side UI
   components), and a handful of standalone pages (`settings.html`, `modules.html`, `plugins.html`,
   `export.html`) that each host their own popup/page via the same primitives.
-- **`src-tauri/`** — the Rust backend. Notable modules:
-  - `runtime/` — the actual game-engine runtime (loaders, driver, manifest resolution) embedded in
+- **`src-tauri/`**: the Rust backend. Notable modules:
+  - `runtime/`: the actual game-engine runtime (loaders, driver, manifest resolution) embedded in
     the IDE for dev-run, and reused by `bin/lowarc_runtime.rs` for exported, standalone builds.
   - `export/` — stages a project into a self-contained folder for distribution.
-  - `plugin_host/`, `plugin_assets.rs`, `plugin_asset_server.rs`, `plugin_session.rs` — the plugin
+  - `plugin_host/`, `plugin_assets.rs`, `plugin_asset_server.rs`, `plugin_session.rs`: the plugin
     system: process isolation, the sandboxed-iframe asset server, and long-lived plugin sessions
     (Terminal).
   - `bin/` — extra binary targets built alongside the main app: `lowarc_runtime` (the exported
     runtime), `native_module_host` (isolates a native-kind module in its own process),
     `file_explorer_backend`/`terminal_backend` (the two built-in plugins with their own backends).
 - **`plugins/`** — every built-in plugin, each its own folder (`plugin.json` + assets, optionally a
-  built backend binary). Tracked as source by default — see `.gitignore`'s own note on this.
+  built backend binary). Tracked as source by default. See `.gitignore`'s own note on this.
 - **`modules/`, `themes/`, `settings.json`, `recent.json`** — per-user runtime state created on
   first launch (see Getting Started above). Not tracked; entirely disposable.
 
@@ -90,7 +90,7 @@ find) before invoking the platform bundler.
 
 A plugin runs inside a fully sandboxed iframe (`sandbox="allow-scripts"`, no `allow-same-origin`,
 no Tauri capability of its own) and can only reach the host through a small `window.lowarc.*`
-harness — everything else (file access, native dialogs, running its own backend process) is
+harness: everything else (file access, native dialogs, running its own backend process) is
 relayed through the host, which enforces per-plugin identity on every relayed action. See
 `plugin_assets.rs`'s `HARNESS_JS` for the current API surface, and any existing plugin under
 `plugins/` for a working example of the manifest shape (`plugin.json`).

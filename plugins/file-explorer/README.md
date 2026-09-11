@@ -14,7 +14,7 @@ this session.
 
 ## Draft Tool
 
-A lightweight, session-only backward snapshot bolted onto the explorer — not a separate plugin,
+A lightweight, session-only backward snapshot bolted onto the explorer: not a separate plugin,
 since browsing files and reviewing what changed in them are the same surface.
 
 Open a Draft (give it a label and an optional description), edit freely, and the tool starts
@@ -24,7 +24,7 @@ When you're done:
 
 - **Revert** restores every changed file to how it was when the Draft opened (deleting anything
   newly created), and discards the Draft.
-- **Commit** just discards the Draft — whatever's on disk is already correct.
+- **Commit** just discards the Draft. Whatever's on disk is already correct.
 
 Storage is entirely local and session-only: it lives in the OS temp directory and is wiped on
 every app launch, never inside the project folder itself. Toggle the whole feature off via the

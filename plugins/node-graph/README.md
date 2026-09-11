@@ -4,7 +4,7 @@ A visual node-graph editor for `.lan` (LowArc Node) files — boxes and connecti
 
 Pure editing surface for now: nothing here feeds into the runtime/compiler yet, this just lets
 you draw and save a graph. (The `node-graph-runtime` module is the piece that actually
-interprets a `.lan` file at run time — see its own README.)
+interprets a `.lan` file at run time; see its own README.)
 
 ## Features
 

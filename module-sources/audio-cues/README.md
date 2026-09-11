@@ -1,6 +1,6 @@
 # Audio Cues
 
-A contract, not a module — it has no process and never runs. Installing it puts this specification
+A contract, not a module. It has no process and never runs. Installing it puts this specification
 and its version in the module store, so a module that wants sound and a module that plays sound can
 agree without either depending on the other's binary.
 
@@ -33,15 +33,15 @@ order.
 
 | Field | Meaning |
 | --- | --- |
-| `handle` | Your name for this sound. Identity across frames — the same handle means the same sound. |
+| `handle` | Your name for this sound. Identity across frames: the same handle means the same sound. |
 | `file` | Path relative to the project root. |
 | `volume` | 0–1, default 1. Changes live without restarting. |
 | `loop` | Default false. |
-| `paused` | Default false. Changes live, keeping position — not a stop and restart. |
+| `paused` | Default false. Changes live, keeping position: not a stop and restart. |
 
 **This list is declarative: it describes what should be sounding right now, not what to start.**
 That distinction is the whole design. Re-publishing an unchanged list every frame is a no-op rather
-than a re-trigger, so the shape is idempotent by construction — a provider states the world it
+than a re-trigger, so the shape is idempotent by construction: a provider states the world it
 wants and never has to track what it already did. Dropping a handle from the list stops that sound.
 
 A player reports back under its own id which non-looping handles reached their natural end, so a

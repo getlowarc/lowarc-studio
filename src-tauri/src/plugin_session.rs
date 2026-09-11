@@ -7,7 +7,7 @@
 // plugin's own business (see terminal_backend.rs for Terminal's), not something this file
 // interprets; it only knows how to read JSON lines and forward them.
 //
-// Keyed by an opaque session_id (frontend-generated, e.g. a UUID), not by plugin_id — one plugin
+// Keyed by an opaque session_id (frontend-generated, e.g. a UUID), not by plugin_id: one plugin
 // can own several concurrent sessions (Terminal's multi-instance support: each open terminal tab
 // is its own session_id under the same "terminal" plugin). A plugin's own frontend is responsible
 // for further routing an incoming lowarc:sessionOutput by the session_id riding along in its
@@ -16,7 +16,7 @@
 // plugin_id IS stored on Session (below), and send()/stop() both take the caller's plugin_id and
 // verify it against the session's actual owner before touching anything. Without this, any
 // session-mode plugin's iframe could write into or kill ANY other plugin's live session just by
-// somehow getting hold of its session_id (guessed, logged, leaked some other way) — the wire
+// somehow getting hold of its session_id (guessed, logged, leaked some other way): the wire
 // protocol on a session's stdin is otherwise unauthenticated by design (it's meant for that
 // session's own owner only), so this ownership check is the one thing standing between "a plugin
 // that doesn't follow the rules" and actually reaching another plugin's process. The caller's own
@@ -45,10 +45,10 @@ pub struct SessionRegistry {
 }
 
 impl SessionRegistry {
-    /// Idempotent — a second start() for a session_id that's already running (and already owned by
+    /// Idempotent: a second start() for a session_id that's already running (and already owned by
     /// this same plugin_id) is a no-op, not a second process (guards against a double-click on "new
     /// terminal" racing itself, say). A second start() for a session_id already owned by a
-    /// DIFFERENT plugin_id is rejected outright rather than silently succeeding as a no-op — a
+    /// DIFFERENT plugin_id is rejected outright rather than silently succeeding as a no-op: a
     /// caller has no way to distinguish "my own session, already running" from "someone else's
     /// session, so I'll pretend I started it" if this returned Ok(()) either way.
     pub fn start(&self, app: &AppHandle, folder: &Path, desc: &PluginDescriptor, plugin_id: &str, session_id: &str) -> Result<(), String> {
@@ -76,7 +76,7 @@ impl SessionRegistry {
                     continue;
                 }
                 let Ok(mut payload) = serde_json::from_str::<Value>(&line) else { continue };
-                // Tag every message with the session it came from — the plugin's own frontend can
+                // Tag every message with the session it came from: the plugin's own frontend can
                 // own several instances (several open terminal tabs) sharing this one relay path,
                 // and has no other way to tell them apart on the receiving end.
                 if let Some(obj) = payload.as_object_mut() {
@@ -95,7 +95,7 @@ impl SessionRegistry {
 
     /// Fire-and-forget, matching window.lowarc.session.send() on the caller's side — there's no
     /// reply to a raw stdin write, only whatever the session eventually emits as output. Errors if
-    /// session_id doesn't exist OR belongs to a different plugin_id — the two are reported the same
+    /// session_id doesn't exist OR belongs to a different plugin_id: the two are reported the same
     /// way ("no running session"), since a plugin has no legitimate reason to distinguish "that
     /// session doesn't exist" from "that session isn't yours" and telling it which would just be
     /// free reconnaissance for a plugin trying to probe for other plugins' live session ids.
@@ -180,7 +180,7 @@ mod tests {
         insert_owned_by(&registry, "sess-2", "terminal");
 
         registry.stop("some-other-plugin", "sess-2");
-        // Still alive — the impostor's stop() didn't touch it.
+        // Still alive: the impostor's stop() didn't touch it.
         registry.send("terminal", "sess-2", &Value::String("hi".into())).expect("session should still be running");
 
         registry.stop("terminal", "sess-2");

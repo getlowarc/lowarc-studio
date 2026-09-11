@@ -2,11 +2,11 @@
       // Real now: Run calls start_dev_run, Stop calls stop_dev_run, Pause toggles pause_dev_run/
       // resume_dev_run, and dev-run-log/dev-run-ended/dev-run-frame (see lib.rs) feed the console's
       // Run tab and any plugin listening for lowarc:devRunFrame/lowarc:devRunEnded (the Debugger
-      // plugin, so far — see broadcastToPlugins below). isRunning is authoritative from
-      // dev-run-ended, not just set optimistically on click — a run can end on its own, not only
+      // plugin, so far; see broadcastToPlugins below). isRunning is authoritative from
+      // dev-run-ended, not just set optimistically on click: a run can end on its own, not only
       // via Stop. isPaused IS set optimistically on a successful pause/resume call, since unlike
       // starting a run there's no meaningfully different "it didn't actually happen" outcome to
-      // wait for — the call either fails outright (already caught) or the flag flips.
+      // wait for: the call either fails outright (already caught) or the flag flips.
       let isRunning = false;
       let isPaused = false;
 
@@ -104,7 +104,7 @@
       }
 
       // Stop, then start again once the backend has actually confirmed the run is over (the
-      // dev-run-ended event, the same one the permanent listener below reacts to) — not just
+      // dev-run-ended event, the same one the permanent listener below reacts to): not just
       // fire-and-forget stop_dev_run immediately followed by start_dev_run, since the backend can't
       // usefully begin a new run while it still considers the old one active.
       async function restartRun() {
@@ -118,7 +118,7 @@
       // backend flag, so a plugin's own displayed state (the Debug plugin, so far) stays accurate
       // no matter which control was actually used. `log` is false for a plugin-triggered change
       // only to avoid double-logging when the plugin itself might want to say something more
-      // specific than a generic line — today nothing does, but the option costs nothing to keep.
+      // specific than a generic line. Today nothing does, but the option costs nothing to keep.
       function setRunPaused(paused, { log = true } = {}) {
         isPaused = paused;
         if (log) appendConsoleLine("info", paused ? "Run paused." : "Run resumed.");
@@ -133,7 +133,7 @@
       }
 
       // Pushed to every mounted plugin any time isRunning/isPaused actually changes (run start,
-      // either Pause control, run end) — see broadcastToPlugins below. Lets a plugin's own status
+      // either Pause control, run end). See broadcastToPlugins below. Lets a plugin's own status
       // display (e.g. the Debug plugin's toolbar text) stay correct even when it had nothing to do
       // with causing the change itself, the same reasoning lowarc:fileStatus already follows for
       // dirty/error state.
@@ -145,7 +145,7 @@
       document.getElementById("stop-btn").addEventListener("click", stopRun);
       document.getElementById("pause-btn").addEventListener("click", togglePause);
 
-      // Broadcasts one event into every currently-mounted plugin iframe — same shape as
+      // Broadcasts one event into every currently-mounted plugin iframe: same shape as
       // broadcastFileStatus(), just generalized into its own helper since dev-run-frame/
       // dev-run-ended both need the exact same "every mounted panel, not just one" relay.
       function broadcastToPlugins(event, payload) {
@@ -181,7 +181,7 @@
         }
       });
 
-      // Plugin log lines share the same Run tab — one place to look for anything the app or
+      // Plugin log lines share the same Run tab: one place to look for anything the app or
       // an installed plugin has to say, rather than needing per-plugin console real estate for it.
       window.__TAURI__.event.listen("plugin-log", (event) => {
         appendConsoleLine(event.payload.level, event.payload.message);
@@ -207,14 +207,14 @@
         console: { open: false, size: 220, min: 160, closeAt: 50, max: 640, cssVar: "--console-height", dataAttr: "consoleOpen" },
       };
 
-      // Split-editor state lives outside PANELS on purpose — it isn't a grid-track toggle (no
+      // Split-editor state lives outside PANELS on purpose. It isn't a grid-track toggle (no
       // cssVar/dataAttr, doesn't collapse to 0 on close), it's a flex ratio *inside* the "center"
       // grid area. See the Tab bar/open files section below for the group machinery this drives.
       let splitOpen = false;
       let splitRatio = 0.5;
 
       // Lives here, next to the two variables it reads, rather than in split-view.js with the rest
-      // of the split machinery — because loadPanelLayout() below calls it after an await, and
+      // of the split machinery, because loadPanelLayout() below calls it after an await, and
       // split-view.js is the LAST script editor.html loads. That only ever worked because a real
       // Tauri invoke() takes longer than the four remaining script tags take to execute; anything
       // that made get_settings resolve promptly (a cache, a synchronous path) would have turned it
@@ -240,7 +240,7 @@
       let restoredSidebarActiveKey = null;
 
       // buildPatch is either a plain object (merged as-is) or a function receiving the just-
-      // fetched fresh settings and returning the patch to merge — the function form is for a
+      // fetched fresh settings and returning the patch to merge: the function form is for a
       // caller that needs to merge against a sub-object (tabOrder) rather than replace it wholesale,
       // so two different containers' saves in quick succession don't stomp on each other either.
       async function updateSettings(buildPatch) {
@@ -347,7 +347,7 @@
         applyPanel("console");
         syncToggleUI();
         // Split has no mounted files to restore (open files never persist across restart, split
-        // or not — see the Tab bar/open files section), just the layout shell itself: whether the
+        // or not; see the Tab bar/open files section), just the layout shell itself: whether the
         // second group is visible, and at what width.
         document.getElementById("center-panel").classList.toggle("is-split", splitOpen);
         document.getElementById("toggle-split").classList.toggle("is-active", splitOpen);

@@ -1,4 +1,4 @@
-// Port of Bootstrap's process_module.rs — the SAME wire protocol as
+// Port of Bootstrap's process_module.rs: the SAME wire protocol as
 // lowarc/Contracts/ProcessModuleLoader.cs (one JSON object per line over stdin/stdout;
 // compile/start/frame/stop phases; {"log":...}/{"requestStop":true} notifications), so an
 // existing process-kind module works unmodified whether it's run by an export or by this IDE.
@@ -8,7 +8,7 @@
 // which is the same compatibility rule the update manifest follows (see docs/updating.md).
 // The only real differences from Bootstrap's copy: logging goes through a caller-supplied
 // callback instead of a Diag file, and {"requestStop":true} sets the run's shared stop flag
-// instead of a process-wide global — this crate can run more than one session in its lifetime.
+// instead of a process-wide global: this crate can run more than one session in its lifetime.
 //
 // Genuinely new versus Bootstrap: inter-module communication. Every "frame" request now carries
 // a `"shared"` object, and every "frame" reply MAY carry a `"publish"` object — see
@@ -179,7 +179,7 @@ impl ProcessModule {
     /// both success and failure, and it had no way to be expressed: a module with no audio device or
     /// no display would run to completion doing nothing, indistinguishable from one that simply had
     /// nothing to do. Reported at Warn so it reaches the dev-run console and an export's diagnostics
-    /// log alike, without failing the module — degrading is the intended behavior, being silent
+    /// log alike, without failing the module. Degrading is the intended behavior, being silent
     /// about it was not.
     pub fn start(&self, settings: &Value) -> bool {
         let reply = self.request(json!({"phase": "start", "settings": settings, "items": self.compile_items}));
@@ -203,7 +203,7 @@ impl ProcessModule {
     /// `all_shared` is the FULL run-wide published-state map (module id -> whatever it last
     /// published); this filters it down to just the entries this module actually `requires`
     /// before it ever reaches the wire, so a module's own request payload only ever contains
-    /// state it declared a dependency on — see this file's own header comment for why.
+    /// state it declared a dependency on. See this file's own header comment for why.
     pub fn frame(&self, delta_seconds: f64, all_shared: &serde_json::Map<String, Value>) -> Option<(Value, Value, f64)> {
         if !self.wants_frames || self.dead.load(Ordering::SeqCst) {
             return None;
@@ -273,7 +273,7 @@ fn spawn_stdout_reader(
                 let level = parse_log_severity(severity);
                 let message = l.get("message").and_then(|m| m.as_str()).unwrap_or("");
                 log(level, &format!("[{name}] {message}"));
-                // Evaluated right here rather than back in the frame loop — a module can log at
+                // Evaluated right here rather than back in the frame loop: a module can log at
                 // any time, not just from inside a frame reply, so this is the one place a
                 // LogLevel breakpoint's triggering data actually exists. No matching FrameTrace
                 // accompanies this kind of pause (there's no frame to attach it to); the log line
@@ -333,7 +333,7 @@ pub fn spawn_and_run(descriptors: Vec<(&ModuleInfo, ProcessDescriptor)>, ctx: &R
             info.manifest.name.clone(),
             info.manifest.id.clone(),
             // store_id(), not id: a contract requirement names the contract, and the contract id is
-            // exactly the key its gathered array lives under in shared — so the existing filter
+            // exactly the key its gathered array lives under in shared, so the existing filter
             // below needs no special case for contracts at all.
             info.manifest.requires.iter().map(|d| d.store_id().to_string()).collect(),
             info.manifest.provides.iter().map(|p| p.contract.clone()).collect(),
@@ -347,11 +347,11 @@ pub fn spawn_and_run(descriptors: Vec<(&ModuleInfo, ProcessDescriptor)>, ctx: &R
         }
     }
 
-    // Requires-order, not just raw loadOrder — the same DFS manifest::order_by_requires uses,
+    // Requires-order, not just raw loadOrder: the same DFS manifest::order_by_requires uses,
     // exposed here as requires_rank() since this function only ever borrows its ModuleInfos (it
     // doesn't own descriptors, so it can't consume-and-reorder the way order_by_requires does).
     // This is what makes the "a consumer's frame() runs after its dependency's" guarantee spelled
-    // out in this function's own header comment actually hold — a plain loadOrder-only sort here
+    // out in this function's own header comment actually hold: a plain loadOrder-only sort here
     // would NOT have guaranteed it (two modules can declare any loadOrder numbers regardless of
     // what they actually require), so run_from_launch_dir (which already called order_by_requires
     // itself) and start_run (which resolves modules via project::resolve — plain BFS, not
@@ -387,7 +387,7 @@ pub fn spawn_and_run(descriptors: Vec<(&ModuleInfo, ProcessDescriptor)>, ctx: &R
         }
     }
 
-    // Run-wide, not per-tick — see spawn_and_run's own comment above for the full design. Lives
+    // Run-wide, not per-tick. See spawn_and_run's own comment above for the full design. Lives
     // right here (not behind an Arc<Mutex<_>>) since driver::run's tick closure is the only thing
     // that ever touches it, on this one thread, never concurrently with anything else.
     let mut shared: serde_json::Map<String, Value> = serde_json::Map::new();
@@ -419,7 +419,7 @@ pub fn spawn_and_run(descriptors: Vec<(&ModuleInfo, ProcessDescriptor)>, ctx: &R
         }
 
         // Fires for a manual step (pause_flag was already true going into this tick) and for a
-        // breakpoint that just fired (pause_flag only just became true above) alike — one gate,
+        // breakpoint that just fired (pause_flag only just became true above) alike: one gate,
         // not two separate mechanisms for what's the same "show the user this tick" need. Stays
         // silent for every tick of a normal free-running loop, where pause_flag is false
         // throughout.
@@ -434,7 +434,7 @@ pub fn spawn_and_run(descriptors: Vec<(&ModuleInfo, ProcessDescriptor)>, ctx: &R
     Ok(())
 }
 
-/// Every module runs as its own child process, driven by the default paced loop — no CLR
+/// Every module runs as its own child process, driven by the default paced loop: no CLR
 /// touched. Only matches a set where EVERY module has process.json, same reasoning as Bootstrap's
 /// ProcessLoader: a run mixing in a native-kind module has to go through NativeLoader instead.
 pub struct ProcessLoader;
@@ -483,7 +483,7 @@ impl RuntimeLoader for ProcessLoader {
 
     fn run(&self, modules: Vec<ModuleInfo>, ctx: &RunContext) -> Result<(), String> {
         // Ranked BEFORE contracts are dropped, so a consumer still lands after everything providing
-        // what it requires — the contract entries themselves just never become processes.
+        // what it requires: the contract entries themselves just never become processes.
         let load_order = order_by_requires(modules);
 
         let mut descriptors = Vec::new();

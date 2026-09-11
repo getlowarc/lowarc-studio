@@ -61,7 +61,7 @@ fn runs_a_native_module_end_to_end_via_dlopen() {
     assert!(trace.contains("started"), "expected lowarc_module_start to have run, trace was: {trace:?}");
     assert!(trace.contains("stopped"), "expected lowarc_module_stop to have run, trace was: {trace:?}");
     // Proves the native ABI side of the inter-module "shared"/"publish" extension actually works,
-    // not just that it type-checks — a bad CString/callback shape here would very likely crash or
+    // not just that it type-checks: a bad CString/callback shape here would very likely crash or
     // hang the process well before this assertion, not fail it cleanly. native-echo requires
     // nothing, so its shared view should always be the empty object.
     assert!(trace.contains("frame 1 shared={}"), "expected the module's own frame() to have received an (empty) shared object, trace was: {trace:?}");

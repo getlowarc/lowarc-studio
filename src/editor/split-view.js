@@ -1,6 +1,6 @@
       // ---------- Split editor ----------
       // applySplitRatio() is deliberately not here but in panels.js, beside the splitOpen/splitRatio
-      // state it reads — see its own comment there for why its position is load-order-sensitive.
+      // state it reads. See its own comment there for why its position is load-order-sensitive.
 
       async function setSplitOpen(open) {
         if (splitOpen === open) return;
@@ -34,7 +34,7 @@
       document.getElementById("toggle-split").addEventListener("click", toggleSplit);
       document.getElementById("view-toggle-split").addEventListener("click", toggleSplit);
 
-      // Same Pointer Capture reasoning as initDividerDrag below — this divider sits directly
+      // Same Pointer Capture reasoning as initDividerDrag below: this divider sits directly
       // beside a group that can hold a sandboxed iframe (Monaco, most often), and a plain
       // document-level mousemove would stop responding the instant the drag crosses into one.
       function initSplitDividerDrag() {
@@ -109,8 +109,8 @@
           return;
         }
 
-        // A plugin replying to a HOST-initiated request — the only such request today is
-        // requestPluginContent() (see moveFileToGroup) — not one of the usual plugin-initiated
+        // A plugin replying to a HOST-initiated request: the only such request today is
+        // requestPluginContent() (see moveFileToGroup): not one of the usual plugin-initiated
         // "call"/"host" messages, so it gets its own type rather than overloading "reply" (which
         // means something different: a plugin's OWN outgoing call() awaiting an answer).
         if (data.type === "hostRequestReply") {
@@ -135,7 +135,7 @@
             return;
           }
 
-          // window.lowarc.refreshFile() — same trust shape as openFile above (any mounted plugin,
+          // window.lowarc.refreshFile(): same trust shape as openFile above (any mounted plugin,
           // not scoped to the file's own viewer via windowToFilePaths, since the CALLER here is
           // never the viewer itself — it's whatever changed the file out from under it).
           if (data.action === "refreshFile") {
@@ -145,7 +145,7 @@
             return;
           }
 
-          // window.lowarc.setDiffStatus() — same trust shape as refreshFile above.
+          // window.lowarc.setDiffStatus(): same trust shape as refreshFile above.
           if (data.action === "setDiffStatus") {
             if (windowToPlugin.get(event.source)) {
               setDraftDiffStatus(data.diffCounts && typeof data.diffCounts === "object" ? data.diffCounts : {});
@@ -153,7 +153,7 @@
             return;
           }
 
-          // window.lowarc.pickOpenFile()/createFile() — a plugin has no filesystem access of its
+          // window.lowarc.pickOpenFile()/createFile(): a plugin has no filesystem access of its
           // own to browse or write with, so these relay to the host's real native file dialogs
           // (openDialog/saveDialog, the same ones the File menu itself uses) rather than giving a
           // plugin raw FS access. Generic, like showMenu/getSettings: any mounted plugin can call
@@ -196,7 +196,7 @@
           // window.lowarc.broadcastToSelf() — relays to every OTHER mounted iframe of the SAME
           // plugin (never the sender, never a different plugin's iframe). iframe.plugin-panel-frame
           // is the one class every plugin-hosted iframe carries regardless of role (panel, viewer,
-          // console tab — see iframeForWindow's own comment above), so this is the same enumeration
+          // console tab; see iframeForWindow's own comment above), so this is the same enumeration
           // that already works for translating a plugin's showMenu() coordinates.
           if (data.action === "broadcastToSelf") {
             const pluginId = windowToPlugin.get(event.source);
@@ -211,7 +211,7 @@
             return;
           }
 
-          // window.lowarc.editFile() — a plugin that isn't the file's own viewer (Outline) asking
+          // window.lowarc.editFile(): a plugin that isn't the file's own viewer (Outline) asking
           // whatever IS to apply an edit. Same trust shape as openFile: any tracked plugin iframe
           // can ask, but only for a path that's actually open right now, forwarded to that path's
           // real owning instance rather than trusted blindly.
@@ -247,11 +247,11 @@
             return;
           }
 
-          // Same trust/routing shape as openFile — these come from whatever plugin performed the
+          // Same trust/routing shape as openFile: these come from whatever plugin performed the
           // filesystem operation (the file explorer, today), not from the affected file's own
           // viewer iframe, so they're keyed by windowToPlugin and an explicit path lookup rather
           // than windowToFilePaths. Only exact-path matches are handled: a folder rename/move/
-          // delete doesn't currently cascade to mark every open file underneath it — a deliberate
+          // delete doesn't currently cascade to mark every open file underneath it: a deliberate
           // scope cut, not an oversight.
           if (data.action === "notifyPathDeleted") {
             if (windowToPlugin.get(event.source) && typeof data.path === "string") {
@@ -275,7 +275,7 @@
             }
             return;
           }
-          // All three routed by windowToPlugin, not windowToFilePaths — a session-mode plugin's UI
+          // All three routed by windowToPlugin, not windowToFilePaths: a session-mode plugin's UI
           // (a console-tab panel, not a file viewer) manages its own instances, each identified by
           // a sessionId it minted itself; the host just needs to know which plugin's files/backend
           // that id belongs to, the same trust boundary as everything else here.
@@ -304,7 +304,7 @@
             }
             return;
           }
-          // window.lowarc.showMenu() — see plugin_assets.rs's harness. data.x/data.y are in the
+          // window.lowarc.showMenu(). See plugin_assets.rs's harness. data.x/data.y are in the
           // calling iframe's OWN document coordinates (typically a right-click's clientX/clientY);
           // this iframe could be mounted in either editor group's viewport, a sidebar/inspector
           // panel, or a console tab, so its screen position isn't fixed — iframeForWindow() finds
@@ -322,13 +322,13 @@
             }
             return;
           }
-          // window.lowarc.openPopup() — see plugin_assets.rs's harness. Unlike showMenu, a popup
+          // window.lowarc.openPopup(). See plugin_assets.rs's harness. Unlike showMenu, a popup
           // is always centered on the real window rather than anchored to the calling iframe, so
           // there's no position to translate here. popupId must name a popup some contribution
-          // already registered via contribute("popups", ...) — no plugin declares one yet, so this
+          // already registered via contribute("popups", ...): no plugin declares one yet, so this
           // is proven the same way notify() was: real, but unexercised until one has a reason to.
           // Same trust (windowToPlugin) and reply-routing (event.source, never broadcast) as every
-          // other action here — the result goes back to the exact iframe that asked.
+          // other action here: the result goes back to the exact iframe that asked.
           if (data.action === "openPopup") {
             if (windowToPlugin.get(event.source) && typeof data.popupId === "string") {
               showPopup(data.popupId, data.target)
@@ -337,7 +337,7 @@
             }
             return;
           }
-          // window.lowarc.getSettings() — see plugin_assets.rs's harness. windowToPlugin is the
+          // window.lowarc.getSettings(). See plugin_assets.rs's harness. windowToPlugin is the
           // trust boundary: a plugin only ever gets ITS OWN saved settings back, since pluginId
           // here comes from the map this iframe was mounted under, never from the message itself.
           if (data.action === "getSettings") {
@@ -349,7 +349,7 @@
             }
             return;
           }
-          // window.lowarc.debug.pause/resume/step/setBreakpoints() — see plugin_assets.rs's
+          // window.lowarc.debug.pause/resume/step/setBreakpoints(). See plugin_assets.rs's
           // harness. Generic, like every other action here: any mounted plugin can call these, not
           // just the first-party Debugger one. Fire-and-forget; a failure (most commonly "no run
           // is active") surfaces as the host's own toast, same as session.start's error handling.
@@ -377,7 +377,7 @@
             }
             return;
           }
-          // window.lowarc.setCommands() — see plugin_assets.rs's harness.
+          // window.lowarc.setCommands(). See plugin_assets.rs's harness.
           if (data.action === "setCommands") {
             const pluginId = windowToPlugin.get(event.source);
             if (pluginId && Array.isArray(data.commands)) {
@@ -391,7 +391,7 @@
           // Every action below is "about" one specific open file — markDirty/markErrors/
           // requestClose/saveFile all carry an explicit path now (see plugin_assets.rs), since one
           // iframe can be responsible for several at once. windowToFilePaths is what validates a
-          // plugin can only claim a path the host itself actually told it to open — not proof of
+          // plugin can only claim a path the host itself actually told it to open: not proof of
           // WHICH file (there's no single one anymore), just that this iframe is allowed to speak
           // for that path at all.
           const claimedPaths = windowToFilePaths.get(event.source);
@@ -414,7 +414,7 @@
             closeFile(path);
           } else if (data.action === "saveFile") {
             // Unlike markDirty/requestClose, this one owes the caller a reply (see saveFile()'s
-            // own comment in __lowarc.js) — a write can fail, and the plugin needs to know before
+            // own comment in __lowarc.js): a write can fail, and the plugin needs to know before
             // it clears its own dirty state.
             try {
               await invoke("write_text_file", { path, contents: String(data.contents ?? "") });
@@ -450,12 +450,12 @@
         event.source.postMessage(reply, "*");
       });
 
-      // Plugins are invoked per call now, not kept running (see plugin_host/protocol.rs) — a
+      // Plugins are invoked per call now, not kept running (see plugin_host/protocol.rs): a
       // backend cannot push something unprompted at an arbitrary later time, since nothing
       // persists between calls. It CAN ride an "emit" along on a call's own reply
       // though (invoke_plugin in lib.rs re-fires it as this event), so a plugin can tell its own
       // other panels/viewers "something changed" as a side effect of whatever it was just asked
-      // to do — still call-triggered, just not truly live.
+      // to do: still call-triggered, just not truly live.
       window.__TAURI__.event.listen("plugin-emit", (event) => {
         const { pluginId, event: eventName, payload } = event.payload;
         for (const entry of pluginPanels.values()) {
@@ -473,7 +473,7 @@
       // The theme just changed in THIS document (theme.js announces every apply). A plugin runs in
       // a sandboxed iframe: it got the resolved theme from __lowarc-theme.css when it loaded, but it
       // has no way to notice a later change, and reloading it to pick one up would throw away
-      // whatever it was showing — an editor's unsaved buffer, a terminal's scrollback. So the
+      // whatever it was showing: an editor's unsaved buffer, a terminal's scrollback. So the
       // resolved values are pushed straight in and applied as custom properties.
       //
       // Read off documentElement's inline style rather than a token list, because that is exactly
@@ -499,7 +499,7 @@
 
       // A setting was changed in settings.html (a separate window/document, so it can't ride
       // plugin-emit — that one only fires as a side effect of invoke_plugin, and no plugin call
-      // happens here) — see set_plugin_setting in lib.rs. Relayed the same way plugin-emit relays
+      // happens here). See set_plugin_setting in lib.rs. Relayed the same way plugin-emit relays
       // a plugin's own emit: filtered to that plugin's own mounted panels/files only, so a plugin
       // doesn't need to know its own id to tell whether an incoming settingsChanged is for it.
       window.__TAURI__.event.listen("plugin-setting-changed", (event) => {
@@ -522,7 +522,7 @@
       // The generic "a save is about to overwrite this file" hook (see write_text_file in lib.rs)
       // — broadcast to every mounted plugin iframe, same shape as broadcastFileStatus()
       // (tabs-inspector.js), just Rust-originated instead of client-state-originated. Host code has
-      // no notion of which plugin (if any) cares — Offshoot is the only one listening today, but
+      // no notion of which plugin (if any) cares. Offshoot is the only one listening today, but
       // nothing here says so.
       window.__TAURI__.event.listen("file-about-to-save", (event) => {
         const payload = { type: "emit", event: "lowarc:beforeSave", payload: event.payload };
@@ -548,12 +548,12 @@
       // remembered size is untouched while closed, so reopening later restores the size from before
       // the drag rather than 0.
 
-      // Pointer Capture, not plain mousedown/mousemove/mouseup on document — every panel this
+      // Pointer Capture, not plain mousedown/mousemove/mouseup on document: every panel this
       // resizes sits right next to a sandboxed iframe (the file explorer, Monaco, Terminal...),
       // and a plain document-level mousemove listener stops receiving events the instant the
       // cursor crosses into one, since the iframe has its own separate document/event target.
       // Confirmed live: dragging past an iframe's edge would just silently stop responding,
-      // making a panel impossible to shrink whenever the mouse happened to cross one — a
+      // making a panel impossible to shrink whenever the mouse happened to cross one: a
       // pointerdown that setPointerCapture()s on the divider itself keeps *all* subsequent
       // pointer events routed to that element regardless of what's visually underneath the
       // cursor, iframe or not, which is exactly the guarantee this needs.

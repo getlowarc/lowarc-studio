@@ -2,7 +2,7 @@
 // ProcessLoader, NativeLoader, the driver): start_run() resolves a project's module PRESET
 // against the GLOBAL module store (project.rs) — what the IDE's own dev-run needs, since nothing
 // has resolved anything yet at that point. run_from_launch_dir() instead reads an ALREADY-resolved
-// launch.json (what export::export_folder wrote — see its own module comment) and runs exactly
+// launch.json (what export::export_folder wrote; see its own module comment) and runs exactly
 // the modules it names, in the folder they were staged into — what bin/lowarc_runtime.rs (the
 // exported, standalone runtime) needs, since export already did the resolving once, at export
 // time, and re-resolving against a "global store" that doesn't exist in a shipped folder would be
@@ -57,7 +57,7 @@ pub fn start_run(
     loader.run(modules, &ctx).map_err(|e| vec![e])
 }
 
-/// launch.json's own shape — the one file bin/lowarc_runtime.rs (the exported, standalone
+/// launch.json's own shape: the one file bin/lowarc_runtime.rs (the exported, standalone
 /// runtime) reads, and the only thing export::export_folder writes describing HOW to run what it
 /// staged. Shared here (not a private struct in export/mod.rs, not a raw json!() macro either) so
 /// the writer and the one real reader can't drift out of sync on a key name. `modules` is already

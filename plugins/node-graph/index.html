@@ -116,7 +116,7 @@
     border-color: var(--cyan);
     box-shadow: 0 0 0 1px var(--cyan), 0 2px 8px rgba(0, 0, 0, 0.25);
   }
-  /* Hovering a connected-node row in the Inspector's Input/Output list — a lighter, temporary
+  /* Hovering a connected-node row in the Inspector's Input/Output list: a lighter, temporary
      "here it is" versus the persistent cyan selection styling above. An outline (not a border
      color swap) so it never fights with is-selected's own border if both apply to the same node
      at once. */
@@ -163,7 +163,7 @@
   }
 
   /* ---------- Badges ---------- */
-  /* Small, fixed-size, wordless indicators — see node-graph.js's "Badges" section for what each
+  /* Small, fixed-size, wordless indicators. See node-graph.js's "Badges" section for what each
      one means. Always the same size regardless of content: "+99" (the widest possible value) has
      to fit exactly as well as a single "S" does, so a badge never grows to fit more text — the
      count caps out visually instead. Real meaning only ever shows in a tooltip, on hover. */

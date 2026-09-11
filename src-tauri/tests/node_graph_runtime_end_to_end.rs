@@ -182,7 +182,7 @@ fn the_interpreter_advances_when_an_input_module_tells_it_to() {
     let entry = write_project(&project_dir, r#"[{"id":"node-graph-runtime","version":"*"},{"id":"input","version":"*"}]"#);
 
     // input starts publishing advanceTo:"n2" on ITS OWN second frame, and node-graph-runtime
-    // requires input — so by the time this same tick reaches node-graph-runtime, it already sees
+    // requires input, so by the time this same tick reaches node-graph-runtime, it already sees
     // that fresh value (the requires-ordering guarantee spawn_and_run's own comment describes),
     // not one tick stale. Frame 2 is therefore already enough to prove it, not just frame 3+.
     let trace = run_to_frame_and_capture(&entry, &project_dir, &modules_dir, 2);

@@ -1,7 +1,7 @@
 // Exercises the real thing: a project.json preset, resolved against a real global module store,
 // run through the actual runtime::start_run — a real PowerShell process module spawned, ticked a
 // few real frames, and stopped, both by its own request and (in the second test) by an external
-// Stop. Not a unit test of one function — the same standard as lowarc/Bootstrap's smoke tests.
+// Stop. Not a unit test of one function: the same standard as lowarc/Bootstrap's smoke tests.
 
 use lowarc_studio_lib::runtime;
 use lowarc_studio_lib::runtime::runtime_loader::{Breakpoint, DebugHooks, FrameTrace, LogFn};

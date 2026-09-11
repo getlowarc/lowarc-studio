@@ -39,7 +39,7 @@
 
       // ---------- File menu: Save / Save As ----------
       // Both route through the active file's own viewer iframe rather than the host reading/
-      // writing disk directly — the iframe holds whatever's actually in its buffer (unsaved edits
+      // writing disk directly: the iframe holds whatever's actually in its buffer (unsaved edits
       // included), the same reasoning moveFileToGroup() already relies on via
       // requestPluginContent(). A viewer with nothing to save (no open file, or a read-only viewer
       // like Media Viewer that never implements lowarc:getContent/requestSave) just does nothing —
@@ -81,7 +81,7 @@
       // Redo aren't registered Monaco Actions (only genuine Actions show up via editor.getAction(),
       // see refreshCommands() in monaco.js), so they need editor.trigger() instead, which reaches a
       // command OR an action either way. A viewer that doesn't understand a given command id just
-      // ignores the event — nothing to route to for a read-only viewer, same graceful no-op as any
+      // ignores the event: nothing to route to for a read-only viewer, same graceful no-op as any
       // other unhandled event in this contract.
       function sendEditorCommand(command) {
         const file = activeFileEntry();
@@ -134,7 +134,7 @@
         await appWindow.setFullscreen(!isFullscreen);
       });
 
-      // Focusing the input is enough to open it — see initSearchbar's own focus listener
+      // Focusing the input is enough to open it. See initSearchbar's own focus listener
       // (primitives.js), which renders the browsable categories the instant it's non-empty.
       function openCommandPalette() {
         commandCenterInput.focus();
@@ -144,7 +144,7 @@
 
       // ---------- Run menu ----------
       // Wrapped in arrow functions (not bare references) on purpose: startRun/togglePause/stopRun/
-      // restartRun/pickAndSetEntry are all defined in panels.js, which loads AFTER this file — a
+      // restartRun/pickAndSetEntry are all defined in panels.js, which loads AFTER this file: a
       // bare reference here would need to resolve immediately, at registration time, and throw.
       // Wrapping defers the lookup to click time, by which every script has already loaded (the
       // same reason this line never had to think about it back when this was all one script:
@@ -186,11 +186,11 @@
         showPopup("about", { version: await getAppVersionLabel() });
       });
 
-      // The logo has no click behavior of its own — this is purely what initTooltips() (below)
+      // The logo has no click behavior of its own: this is purely what initTooltips() (below)
       // reads on hover. Starts as just the name (data-tooltip is already set in the markup) and
       // grows a version line once getAppVersionLabel() actually resolves; tooltip content is read
       // live at hover time, not cached at init, so updating the attribute after initTooltips() has
-      // already run is enough — no re-init needed.
+      // already run is enough: no re-init needed.
       getAppVersionLabel().then((version) => {
         const logo = document.getElementById("app-logo-icon");
         if (version) logo.dataset.tooltip = `LowArc Studio — ${version}`;
@@ -221,13 +221,13 @@
       initWindowControls(() => confirmAppClose());
       initTabs();
 
-      // Drag-to-reorder — see initReorderable() in primitives.js. Only these four strips opt in
+      // Drag-to-reorder. See initReorderable() in primitives.js. Only these four strips opt in
       // (data-reorderable, set on each one's own markup); everything else (the top menu bar, a
       // standalone page's view tabs) is untouched. Safe to call before any of their items exist —
       // the listeners are delegated on the container itself, not attached per-item.
       initReorderable(document.getElementById("rail-tabs"), { axis: "y", onReorder: (order) => saveTabOrder("rail-tabs", order) });
       // Each group names the OTHER as its crossContainer, so a file tab can be dragged freely
-      // between them — see initReorderable's crossContainer/onMoveAcross in primitives.js.
+      // between them. See initReorderable's crossContainer/onMoveAcross in primitives.js.
       // moveFileToGroup isn't defined yet at this point in the script, but neither closure below
       // calls it until an actual cross-drag completes, by which point it is (function declarations
       // are hoisted, and this only ever fires from later user interaction, never synchronously here).

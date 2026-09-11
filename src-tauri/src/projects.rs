@@ -7,7 +7,7 @@ use crate::app_paths::AppPaths;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-/// What's persisted to disk — just enough to reconstruct a RecentProject at read time (name/exists
+/// What's persisted to disk: just enough to reconstruct a RecentProject at read time (name/exists
 /// are always computed live, never stored, so a renamed or deleted project shows up correctly).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct StoredEntry {
@@ -43,7 +43,7 @@ fn write_entries(recents_file: &Path, entries: &[StoredEntry]) -> std::io::Resul
 fn to_recent_project(entry: &StoredEntry) -> RecentProject {
     let path = PathBuf::from(&entry.path);
     let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| entry.path.clone());
-    // Whether the FOLDER is still there, not whether it happens to have a project.json — a
+    // Whether the FOLDER is still there, not whether it happens to have a project.json: a
     // project-less folder (see open_project_in below) is just as openable as one with a preset,
     // so gating "exists" on project.json specifically would show every one of those as the
     // "missing" (grayed out, unclickable) state in the recents list despite being perfectly fine.
@@ -117,7 +117,7 @@ fn remove_recent_in(recents_file: &Path, path: &Path) -> Result<(), String> {
 }
 
 /// Creates `<parent_dir>/<name>/` with an empty project.json preset, and adds it to recents.
-/// The preset starts with no requires — the user picks modules for it afterward, this just
+/// The preset starts with no requires: the user picks modules for it afterward, this just
 /// gets a real, openable project on disk.
 pub fn create_project(parent_dir: &Path, name: &str) -> Result<PathBuf, String> {
     create_project_in(&AppPaths::recent_projects_file(), parent_dir, name)
@@ -148,7 +148,7 @@ fn create_project_in(recents_file: &Path, parent_dir: &Path, name: &str) -> Resu
     Ok(project_dir)
 }
 
-/// Validates the folder actually exists before adding it to recents — the same "throw a visible
+/// Validates the folder actually exists before adding it to recents: the same "throw a visible
 /// error, don't guess" rule as everywhere else, not a silent no-op. project.json is deliberately
 /// NOT required here: this app works as a plain editor over any folder, LowArc project or not —
 /// project.json only matters once something actually needs project-run features (see

@@ -6,7 +6,7 @@
 // (that existed specifically so concurrent calls could share one connection — under one-process-
 // per-call, concurrent calls just get concurrent separate processes, nothing to correlate), no
 // "is this plugin currently running" state to track anywhere. A crashing plugin still can't take
-// the editor down with it — every call is already its own isolated process, no isolation lost.
+// the editor down with it: every call is already its own isolated process, no isolation lost.
 //
 // Messages:
 //   host -> plugin (stdin, exactly one line):
@@ -19,9 +19,9 @@
 //
 // "emit" riding along on the reply (instead of a plugin pushing it unprompted at some arbitrary
 // later time, which nothing persists long enough to do any more) lets a plugin still tell its own
-// panel "something changed" as a side effect of a call — still invoke-triggered, not truly live,
+// panel "something changed" as a side effect of a call: still invoke-triggered, not truly live,
 // so it fits the model. Contributes (panels/consoleTabs/viewers) stays the sole, purely static
-// source of what a plugin provides — there's no running process left to "confirm" a registration
+// source of what a plugin provides: there's no running process left to "confirm" a registration
 // live the way v2's registerPanel notification did, so that whole mechanism is gone with it.
 
 use serde::{Deserialize, Serialize};
@@ -46,7 +46,7 @@ pub struct PluginDescriptor {
     pub args: Vec<String>,
     #[serde(rename = "timeoutMs", default = "default_timeout")]
     pub timeout_ms: u64,
-    /// Purely descriptive — the plugin's real identity everywhere else (logs, PluginProcess.id) is
+    /// Purely descriptive: the plugin's real identity everywhere else (logs, PluginProcess.id) is
     /// still its folder name, not this. Shown in the Plugins manage page.
     pub name: Option<String>,
     pub version: Option<String>,
@@ -64,20 +64,20 @@ pub struct PluginDescriptor {
     /// fresh per call, and keeps it running until explicitly stopped or the app exits. Everything
     /// else (contributes, path-traversal rules, etc.) is identical either way; the wire protocol
     /// on that persistent process's stdin/stdout is also JSON-lines, just streamed instead of
-    /// one-shot — see plugin_session.rs for the exact shape.
+    /// one-shot. See plugin_session.rs for the exact shape.
     #[serde(default)]
     pub session: bool,
     #[serde(default)]
     pub contributes: Contributes,
     /// Config fields this plugin wants exposed generically in Settings, rendered off this schema
-    /// rather than the app hand-coding a UI control per plugin. Optional — most plugins won't
+    /// rather than the app hand-coding a UI control per plugin. Optional. Most plugins won't
     /// declare any. Values themselves live in Settings.plugin_settings, keyed by plugin id then by
     /// each field's own `key`; a plugin reads its current values back via window.lowarc.getSettings()
     /// (see plugin_assets.rs). No mechanism forces a plugin to use this over reading its own
     /// plugin-specific config some other way — it's the generic option, not a requirement.
     #[serde(default)]
     pub settings: Vec<PluginSettingField>,
-    /// Commands this plugin wants exposed in the app's Command Palette — the plugin-declared half
+    /// Commands this plugin wants exposed in the app's Command Palette: the plugin-declared half
     /// of that registry; host-owned menu items are the other half, auto-discovered from the menu
     /// bar's own DOM rather than declared anywhere (see buildHostMenuCommands() in editor.html) —
     /// a sandboxed plugin has no equivalent to introspect, so it has to say so itself. Selecting one
@@ -145,7 +145,7 @@ pub struct PanelContribution {
     pub id: String,
     pub title: String,
     /// "sidebar" | "inspector" — console isn't a value here since it can hold multiple tabs at
-    /// once (see `console_tabs` below), and there's no "viewport" location any more — an open
+    /// once (see `console_tabs` below), and there's no "viewport" location any more: an open
     /// file's viewer is picked by extension via the sibling `viewers` list instead, since the
     /// viewport now holds one iframe per open file rather than a single permanent plugin.
     pub location: String,
@@ -182,7 +182,7 @@ pub struct ViewerContribution {
     pub extensions: Vec<String>,
     /// False (the default — every existing viewer, Monaco included, wants this) reads the file as
     /// UTF-8 text via read_text_file and pushes it as a plain string, same as always. True reads
-    /// it via read_binary_file instead and pushes it as a base64 string — for anything that isn't
+    /// it via read_binary_file instead and pushes it as a base64 string. For anything that isn't
     /// text (images, video), where decoding as UTF-8 would corrupt the bytes. See lowarc:openFile's
     /// payload shape in plugin_assets.rs for exactly which field carries which.
     #[serde(default)]
@@ -224,7 +224,7 @@ pub fn invoke(folder: &Path, desc: &PluginDescriptor, plugin_id: &str, method: &
             let _ = child.wait();
             return json!({"ok": false, "error": "failed to write to plugin process"});
         }
-        // Dropping stdin here closes it — the EOF signal a well-behaved one-shot plugin reads
+        // Dropping stdin here closes it: the EOF signal a well-behaved one-shot plugin reads
         // until, rather than something that has to loop waiting for a second message that will
         // never come.
     }
@@ -250,12 +250,12 @@ pub fn invoke(folder: &Path, desc: &PluginDescriptor, plugin_id: &str, method: &
                 reader_log(parse_log_severity(severity), &format!("[{reader_plugin_id}] {message}"));
                 continue;
             }
-            // First non-log line is the reply — this invocation is done regardless of whether
+            // First non-log line is the reply: this invocation is done regardless of whether
             // the process itself has actually exited yet.
             let _ = tx.send(value);
             return;
         }
-        // Stdout closed (EOF) without ever sending a reply — the caller's recv_timeout will time
+        // Stdout closed (EOF) without ever sending a reply: the caller's recv_timeout will time
         // out and report it, nothing more to do here.
     });
 

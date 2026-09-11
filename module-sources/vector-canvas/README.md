@@ -1,10 +1,10 @@
 # Vector Canvas
 
-A real 2D drawing surface for a LowArc project — this is the module that makes a run stop being
+A real 2D drawing surface for a LowArc project: this is the module that makes a run stop being
 headless. It opens a window, owns an OpenGL context, and draws whatever your project tells it to.
 
 Built on [femtovg](https://github.com/femtovg/femtovg), a GPU vector renderer (OpenGL ES 3.0+)
-whose API is modelled on the HTML5 Canvas API — the same drawing model p5.js wraps. Windowing is
+whose API is modelled on the HTML5 Canvas API: the same drawing model p5.js wraps. Windowing is
 [winit](https://docs.rs/winit) with [glutin](https://docs.rs/glutin) for the GL context.
 Cross-platform: Windows, macOS, Linux.
 
@@ -30,7 +30,7 @@ top of it without anyone arranging that.
 Unlike audio's declarative "what should be playing" list, drawing is immediate-mode: a frame draws
 exactly what it was handed, and a frame handed nothing draws nothing.
 
-An unknown `op` is logged and skipped rather than failing the frame — one bad command must not take
+An unknown `op` is logged and skipped rather than failing the frame: one bad command must not take
 down everything else being drawn.
 
 ### Commands
@@ -48,7 +48,7 @@ down everything else being drawn.
 // Images. "w"/"h" default to the file's own size; "tint" and "alpha" are alternatives.
 {"op":"image","file":"art/player.png","x":0,"y":0,"w":32,"h":32,"rotation":0,"alpha":1}
 
-// Text. "font" is required — there is no built-in font.
+// Text. "font" is required: there is no built-in font.
 {"op":"text","text":"Score: 10","x":8,"y":8,"font":"fonts/Roboto.ttf","size":16,"fill":"#fff","align":"left"}
 
 // Transform stack.
@@ -89,7 +89,7 @@ Every frame, under its own id:
 
 Input is published here because this module owns the window, so it's the only thing that can report
 a pointer position in canvas space. That deliberately overlaps the `input` module, which polls the
-OS globally in screen space — that one remains the right source for gamepads and for input that
+OS globally in screen space: that one remains the right source for gamepads and for input that
 isn't about this window.
 
 Keys are reported as **physical** key codes, so checking for "the W key" gives the same answer on a

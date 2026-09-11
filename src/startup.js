@@ -16,13 +16,13 @@ function openEditor(projectPath) {
 
 // Icons for the row actions (sized by the .btn-icon-only.btn-sm primitive, not by the SVG itself —
 // matching every other icon button in the app). PIN_ICON does double duty as both the "Pin"
-// ⋮-menu item's icon-less label and the standalone Unpin button — a pin glyph reads fine for
+// ⋮-menu item's icon-less label and the standalone Unpin button: a pin glyph reads fine for
 // "unpin" too given the row it's sitting on.
 const PIN_ICON = '<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5.5" r="3" stroke="currentColor" stroke-width="1.3" /><path d="M8 8.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" /></svg>';
 const TRASH_ICON = '<svg viewBox="0 0 16 16" fill="none"><path d="M3 4.5h10M6.5 4.5V3a1 1 0 011-1h1a1 1 0 011 1v1.5M6 7v4M10 7v4M4 4.5l.6 8a1 1 0 001 .9h4.8a1 1 0 001-.9l.6-8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" /></svg>';
 const MORE_ICON = '<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="3.5" r="1.3" fill="currentColor" /><circle cx="8" cy="8" r="1.3" fill="currentColor" /><circle cx="8" cy="12.5" r="1.3" fill="currentColor" /></svg>';
 
-// Any open ⋮ menu closes on an outside click — same mechanic as editor.html's menu bar, just not
+// Any open ⋮ menu closes on an outside click: same mechanic as editor.html's menu bar, just not
 // tracked by a fixed id list since there's one per row and rows get rebuilt on every reload.
 document.addEventListener("click", () => {
   document.querySelectorAll(".menu-dropdown.is-open").forEach((d) => d.classList.remove("is-open"));
@@ -101,7 +101,7 @@ function buildRecentItem(project, isPinned) {
   const menuList = document.createElement("div");
   menuList.className = "menu-dropdown-list anchor-right";
 
-  // Pin only makes sense from a Recents row — a Pinned row's equivalent action is the standalone
+  // Pin only makes sense from a Recents row: a Pinned row's equivalent action is the standalone
   // Unpin button above, so there's nothing to duplicate here.
   if (!isPinned) {
     const pinItem = document.createElement("button");
@@ -148,7 +148,7 @@ async function loadRecents() {
   const pinned = all.filter((p) => p.pinned);
   const recents = all.filter((p) => !p.pinned);
 
-  // Both sections always show — an empty one gets a short standard "nothing here" line instead
+  // Both sections always show: an empty one gets a short standard "nothing here" line instead
   // of disappearing, so Pinned doesn't just vanish the moment nothing's pinned.
   document.getElementById("pinned-empty").style.display = pinned.length ? "none" : "";
   document.getElementById("recents-empty").style.display = recents.length ? "none" : "";

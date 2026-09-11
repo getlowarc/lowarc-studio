@@ -1,7 +1,7 @@
 # Device Input
 
 Polls keyboard, mouse and gamepads at the OS level (screen coordinates, regardless of window
-focus), cross-platform, with no coupling to any other module — a pure producer. Publishes state
+focus), cross-platform, with no coupling to any other module: a pure producer. Publishes state
 every frame; what (if anything) consumes it is entirely up to the project.
 
 For input *about a window* — a pointer position in the space you're drawing in — see
@@ -26,12 +26,12 @@ Publishes every frame:
 ```
 
 An unavailable gamepad backend (or no keyboard/mouse polling support on the current platform)
-degrades gracefully — the relevant section just stays empty, rather than failing the module.
+degrades gracefully: the relevant section just stays empty, rather than failing the module.
 
 ## Not supported
 
 Drawing-tablet/stylus input isn't read by this module. Modern platforms scope pen/tablet input to
-a specific window by design (the same reason Wayland has no global keyboard/mouse polling) — the
+a specific window by design (the same reason Wayland has no global keyboard/mouse polling): the
 best cross-platform crate found (`octotablet`) needs a real `raw_window_handle` to attach to,
 which no process module in this engine currently has. Bigger architectural step, not attempted
 here.

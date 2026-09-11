@@ -11,11 +11,11 @@
 //
 // Named "vector-canvas", not "canvas", deliberately. It is a VECTOR renderer (antialiased paths and
 // strokes, via femtovg), not a sprite blitter, and it is one possible surface rather than the only
-// one — a pixel/tile surface or a 3D one should be able to sit beside it as a peer instead of being
+// one: a pixel/tile surface or a 3D one should be able to sit beside it as a peer instead of being
 // "the other canvas". The command vocabulary below is this module's own interface, not an
 // engine-wide drawing protocol; a different surface module is free to speak differently.
 //
-// Rendering is femtovg (GPU, OpenGL ES 3.0+), whose API is modelled on the HTML5 Canvas API — the
+// Rendering is femtovg (GPU, OpenGL ES 3.0+), whose API is modelled on the HTML5 Canvas API: the
 // same drawing model p5.js wraps. That's what makes growing this cheap: every new command is one
 // more arm in draw_command()'s match, mapping a JSON object onto a femtovg call. Rasterization,
 // antialiasing and glyph shaping are already solved by that crate.
@@ -30,7 +30,7 @@
 // Outbound (published every frame): window size, plus mouse/keyboard/focus state. Input is here
 // because this module owns the window, so it's the only thing that can report a pointer position in
 // CANVAS coordinates (the camera transform inverted). That deliberately overlaps the
-// "device-input" module, which polls the OS globally in screen space — that one remains the right
+// "device-input" module, which polls the OS globally in screen space: that one remains the right
 // source for gamepads and for input that isn't about this window.
 //
 // Closing the window sends {"requestStop":true}, ending the run the same way any module asking to
@@ -235,7 +235,7 @@ impl App {
 }
 
 /// Assets are named relative to the PROJECT root (captured from the compile phase's own sourcePath),
-/// the same convention audio_playback_runtime.rs resolves its sound files by — so a director can say
+/// the same convention audio_playback_runtime.rs resolves its sound files by, so a director can say
 /// "art/player.png" without knowing where the project lives. An already-absolute path is left alone.
 /// A free function rather than a method so callers can hold a disjoint borrow of the canvas at the
 /// same time; see draw_command's destructuring.
@@ -282,7 +282,7 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::KeyboardInput { event, .. } => {
-                // The physical key, not the produced character — a consumer checking for "the W key"
+                // The physical key, not the produced character: a consumer checking for "the W key"
                 // wants the same answer on a QWERTY and an AZERTY keyboard, which is what a
                 // layout-independent code gives and a text character doesn't.
                 let name = format!("{:?}", event.physical_key);
@@ -305,7 +305,7 @@ impl ApplicationHandler for App {
 
 /// All the glutin/winit bootstrapping in one place. On Windows (WGL) the window attributes MUST go
 /// through DisplayBuilder rather than being created separately — glutin-winit's own docs are
-/// explicit that modern OpenGL is otherwise unavailable — which is why this builds the window and
+/// explicit that modern OpenGL is otherwise unavailable, which is why this builds the window and
 /// the GL config together rather than in two steps.
 fn build_window(event_loop: &ActiveEventLoop, settings: &WindowSettings) -> Result<Gfx, String> {
     let attributes = Window::default_attributes()
@@ -316,7 +316,7 @@ fn build_window(event_loop: &ActiveEventLoop, settings: &WindowSettings) -> Resu
     let (window, gl_config) = DisplayBuilder::new()
         .with_window_attributes(Some(attributes))
         .build(event_loop, ConfigTemplateBuilder::new().with_alpha_size(8), |configs| {
-            // Most samples wins — antialiasing is the whole point of a vector renderer.
+            // Most samples wins. Antialiasing is the whole point of a vector renderer.
             configs
                 .reduce(|best, config| if config.num_samples() > best.num_samples() { config } else { best })
                 .expect("at least one GL config")
@@ -342,7 +342,7 @@ fn build_window(event_loop: &ActiveEventLoop, settings: &WindowSettings) -> Resu
     } else {
         SwapInterval::DontWait
     };
-    // Not fatal — a driver refusing the requested interval just means a different frame pace, not a
+    // Not fatal: a driver refusing the requested interval just means a different frame pace, not a
     // broken canvas.
     let _ = surface.set_swap_interval(&context, interval);
 
@@ -360,7 +360,7 @@ fn build_window(event_loop: &ActiveEventLoop, settings: &WindowSettings) -> Resu
 /// This is the gathering half of the contract mechanism, and it's what stops this module being
 /// something producers must funnel through one privileged "director" to reach. Any number of
 /// modules can draw; each publishes its own list, and they land here concatenated. Since draw order
-/// is list order, run order is z-order — a debug overlay that requires the module it annotates
+/// is list order, run order is z-order: a debug overlay that requires the module it annotates
 /// therefore draws on top of it, for free, with nobody arranging that.
 fn gather(msg: &Value, contract: &str, key: &str) -> Vec<Value> {
     let Some(providers) = msg.pointer(&format!("/shared/{contract}")).and_then(|v| v.as_array()) else {
@@ -395,7 +395,7 @@ fn paint_path(canvas: &mut Canvas<OpenGl>, cmd: &Value, path: &Path) {
     }
 }
 
-/// One command. Unknown ops are logged and skipped rather than failing the frame — one bad command
+/// One command. Unknown ops are logged and skipped rather than failing the frame: one bad command
 /// from a director must not take down everything else being drawn, the same way audio treats one
 /// unloadable sound file.
 fn draw_command(app: &mut App, cmd: &Value, width: f32, height: f32) {
@@ -627,7 +627,7 @@ fn is_start(msg: &Value) -> bool {
     msg.get("phase").and_then(|p| p.as_str()) == Some("start")
 }
 
-/// A "start" reply, carrying the degraded marker when there's no window — see ProcessModule::start
+/// A "start" reply, carrying the degraded marker when there's no window. See ProcessModule::start
 /// in process_module.rs for what the engine does with it.
 fn reply_started(degraded: Option<&str>) {
     let mut extra = Map::new();
@@ -647,7 +647,7 @@ fn handle_message(app: &mut App, msg: &Value) -> Outcome {
                 .and_then(|p| p.parent().map(|p| p.to_path_buf()));
             reply_ok(Map::new());
         }
-        // Deliberately not handled here — the reply has to report whether a window was actually
+        // Deliberately not handled here: the reply has to report whether a window was actually
         // obtained, and that isn't known until the event loop has been pumped once. Both run loops
         // handle it themselves; see apply_start_settings.
         "start" => reply_err("internal: start is handled by the run loop, not here"),
@@ -669,7 +669,7 @@ fn handle_message(app: &mut App, msg: &Value) -> Outcome {
 }
 
 /// Reads stdin on its own thread so the main thread never blocks on it. That's what keeps the window
-/// pumping while no frames are arriving — which is exactly what happens whenever the run is paused
+/// pumping while no frames are arriving, which is exactly what happens whenever the run is paused
 /// at a debugger breakpoint, and without it the OS would mark the window "not responding" every
 /// time you paused.
 fn spawn_stdin_reader() -> Receiver<Value> {
@@ -700,7 +700,7 @@ fn run_windowed(mut event_loop: EventLoop<()>, rx: Receiver<Value>) {
         let _ = event_loop.pump_app_events(Some(Duration::ZERO), &mut app);
 
         // The window's own close button ends the run, the same way any module asking to stop does.
-        // Announced once — the host sets a run-wide flag off this, so repeating it every frame would
+        // Announced once: the host sets a run-wide flag off this, so repeating it every frame would
         // be pure noise.
         if app.input.close_requested && !announced_close {
             announced_close = true;
@@ -712,7 +712,7 @@ fn run_windowed(mut event_loop: EventLoop<()>, rx: Receiver<Value>) {
         match rx.recv_timeout(Duration::from_millis(4)) {
             Ok(msg) if is_start(&msg) => {
                 // Settings first (the window's title and size come from them), then one pump to
-                // actually build it, and only then the reply — which is the whole reason start is
+                // actually build it, and only then the reply, which is the whole reason start is
                 // handled here rather than in handle_message. Answering before the pump would mean
                 // always claiming success, including on the machine where it just failed.
                 apply_start_settings(&mut app, &msg);
@@ -733,7 +733,7 @@ fn run_windowed(mut event_loop: EventLoop<()>, rx: Receiver<Value>) {
     }
 }
 
-/// No display at all — a headless CI runner, a locked-down environment. The module still speaks the
+/// No display at all: a headless CI runner, a locked-down environment. The module still speaks the
 /// protocol, still replies, and just never draws anything; the run continues rather than dying on a
 /// machine that was never going to show a window. Same promise audio_playback_runtime.rs makes for a missing
 /// audio device, and the reason that one exists is that it has genuinely broken CI here before.
@@ -741,7 +741,7 @@ fn run_headless(rx: Receiver<Value>, reason: &str) {
     let mut app = App::new();
     while let Ok(msg) = rx.recv() {
         if is_start(&msg) {
-            // No pump to wait on here — this path already knows there will never be a window, so
+            // No pump to wait on here: this path already knows there will never be a window, so
             // the reply can say so outright.
             apply_start_settings(&mut app, &msg);
             reply_started(Some(&format!("no display is available ({reason}) — nothing will be drawn")));

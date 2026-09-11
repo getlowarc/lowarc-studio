@@ -1,13 +1,13 @@
-// No native prompt()/confirm()/alert() here — the plugin iframe is sandboxed with
+// No native prompt()/confirm()/alert() here: the plugin iframe is sandboxed with
 // sandbox="allow-scripts" only (no allow-modals), so those are silently no-ops, not errors. Every
 // interaction that would normally be a dialog (new file/folder naming, rename, delete
-// confirmation) is built as inline UI instead — the same reason VS Code's own explorer edits tree
+// confirmation) is built as inline UI instead: the same reason VS Code's own explorer edits tree
 // rows in place rather than popping a native prompt.
 
 const CHEVRON_SVG = '<svg viewBox="0 0 10 10" fill="none"><path d="M3 1l4 4-4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const FILE_SVG = '<svg viewBox="0 0 16 16" fill="none"><path d="M4 2h5l3 3v9H4V2Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M9 2v3h3" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>';
 
-// Read synchronously off the iframe's own URL fragment, not pushed in later via postMessage — no
+// Read synchronously off the iframe's own URL fragment, not pushed in later via postMessage: no
 // race between "did the host's push arrive before I started listening" to get wrong.
 // URLSearchParams parses a "#"-free string, so the leading "#" gets stripped first.
 let root = new URLSearchParams(window.location.hash.replace(/^#/, "")).get("project");
@@ -163,7 +163,7 @@ function fileIconHtml(name) {
   return `<span class="file-icon ${window.lowarcIconClass(name)}"></span>`;
 }
 
-// ONE slot, not a chevron slot followed by a separate icon slot — a folder's chevron and a file's
+// ONE slot, not a chevron slot followed by a separate icon slot: a folder's chevron and a file's
 // icon are the same thing positionally (the row's one "what is this" marker), so they need to
 // literally share one element's box, not two sequential ones. Two separate slots would make every
 // file row reserve an invisible chevron-width column before its icon started, so a file's icon and
@@ -234,7 +234,7 @@ function createRow({ path, label, isDir, depth }) {
     }
   }
 
-  // Draft Tool decoration — only while a Draft is actually open, and only for a file that's
+  // Draft Tool decoration: only while a Draft is actually open, and only for a file that's
   // genuinely changed since it opened (diffCounts is empty for anything untouched).
   if (!isDir && draftId) appendDiffCounts(row, path);
 
@@ -276,7 +276,7 @@ function createInlineCreateRow(dir, isDir, depth) {
   row.className = "row";
   appendIndentGuides(row, depth);
 
-  // Nothing's been typed yet to pick an extension-specific glyph from — this always shows the
+  // Nothing's been typed yet to pick an extension-specific glyph from: this always shows the
   // generic file icon regardless of what's ultimately created, until the row re-renders as a real
   // row (createRow, above) with the committed name. A pending folder's chevron is non-functional
   // (nothing to expand yet) but shown anyway, matching createRow's marker for visual consistency.
@@ -415,7 +415,7 @@ async function commitRename(path, newName) {
     invalidate(parent);
     if (selectedPath === path) selectedPath = joinPath(parent, newName);
     renderTree(); // renaming changes neither the file/folder count nor total bytes — no refreshTotals()
-    // Only ever flags the exact renamed path's own open tab, if there is one — a renamed folder
+    // Only ever flags the exact renamed path's own open tab, if there is one: a renamed folder
     // doesn't cascade to everything open underneath it (see the host's own comment on this).
     window.lowarc.notifyPathRenamed(path, joinPath(parent, newName));
   } catch (err) {
@@ -456,7 +456,7 @@ async function pasteInto(destDir) {
   // A paste is either a move (no total change) or a copy (adds files/bytes) — refreshing
   // unconditionally is simpler than threading that distinction through, and cheap either way.
   refreshTotals();
-  // A copy leaves the original in place — only a cut (move) actually displaces the source path.
+  // A copy leaves the original in place: only a cut (move) actually displaces the source path.
   if (wasCut) window.lowarc.notifyPathRenamed(sourcePath, joinPath(destDir, baseName(sourcePath)));
 }
 
@@ -694,7 +694,7 @@ document.getElementById("commit-btn").addEventListener("click", async () => {
   renderTree();
 });
 
-// The host's generic "about to overwrite" broadcast (see write_text_file in lib.rs) — the actual
+// The host's generic "about to overwrite" broadcast (see write_text_file in lib.rs): the actual
 // backward-snapshot moment. Only matters while a Draft is open; every other plugin just ignores
 // this same broadcast.
 window.lowarc.on("lowarc:beforeSave", ({ path, previousContent }) => {
@@ -720,7 +720,7 @@ document.getElementById("tree").addEventListener("contextmenu", (e) => {
 });
 
 // Pushed by the host any time a file's dirty/error/missing state changes, or a new plugin panel
-// (this one) mounts — see broadcastFileStatus() in editor.html. A full snapshot, not a delta, so
+// (this one) mounts. See broadcastFileStatus() in editor.html. A full snapshot, not a delta, so
 // this just replaces the whole map and re-renders rather than merging.
 window.lowarc.on("lowarc:fileStatus", (status) => {
   fileStatus = status || {};
@@ -731,7 +731,7 @@ window.lowarc.on("lowarc:fileStatus", (status) => {
 // but the backend process and its disk storage aren't, so this is the one thing standing between
 // "just reload the window" and silently losing track of an open Draft. Safe to call unconditionally
 // on every load (a fresh mount included): with nothing open, the backend just replies null and this
-// is a no-op. Restores regardless of the draftTool setting — if it's off, #draft-tool stays hidden
+// is a no-op. Restores regardless of the draftTool setting, if it's off, #draft-tool stays hidden
 // either way, but the underlying tracking (and status bar diff) shouldn't depend on that toggle.
 async function restoreActiveDraftIfAny() {
   let active;
@@ -746,7 +746,7 @@ async function restoreActiveDraftIfAny() {
   await refreshDiffStatus();
 }
 
-// Live counterpart to the getSettings() read below — see set_plugin_setting/plugin-setting-changed
+// Live counterpart to the getSettings() read below. See set_plugin_setting/plugin-setting-changed
 // in lib.rs and its relay to lowarc:settingsChanged in split-view.js. showHidden/foldersFirst just
 // need a re-render; draftTool also needs the section's own visibility toggled (it's independent of
 // the underlying tracking, same as the initial read below).

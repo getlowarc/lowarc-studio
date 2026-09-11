@@ -1,6 +1,6 @@
 // Same paced default loop as Bootstrap's driver.rs, adapted for one thing: it checks a
 // caller-supplied stop flag instead of a process-wide global, since a dev-run session isn't the
-// whole process's lifetime here — the IDE can start, stop, and start another run again later.
+// whole process's lifetime here: the IDE can start, stop, and start another run again later.
 
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;

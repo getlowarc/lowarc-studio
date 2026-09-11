@@ -6,7 +6,7 @@
 // Speaks the exact same wire protocol as a process.json module (runtime::process_module) — one
 // JSON object per line on stdin/stdout, compile/start/frame/stop phases, {"log":...}/
 // {"requestStop":true} notifications, and now "shared"/"publish" for inter-module communication
-// too (see process_module.rs's own header comment for the full design) — so NativeLoader can
+// too (see process_module.rs's own header comment for the full design), so NativeLoader can
 // drive it through process_module's existing spawn/compile/start/frame-loop/stop lifecycle
 // unchanged, same as a real process module. "compile" is a no-op here (native code is already
 // compiled); replied to immediately so the shared lifecycle doesn't need to know which kind of
@@ -18,7 +18,7 @@
 // times during frame() with a JSON *object* string, and whatever it passed gets merged (by key,
 // last call wins on a collision) into PUBLISH_BUFFER, which this process reads back out and sends
 // as this frame's reply once frame_fn returns. A callback rather than a return value sidesteps any
-// question of who owns/frees a string handed back across the FFI boundary — nothing has to.
+// question of who owns/frees a string handed back across the FFI boundary: nothing has to.
 
 use lowarc_studio_lib::dylib::Library;
 use lowarc_studio_lib::runtime::native_module::{platform_library_file_name, NativeDescriptor};
@@ -37,7 +37,7 @@ type StartFn = extern "C" fn(*const c_char, RequestStopFn);
 type FrameFn = extern "C" fn(f64, *const c_char, PublishFn);
 type StopFn = extern "C" fn();
 
-/// Serializes stdout writes — the module's own request_stop() callback can fire from a thread the
+/// Serializes stdout writes: the module's own request_stop() callback can fire from a thread the
 /// module created itself, concurrently with this process's own main-loop reply to a frame/stop
 /// message. Without this, two writers could interleave mid-line and hand the host an unparseable
 /// (or worse, wrongly-parseable) line.
@@ -50,7 +50,7 @@ fn stdout_lock() -> &'static Mutex<()> {
 /// call, read back out (and included in the reply) right after it returns. A module's own
 /// request_stop() callback can already fire from a thread it created itself (see stdout_lock's
 /// comment); publish() is documented as frame()-only (called synchronously, from the same thread
-/// frame() itself runs on) specifically so this doesn't need the same cross-thread story — a plain
+/// frame() itself runs on) specifically so this doesn't need the same cross-thread story: a plain
 /// Mutex is enough, not because publish() couldn't race but because a well-behaved module never
 /// gives it the chance to.
 fn publish_buffer() -> &'static Mutex<Map<String, Value>> {
@@ -58,7 +58,7 @@ fn publish_buffer() -> &'static Mutex<Map<String, Value>> {
     BUFFER.get_or_init(|| Mutex::new(Map::new()))
 }
 
-/// The module calls this any number of times during frame() with a JSON *object* string — anything
+/// The module calls this any number of times during frame() with a JSON *object* string: anything
 /// else (unparseable, or valid JSON that isn't an object) is silently dropped rather than killing
 /// the module's whole frame over one malformed publish call.
 extern "C" fn publish(json_str: *const c_char) {

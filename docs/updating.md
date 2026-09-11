@@ -11,7 +11,7 @@ Three things can change independently, and they are **not** three update systems
 | Layer | What it covers | Mechanism |
 | --- | --- | --- |
 | 1. App | The binary, built-in plugins shipped as bundle resources | Tauri updater (this doc) |
-| 2. Content | User-installed plugins and modules | App code — so updated *by* layer 1 |
+| 2. Content | User-installed plugins and modules | App code, so updated *by* layer 1 |
 | 3. Preferences | `settings.json`, projects, recents | Migration, not updating |
 
 The thing that makes this tractable: **the machinery for layer 2 is app code**, not plugin code.
@@ -21,11 +21,11 @@ design around.
 
 **Layer 3 is a different problem wearing similar clothes.** You don't update `settings.json`, you
 migrate it: a version field plus migration steps that run on launch after the app changes shape.
-Grouping it with the other two would be a category error — its failure mode is "your preferences
+Grouping it with the other two would be a category error: its failure mode is "your preferences
 silently became wrong," not "you're on an old version."
 
-**Plugins and modules share one system.** They're structurally identical — a versioned folder with a
-`manifest.json` and an id, in user data — and the UI already treats them as one implementation
+**Plugins and modules share one system.** They're structurally identical: a versioned folder with a
+`manifest.json` and an id, in user data, and the UI already treats them as one implementation
 parameterized by noun (`createManagerPage` / `createManagerPanel`). Splitting them would break a
 symmetry the code already found.
 
@@ -62,7 +62,7 @@ shipping a fix.
 ## Distribution: one channel, for everyone
 
 Tauri does not produce MSIX. The [Microsoft Store path](https://v2.tauri.app/distribute/microsoft-store/)
-is a listing that links to your own EXE/MSI — the Store never takes ownership of the package, and
+is a listing that links to your own EXE/MSI: the Store never takes ownership of the package, and
 their docs require the linked installer to *"handle auto-updates"* itself.
 
 So there is no store-managed update path to defer to, and no second code path to maintain. Same
@@ -72,7 +72,7 @@ The Store adds three requirements to the installer, none of which change the upd
 code signed, silent-install capable (`/S` for NSIS, registered in Partner Center), and the offline
 WebView2 option.
 
-**The Mac App Store is the one genuine exception** — a real sandboxed store where self-updating is
+**The Mac App Store is the one genuine exception**: a real sandboxed store where self-updating is
 forbidden. Not investigated, because macOS isn't a target yet (see `rust-toolchain.toml`). If it
 becomes one, that needs its own design; it's the only case where the "one channel" premise breaks.
 
@@ -84,13 +84,13 @@ becomes one, that needs its own design; it's the only case where the "one channe
 - `"createUpdaterArtifacts": true` in `tauri.conf.json`, so a bundle produces signed update artifacts.
 - **Version single-sourced.** `tauri.conf.json` no longer carries `"version"`; it inherits from
   `Cargo.toml`. Verified: the built exe reports `0.1.0` in its file metadata. This matters because
-  the updater compares versions — two copies that can disagree is a correctness bug in waiting, and
+  the updater compares versions: two copies that can disagree is a correctness bug in waiting, and
   the git tag made a third.
 - `.github/workflows/release.yml`, tag-triggered, which checks the tag against `Cargo.toml` before
   building and refuses to publish a release whose contents disagree with its own name.
 
 **The plugin is not registered in the builder yet, and must not be until the config below exists.**
-An earlier version of this document claimed registering it early was harmless — that the feature
+An earlier version of this document claimed registering it early was harmless: that the feature
 would sit inert and `check()` would error until configured. That is wrong. The plugin refuses to
 initialize at all without a `plugins.updater` block:
 
@@ -104,7 +104,7 @@ which panics at startup and takes the whole app down, rather than leaving one fe
 Worth noting how it got missed: `cargo build` and `cargo test` both pass with the plugin registered
 and unconfigured, because nothing about it fails until a window is actually created. Only launching
 the app catches it. Add the registration line in the same change that adds the pubkey and endpoints,
-and launch the app afterwards — not just build it.
+and launch the app afterwards: not just build it.
 
 ## What's left, and what it depends on
 
@@ -126,14 +126,14 @@ created by you and never pass through anything else.
 
 The repo is private, so GitHub release assets can't be fetched anonymously by the updater. The
 alternative was making releases public while the source stayed closed; **lowarc.com was chosen
-instead** — no coupling to GitHub, full control over the manifest, and the site is being built
+instead**: no coupling to GitHub, full control over the manifest, and the site is being built
 anyway.
 
 The site doesn't exist yet, so nothing here can be wired up. What the site will need to implement is
 specified below so it can be built against a fixed contract rather than reverse-engineered later.
 
 Note this needs nothing from the webview's CSP. The updater performs its request from Rust, so
-`connect-src 'self'` does not apply to it — that restriction only governs plugins.
+`connect-src 'self'` does not apply to it: that restriction only governs plugins.
 
 #### The contract lowarc.com has to satisfy
 
@@ -150,8 +150,8 @@ GET https://lowarc.com/updates/windows/x86_64/0.1.0
 
 Two valid responses:
 
-- **`204 No Content`** — already current. This is the common case and should be cheap.
-- **`200`** with the manifest below — an update exists.
+- **`204 No Content`**: already current. This is the common case and should be cheap.
+- **`200`** with the manifest below: an update exists.
 
 ```jsonc
 {
@@ -172,7 +172,7 @@ client independently refuses anything not newer than itself, and refuses anythin
 doesn't verify against the baked-in public key. A compromised server cannot push code without the
 private key.
 
-Serve artifacts over HTTPS. The `url` need not be on lowarc.com — it just has to be publicly
+Serve artifacts over HTTPS. The `url` need not be on lowarc.com. It just has to be publicly
 fetchable.
 
 #### Getting artifacts to the site
@@ -215,7 +215,7 @@ available → downloading → ready to restart.
 Reuse what exists rather than inventing: the toast system, `setProgress`, and the `install-progress`
 event shape already used for plugin and module installs.
 
-Deliberately not built yet — it can't be verified against a live endpoint, and an update UI that
+Deliberately not built yet. It can't be verified against a live endpoint, and an update UI that
 looks right while checking the wrong place is the classic failure here. Small once the plumbing is
 proven.
 
@@ -232,7 +232,7 @@ without consent.
 
 - Check cadence (on launch, then every N hours?), and prompt-before-download vs download-then-prompt.
 - Whether a beta/nightly channel is wanted. Cheap to allow for in the manifest now, annoying to
-  retrofit — see the additive-only rule above.
+  retrofit. See the additive-only rule above.
 - Plugin/module compatibility across app versions. If the harness API changes, an older
   user-installed plugin can break. Eventually wants a compatibility field in the plugin manifest;
   not now, but the manifest-versioning rule is what keeps that door open.

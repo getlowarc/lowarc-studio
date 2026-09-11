@@ -1,11 +1,11 @@
 // Proves bin/audio_playback_runtime.rs actually plays real audio through the real runtime and correctly
-// detects natural completion — not just that it type-checks. Manually piping the wire protocol
+// detects natural completion: not just that it type-checks. Manually piping the wire protocol
 // into the built exe (see this module's own dev notes) already confirmed a real WAV genuinely
 // plays; this test additionally proves the justFinished transition, using the same pause+step
 // mechanism runtime_end_to_end.rs's own pausing/stepping test already relies on: pausing the
 // engine stops it from sending this module any more "frame" phase messages, but does NOT pause
 // the actual audio output (rodio plays via its own OS-level callback thread, entirely independent
-// of whether this engine's frame loop is ticking) — so a real sleep while paused lets a short test
+// of whether this engine's frame loop is ticking), so a real sleep while paused lets a short test
 // tone genuinely finish playing in the background, and a single manual step afterward is enough
 // to observe that the module's next real poll of its own playback state correctly reports it.
 
@@ -24,7 +24,7 @@ fn temp_dir(name: &str) -> std::path::PathBuf {
     dir
 }
 
-/// A tiny (0.1s, 440Hz) mono 16-bit PCM WAV — just enough to be a real, decodable audio file
+/// A tiny (0.1s, 440Hz) mono 16-bit PCM WAV: just enough to be a real, decodable audio file
 /// without vendoring a fixture asset or adding a WAV-writing dependency just for this test.
 fn write_test_tone(path: &std::path::Path) {
     let sample_rate: u32 = 44100;
@@ -209,7 +209,7 @@ fn the_audio_module_plays_a_real_file_and_reports_when_it_finishes() {
     let modules_dir_c = modules_dir.clone();
     let stop_flag_for_thread = stop_flag.clone();
     // High target_fps so the first tick (and each subsequent step) fires as soon as it's allowed
-    // to, not gated on a slow frame interval — same reasoning runtime_end_to_end.rs's own
+    // to, not gated on a slow frame interval: same reasoning runtime_end_to_end.rs's own
     // pause/step test uses.
     let handle = std::thread::spawn(move || {
         runtime::start_run(&entry_c, &project_dir_c, &modules_dir_c, 200, serde_json::json!({}), stop_flag_for_thread, noop_logger(), debug)
@@ -225,7 +225,7 @@ fn the_audio_module_plays_a_real_file_and_reports_when_it_finishes() {
     assert_eq!(published["playing"], serde_json::json!(["tone"]), "should be playing right after the first frame, got {published:?}");
 
     // The 0.1s tone genuinely finishes playing (for real, via rodio's own background thread) well
-    // within this — the engine itself stays paused/idle the whole time, sending audio_playback_runtime no
+    // within this: the engine itself stays paused/idle the whole time, sending audio_playback_runtime no
     // further "frame" messages until the step below.
     std::thread::sleep(Duration::from_millis(500));
 
@@ -307,13 +307,13 @@ fn pausing_holds_position_and_resuming_continues_it() {
     assert_eq!(published["playing"], serde_json::json!(["tone"]), "should still be playing (paused, not finished) despite real time exceeding the tone's own length, got {published:?}");
 
     // One manual step: director's own frame_count becomes paused_frames + 1, crossing its "-le
-    // paused_frames" threshold — this is the exact tick where it starts publishing paused:false,
+    // paused_frames" threshold: this is the exact tick where it starts publishing paused:false,
     // and audio_playback_runtime resumes the still-fresh (0 elapsed) sound in the same tick.
     let resumed_trace = step_once(&step_request, &last_trace, paused_trace.frame_index);
     let published = resumed_trace.modules.iter().find(|m| m.id == "audio-playback").and_then(|m| m.reply.get("publish")).cloned().unwrap();
     assert_eq!(published["playing"], serde_json::json!(["tone"]), "should have resumed (still playing, not yet finished) right after unpausing, got {published:?}");
 
-    // The engine stays paused (no more automatic ticks) while this real sleep happens — same
+    // The engine stays paused (no more automatic ticks) while this real sleep happens: same
     // "audio plays via its own background thread regardless of engine ticking" reasoning as the
     // other test above — long enough for the now-resumed 0.1s tone to genuinely reach its end.
     std::thread::sleep(Duration::from_millis(500));

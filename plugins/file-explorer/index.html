@@ -96,7 +96,7 @@
   .indent-guide { width: 12px; flex: none; align-self: stretch; position: relative; }
   .indent-guide::before { content: ""; position: absolute; top: 0; bottom: 0; left: 5px; width: 1px; background: var(--border); }
 
-  /* The ONE marker slot every row has — a folder's chevron and a file's icon are the same thing
+  /* The ONE marker slot every row has: a folder's chevron and a file's icon are the same thing
      positionally (see explorer.js's createRowMarker), so they share this exact box rather than
      being two separate elements that could end up different sizes or in different places depending
      on row type. Nothing else in this file should reference `.chevron`/`.row-icon` as standalone
@@ -104,7 +104,7 @@
   .row-marker { width: 20px; height: 20px; flex: none; display: flex; align-items: center; justify-content: center; color: var(--fg); }
   .row-marker.chevron { color: var(--fg-dim); transform: rotate(0deg); transition: transform 0.08s ease; }
   .row-marker.chevron.expanded { transform: rotate(90deg); }
-  /* Grows with .row-marker's own box (was 10px in a 14px box) — a chevron that stayed fixed-size
+  /* Grows with .row-marker's own box (was 10px in a 14px box): a chevron that stayed fixed-size
      while the file icon next to it grew would end up looking smaller than its own sibling. */
   .row-marker.chevron svg { width: 14px; height: 14px; }
   .row-marker svg { width: 100%; height: 100%; }
@@ -135,7 +135,7 @@
   .row-diff-added { color: var(--success); }
   .row-diff-removed { color: var(--danger); }
 
-  /* ---------- Draft Tool: bolted onto the explorer, not a separate panel — stays fixed to the
+  /* ---------- Draft Tool: bolted onto the explorer, not a separate panel. Stays fixed to the
      bottom same as .footer above it, a divider line between "browsing" and "reviewing". Hidden
      entirely when the draftTool setting is off. ---------- */
   .draft-tool {

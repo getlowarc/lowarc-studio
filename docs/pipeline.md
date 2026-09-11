@@ -12,7 +12,7 @@ overturns most of it. Neither has been chosen.
 **A · Translation.** An interpreter module reads the user's language and rewrites the code inside the
 build copy into a form the other modules work with. Stages 4 and 5 below describe this.
 
-**B · Native execution — the original idea.** The user's code runs normally, in its own language's
+**B · Native execution: the original idea.** The user's code runs normally, in its own language's
 runtime. Modules **provide** the words (`rectangle`, `play`) as real functions in that runtime; the
 code calls them because they exist. Nothing is parsed, translated or mutated by LowArc. Only the part
 of the code written *for* the modules ever crosses the boundary — logic, physics, control flow and
@@ -33,10 +33,10 @@ it first looks:
 - **It removes LowArc as a possible author of bugs**, which is one of the two things that must never
   happen: no translation means no mistranslation.
 
-What model B costs: an interpreter is replaced by a **host** per language — something that starts
+What model B costs: an interpreter is replaced by a **host** per language. Something that starts
 that runtime, puts the modules' words in front of it and drives frames. A host is a fraction of an
 interpreter (no parsing, no rewriting, no source maps), and it is one per *language*, not per module,
-provided modules expose a uniform ABI — which already exists as the JSON line protocol and the C ABI.
+provided modules expose a uniform ABI, which already exists as the JSON line protocol and the C ABI.
 Compiled languages are the awkward case: bindings cannot be injected at runtime, so the host becomes
 a build step plus a library to link.
 
@@ -49,7 +49,7 @@ vocabulary belongs to the modules and never to LowArc; and state-in / calls-out,
 calls can be buffered and only genuine queries need an answer back.
 
 **Provide, never scan.** Under model B a module supplies its words as real functions. It does not
-search the source for known names — an alias or a wrapper defeats that, and it would put LowArc back
+search the source for known names: an alias or a wrapper defeats that, and it would put LowArc back
 to guessing at code it does not parse.
 
 ## The invariant
@@ -62,7 +62,7 @@ Consequences, all of them downstream of that one line:
 - LowArc has no language of its own and no project format.
 - The entry file is an **entry point, not the only file**. A project is a source tree.
 - **An interpreter module understands one language and nothing else.** Syntax, with no opinion about
-  what the code is *for* — that is what makes it reusable across a game, a tool, or something with no
+  what the code is *for*: that is what makes it reusable across a game, a tool, or something with no
   screen at all. A separate module decides what the translated code means.
 - **The vocabulary belongs to the modules.** Install a draw module that names it `rect` and you write
   `rect`. LowArc never has an opinion about the name.
@@ -95,7 +95,7 @@ run and scrapped when it ends: no incremental build, no cache to invalidate, no 
 of bug.
 
 A copy identical to an export contains the assets, and copying hundreds of megabytes of textures on
-every Run would be felt — so **link rather than copy anything the build does not modify**.
+every Run would be felt, so **link rather than copy anything the build does not modify**.
 Near-instant on NTFS, and byte-identical to what an export produces.
 
 *Today's export instead stages: it copies the source, copies each module folder, writes a
@@ -111,13 +111,13 @@ so a provider always runs before its consumers. Contract modules resolve here an
 
 This is where the real work belongs. Four things happen:
 
-1. **Walk the tree.** Universal, so it belongs to the runtime — every interpreter reimplementing
+1. **Walk the tree.** Universal, so it belongs to the runtime: every interpreter reimplementing
    directory traversal is waste.
 2. **Select an interpreter per file**, by the file types it publicly declares. Precedent for the
    shape: a plugin already declares `contributes.viewers[].extensions` in `plugin.json`.
 3. **Follow imports.** What a file imports is syntax, so the interpreter reports it; the runtime
    resolves the path and serves the bytes. Resolution *policy* is language-specific — `node_modules`,
-   Python packages and Rust crates follow different rules — so the runtime must not pretend to own
+   Python packages and Rust crates follow different rules, so the runtime must not pretend to own
    it. Start at the entry, pick its interpreter, let it report what it imported, resolve, recurse.
    Cross-language imports fall out for free.
 4. **Mutate the copy.** Rather than producing a message, an interpreter **rewrites the user's code
@@ -144,7 +144,7 @@ typed, an error must still point at their line.
 >
 > Ordinary shapes exist for it: results bound to slots that later steps reference; the code split
 > into steps at each call boundary; a form where whatever walks it resolves calls as it goes. All of
-> them dissolve "blocking mid-statement", because there are no statements left — there are steps.
+> them dissolve "blocking mid-statement", because there are no statements left: there are steps.
 >
 > This is also one of the most well-trodden problems in compilers. `async`/`await` and generators are
 > precisely this: a compiler splitting a function at the points where it must wait and rebuilding it
@@ -154,10 +154,10 @@ typed, an error must still point at their line.
 > covers a rectangle on screen and most of what follows.
 >
 > **One division worth not getting backwards, for when the runtime side is built:** the *vocabulary*
-> is the modules' business and LowArc must never have an opinion about it — that is what a contract
+> is the modules' business and LowArc must never have an opinion about it: that is what a contract
 > is for. The *transport* is LowArc's, because LowArc owns the only pipe: modules are separate OS
 > processes and the runtime holds every stdin/stdout handle, so "the modules will agree among
-> themselves" is not possible even in principle — they have nothing to agree over. A module could
+> themselves" is not possible even in principle. They have nothing to agree over. A module could
 > open its own socket, but then module authors reinvent discovery, handshakes, lifetimes and error
 > handling, and none of the runtime's guarantees apply: not ordering, not stop, not degraded
 > reporting, not breakpoints, not the frame trace.
@@ -178,7 +178,7 @@ the user's code runs.
 means it has to run the code to know which calls happen.
 
 - A read (`mouse.x`) is a **lookup** in the state it is already holding. No call, no cost.
-- A call (`rectangle(x, y, w, h)`) is recorded as **a name and its arguments** — the interpreter has
+- A call (`rectangle(x, y, w, h)`) is recorded as **a name and its arguments**: the interpreter has
   no idea what `rectangle` means.
 
 Note that the code being executed here is the **mutated** form, not the user's source. Whatever the
@@ -194,7 +194,7 @@ the output's vocabulary — `draw-commands`, or whatever the output speaks.
 order and draws them; draw order is list order, so run order is z-order. It publishes `input-state`
 back for the next tick.
 
-*Execution is sequential and deliberately so — run order is what guarantees a consumer sees this
+*Execution is sequential and deliberately so. Run order is what guarantees a consumer sees this
 tick's output rather than last tick's. Running independent modules in parallel is possible and the
 dependency graph to identify them exists, but the gain is bounded by the longest chain, and this
 pipeline is a chain.*
@@ -214,7 +214,7 @@ which is what makes "it worked in dev" mean something.
 ## What compiling buys, precisely
 
 Compiling makes things faster in exactly one way: **it moves work from every frame to once.** It does
-not on its own remove the cost of separate programs talking — that only goes away by removing the
+not on its own remove the cost of separate programs talking: that only goes away by removing the
 separateness, which is module fusion, which is the lesser goal. So "compile it together and it gets
 faster" is half true, and stage 4's rewrite is the half worth building.
 

@@ -1,4 +1,4 @@
-// Drives the real `lowarc` binary the way a person or a CI job would — a project directory, an
+// Drives the real `lowarc` binary the way a person or a CI job would: a project directory, an
 // argument list, and whatever it prints and exits with.
 //
 // Exit codes are the point. A CLI that runs correctly but always exits 0 is useless for CI, and
@@ -25,7 +25,7 @@ fn cli_bin() -> PathBuf {
 }
 
 /// A module that logs once per frame and asks to stop on its third, so a run ends on its own rather
-/// than needing to be killed — the CLI has no external stop the way Studio does.
+/// than needing to be killed: the CLI has no external stop the way Studio does.
 ///
 /// timeoutMs is generous on purpose: the 10s default is sized for a real module, not for starting a
 /// PowerShell interpreter on a contended CI runner, which has already cost this repo a red build.

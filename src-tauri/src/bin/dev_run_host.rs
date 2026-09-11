@@ -1,5 +1,5 @@
 // The IDE's dev-run, as its own process. Studio spawns this, hands it a scratch directory holding
-// a launch.json it just wrote, and drives it from outside over stdin/stdout — one JSON object per
+// a launch.json it just wrote, and drives it from outside over stdin/stdout: one JSON object per
 // line, the same shape runtime::process_module already uses one level down for an individual
 // module.
 //
@@ -11,7 +11,7 @@
 //
 // Separate from bin/lowarc_runtime.rs on purpose, even though both ultimately call
 // runtime::run_from_launch_dir. That binary IS a shipped export — "no IDE, no window, no UI of its
-// own at all" — and has no debugger by design. This one is a Studio-only debug harness with the
+// own at all", and has no debugger by design. This one is a Studio-only debug harness with the
 // opposite needs. They share the run machinery through run_from_launch_dir's `debug` parameter
 // rather than by one binary growing a mode flag for the other's lifecycle.
 //
@@ -24,7 +24,7 @@
 //     {"cmd":"pause"} {"cmd":"resume"} {"cmd":"step","count":n} {"cmd":"stop"}
 //     {"cmd":"setBreakpoints","breakpoints":[...]}
 //
-// FrameTrace/Breakpoint/LogLevel go over the wire as their own serde impls — the same types the
+// FrameTrace/Breakpoint/LogLevel go over the wire as their own serde impls: the same types the
 // engine already produces and the frontend already consumes, not a parallel set to keep in sync.
 
 use lowarc_studio_lib::runtime::{
@@ -37,7 +37,7 @@ use std::io::{BufRead, Write};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 
-/// One writer for every line this process emits — stdout is shared between the engine's log
+/// One writer for every line this process emits. Stdout is shared between the engine's log
 /// callback, the frame-trace callback, and the final ended line, all of which can fire from
 /// different threads. Interleaved half-lines would be unparseable on Studio's side.
 fn stdout_lock() -> &'static Mutex<std::io::Stdout> {
@@ -93,7 +93,7 @@ fn main() {
         on_frame: Arc::new(|trace| write_line(&json!({"frame": trace}))),
     };
 
-    // Called straight from main, NOT on a spawned thread — this process's true OS main thread has
+    // Called straight from main, NOT on a spawned thread: this process's true OS main thread has
     // to be the one running the frame loop. Nothing needs that today, but a module that opens a
     // real window will: platform windowing (macOS especially) requires its event loop on the main
     // thread, and burying the engine under a thread::spawn here would break that non-obviously
@@ -109,7 +109,7 @@ fn main() {
 
 /// Applies Studio's commands to the run's own primitives as they arrive. Its own thread because
 /// reading stdin blocks, and the frame loop on main can't wait on it. An unparseable or unknown
-/// line is ignored rather than fatal — a control-channel hiccup shouldn't kill a running project.
+/// line is ignored rather than fatal: a control-channel hiccup shouldn't kill a running project.
 fn spawn_command_reader(
     stop_flag: Arc<AtomicBool>,
     pause_flag: Arc<AtomicBool>,

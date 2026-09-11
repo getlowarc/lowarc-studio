@@ -13,7 +13,7 @@ pub struct Settings {
     #[serde(default = "default_target_fps")]
     pub dev_run_target_fps: u32,
     /// "system" | "light" | "dark" | the name of a saved custom theme (see theme.rs). Not an enum
-    /// on the Rust side — the frontend is the one place that needs to interpret this value (resolve
+    /// on the Rust side: the frontend is the one place that needs to interpret this value (resolve
     /// "system" against the OS, look up a custom name in the saved presets), so Rust just carries
     /// it through opaquely.
     #[serde(default = "default_theme_mode")]
@@ -45,7 +45,7 @@ pub struct Settings {
     /// valued by the ordered list of that strip's own item identifiers (a rail/console tab's
     /// panelKey, a file tab's absolute path). A strip missing from this map, or an id present in
     /// the map but no longer present in the strip (an uninstalled plugin, a closed file), just
-    /// falls back to natural order — this only ever overrides once a real drag has happened for
+    /// falls back to natural order: this only ever overrides once a real drag has happened for
     /// that specific strip.
     #[serde(default)]
     pub tab_order: HashMap<String, Vec<String>>,
@@ -118,7 +118,7 @@ pub struct PanelLayout {
     #[serde(default = "default_sidebar_size")]
     pub sidebar_size: f64,
     /// Which rail tab (panelKey(pluginId, panelId), see editor.html) was active when this layout
-    /// was last saved — None if none was, or if it belonged to a plugin no longer installed. Lets
+    /// was last saved. None if none was, or if it belonged to a plugin no longer installed. Lets
     /// a restart reopen the same sidebar panel instead of just an empty column with sidebar_open
     /// stale-true and nothing active behind it.
     #[serde(default)]
@@ -133,7 +133,7 @@ pub struct PanelLayout {
     pub console_size: f64,
     /// Whether the center panel's second editor group (see editor.html's toggleSplit) was open,
     /// and how much of the panel's width the first group took (0.0-1.0). Only the shell layout
-    /// persists — which files were open in either group does not, matching every other panel here
+    /// persists, which files were open in either group does not, matching every other panel here
     /// (and the main tab bar itself): only chrome visibility survives a restart, not content.
     #[serde(default)]
     pub split_open: bool,

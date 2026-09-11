@@ -210,7 +210,7 @@
 
       // ---------- Tabs ----------
       // The tab BUTTONS render in the popup shell's own header now (see setPopupHeaderControls()
-      // near the bottom of this script) — this just switches which panel is visible.
+      // near the bottom of this script): this just switches which panel is visible.
       function showTab(value) {
         document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("is-active", p.id === `tab-panel-${value}`));
       }
@@ -220,7 +220,7 @@
       // not a single committed value, so they stay hand-built) renders off ONE shared shape now:
       // buildSearchableSettingsList()/renderSettingRow() (primitives.js), the exact same functions
       // the command-center's global search uses. General and Plugins are just two different FILTERS
-      // over the same flat list, not two different rendering paths — and the search tab below is a
+      // over the same flat list, not two different rendering paths, and the search tab below is a
       // third filter over that same list, so there is genuinely only one way a setting ever renders
       // anywhere in this app.
       let loadedSettings = null;
@@ -293,7 +293,7 @@
           return;
         }
 
-        // Grouped by plugin, same visual shape as before (a heading per plugin) — the row shape
+        // Grouped by plugin, same visual shape as before (a heading per plugin): the row shape
         // underneath each heading is the only thing that's actually standardized now, the grouping
         // itself is still meaningful (these fields belong to a plugin, that's real context to keep).
         const bySource = new Map();
@@ -316,7 +316,7 @@
       }
 
       // ---------- Search ----------
-      // Not initSearchbar() — that helper is a type-and-pick-ONE autocomplete (right for the
+      // Not initSearchbar(): that helper is a type-and-pick-ONE autocomplete (right for the
       // command-center overlay in editor.html, which searches this exact same list), whereas this
       // is a live-filtered VIEW: every match renders as a real, immediately-editable row, not a
       // suggestion you select before anything happens.
@@ -538,8 +538,8 @@
 
         try {
           await persistThemeMode(mode);
-          // applyThemeColors above only restyled THIS page. Everything outside it — the editor
-          // hosting this popup — has to re-read the theme too, or the change doesn't show until a
+          // applyThemeColors above only restyled THIS page. Everything outside it: the editor
+          // hosting this popup. Has to re-read the theme too, or the change doesn't show until a
           // reload. Deliberately after the save, so what other documents resolve is what is now on
           // disk rather than a value that might still fail to persist.
           broadcastThemeChange();
@@ -669,7 +669,7 @@
           });
 
           registry = await buildSearchableSettingsList();
-          // allSettled, not all — one tab's own load failing shouldn't stop the other two from
+          // allSettled, not all: one tab's own load failing shouldn't stop the other two from
           // still rendering whatever they can; a plain Promise.all would abandon all three the
           // moment any single one rejects.
           const results = await Promise.allSettled([loadGeneral(), loadAppearance(), loadPluginSettings()]);

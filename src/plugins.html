@@ -74,7 +74,7 @@
         detailFields: (item) => [{ label: "Command", value: item.command, mono: true }],
         // What VSCode's "Feature Contributions" tab conveys for an extension — what this plugin
         // actually plugs into the app with. All of this already reaches the frontend via
-        // list_installed_plugins (see PluginListItem in installs.rs) — nothing new to fetch here.
+        // list_installed_plugins (see PluginListItem in installs.rs): nothing new to fetch here.
         contributionFields: (item) => {
           const fields = [];
           const c = item.contributes || { panels: [], consoleTabs: [], viewers: [] };

@@ -22,7 +22,7 @@ self.MonacoEnvironment = {
   },
 };
 
-// Broad but not exhaustive — anything Monaco can highlight is fair game to add here later. Only
+// Broad but not exhaustive: anything Monaco can highlight is fair game to add here later. Only
 // languages Monaco actually ships belong here; registering an id Monaco has no tokenizer for buys
 // nothing over the plaintext fallback it would get anyway.
 const LANGUAGE_BY_EXT = {
@@ -65,7 +65,7 @@ require.config({ paths: { vs: "vs" } });
 
 // Plugin settings (Settings > Plugins > Monaco, see plugin.json's `settings` declaration) are
 // always stored/returned as plain strings — Settings.plugin_settings is a
-// HashMap<String, HashMap<String, String>> with no per-field type on the Rust side — so parsing
+// HashMap<String, HashMap<String, String>> with no per-field type on the Rust side, so parsing
 // and defaulting each one is this plugin's own job, same as every other plugin that reads its own
 // settings this way. Fetched in parallel with the (much slower) editor.main module load itself,
 // not after it, so this never adds to the real bottleneck.
@@ -109,7 +109,7 @@ function applyEditorTheme() {
     return /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(value) ? value : fallback;
   };
 
-  // The app's tokens are opaque, but half of these colours are WASHES laid over text — a solid
+  // The app's tokens are opaque, but half of these colours are WASHES laid over text: a solid
   // selection would bury whatever it highlights. Monaco takes #rrggbbaa, so the alpha is synthesised
   // here rather than being something every theme has to define.
   const alpha = (hex, aa) => hex.slice(0, 7) + aa;
@@ -153,7 +153,7 @@ function applyEditorTheme() {
         "editor.findMatchHighlightBackground": alpha(cyan, "33"),
         "editor.lineHighlightBackground": alpha(fg, "0d"),
 
-        // Panels Monaco floats over the editor — these are dialogs, and should look like the app's
+        // Panels Monaco floats over the editor: these are dialogs, and should look like the app's
         // dialogs rather than like VS Code's.
         "editorWidget.background": bgRaised,
         "editorWidget.foreground": fg,
@@ -205,7 +205,7 @@ Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve
     insertSpaces: boolSetting(settings, "insertSpaces", true),
     // Monaco's own right-click menu is a second, separate context-menu system living outside the
     // app's own (every other plugin either has none or, like file explorer, builds its own via
-    // window.lowarc.showMenu() into the host's un-clippable floating-menu) — and its default
+    // window.lowarc.showMenu() into the host's un-clippable floating-menu), and its default
     // "Command Palette" entry is one of the two ways Monaco's native palette overlay was reachable
     // even after the keybindings below were overridden, since a context-menu click calls the
     // action directly rather than going through keybinding dispatch.
@@ -220,7 +220,7 @@ Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve
     // duplicating what the Outline panel is already for, while eating editor rows to do it.
     stickyScroll: { enabled: false },
     // Code lens and the lightbulb only ever appear when a language service contributes actions.
-    // Nothing here does, so they are dead affordances — the lightbulb in particular shifts the
+    // Nothing here does, so they are dead affordances: the lightbulb in particular shifts the
     // gutter around when it thinks it might show.
     codeLens: false,
     lightbulb: { enabled: "off" },
@@ -228,7 +228,7 @@ Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve
     // Ghost-text completion, with its own hover toolbar and its own "snooze" commands. There is no
     // inline completion provider, and adding one is a plugin's business, not the editor's.
     inlineSuggest: { enabled: false },
-    // The swatch beside a hex colour opens Monaco's own colour picker — a second, differently
+    // The swatch beside a hex colour opens Monaco's own colour picker: a second, differently
     // styled colour UI inside an app whose Appearance page already has one.
     colorDecorators: false,
     // Ctrl+click on a URL calls window.open, which this sandbox has no allow-popups for: the
@@ -241,10 +241,10 @@ Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve
     overviewRulerBorder: false,
   });
 
-  // Live counterpart to the getSettings() read above — see set_plugin_setting/
+  // Live counterpart to the getSettings() read above. See set_plugin_setting/
   // plugin-setting-changed in lib.rs and its relay to lowarc:settingsChanged in split-view.js.
   // Every option this plugin reads from settings is a plain editor.updateOptions() field, so there's
-  // no per-doc/per-model state to touch — one shared call applies to whichever file is showing.
+  // no per-doc/per-model state to touch: one shared call applies to whichever file is showing.
   window.lowarc.on("lowarc:settingsChanged", ({ key, value }) => {
     const one = { [key]: value };
     switch (key) {
@@ -273,14 +273,14 @@ Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve
   // and stays alive as long as ANY file that group opened through Monaco is still open, the same
   // "one iframe, many documents" shape the Terminal plugin already uses for multiple terminal tabs
   // (see its own file header). path -> {model, viewState, savedVersionId}. Nothing here is read
-  // off the URL any more — every file this instance shows arrives entirely through
+  // off the URL any more: every file this instance shows arrives entirely through
   // lowarc:openFile/activateFile/closeFile messages over its lifetime, matching the host's own
   // contract in plugin_assets.rs.
   const docs = new Map();
   let activePath = null;
   let saving = false;
   // A doc's own model.setValue()/createModel() fires onDidChangeContent, which would otherwise
-  // report a brand-new file as dirty against its own starting content — this guard is what keeps
+  // report a brand-new file as dirty against its own starting content: this guard is what keeps
   // "just opened" from reading as "already edited."
   let loading = false;
 
@@ -297,7 +297,7 @@ Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve
   }
 
   // onDidChangeMarkers is a static event on monaco.editor (fires for marker changes on any model
-  // in the process, not just the active one) rather than something scoped to one model — only a
+  // in the process, not just the active one) rather than something scoped to one model: only a
   // language with real diagnostics wired up reports anything here (json's schema validation,
   // typescript/javascript's checker); a Monarch-tokenizer-only language (most of LANGUAGE_BY_EXT)
   // never fires this at all, so "red for errors" is honest about only covering what Monaco can
@@ -313,7 +313,7 @@ Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve
     window.lowarc.markErrors(activePath, hasErrors);
   });
 
-  // A path already in `docs` means it's already open here — nothing to do (lowarc:activateFile is
+  // A path already in `docs` means it's already open here: nothing to do (lowarc:activateFile is
   // the separate "make this one visible" step; re-sending lowarc:openFile for an already-open path
   // is a normal no-op, not an error, since the host doesn't track per-instance state itself).
   window.lowarc.on("lowarc:openFile", (payload) => {
@@ -329,7 +329,7 @@ Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve
   // what motivated this) — deliberately a SEPARATE event from lowarc:openFile, which is a no-op
   // for an already-open path by design (see that handler's own comment). setValue(), not a fresh
   // model: keeps this the SAME model instance (still attached to the editor if it's the active
-  // file, still the same object everything else here references) — just replaces its content and
+  // file, still the same object everything else here references): just replaces its content and
   // resets the dirty baseline to match, the same "this is now the clean, saved state" treatment a
   // real save gets. Undo history resets along with it, on purpose: there's no meaningful "undo"
   // back to an in-editor state that disk has since genuinely diverged from.
@@ -348,7 +348,7 @@ Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve
     const doc = payload && docs.get(payload.path);
     if (!doc) return;
     // Saving/restoring view state (scroll position, cursor, folds) around the swap is what makes
-    // switching tabs feel like coming back to the same place — the model itself already carries
+    // switching tabs feel like coming back to the same place: the model itself already carries
     // undo history for free, but a model has no notion of "where the viewport was."
     if (activePath && docs.has(activePath)) {
       docs.get(activePath).viewState = editor.saveViewState();
@@ -411,7 +411,7 @@ Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve
       doc.savedVersionId = doc.model.getAlternativeVersionId();
       updateDirty(path);
     } catch (err) {
-      // The host already surfaces a toast for a failed write — nothing useful for this iframe
+      // The host already surfaces a toast for a failed write: nothing useful for this iframe
       // to additionally show, but the dirty flag must NOT be cleared on a failed save.
     } finally {
       saving = false;
@@ -420,7 +420,7 @@ Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve
 
   editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, save);
 
-  // The host's File > Save menu item / Ctrl+S (see editor.html) — a click happens in the host
+  // The host's File > Save menu item / Ctrl+S (see editor.html): a click happens in the host
   // document, not this iframe, so it can't reach the keybinding above; this is the same save()
   // reached a different way.
   window.lowarc.on("lowarc:requestSave", save);
@@ -435,7 +435,7 @@ Promise.all([new Promise((resolve) => require(["vs/editor/editor.main"], resolve
   });
 
   // Paste specifically: the host already read the OS clipboard itself (this iframe's own
-  // navigator.clipboard.readText() is what's actually blocked — see editor.html's paste handler
+  // navigator.clipboard.readText() is what's actually blocked; see editor.html's paste handler
   // for the full reasoning) and hands over plain text to drop in at the current selection.
   // executeEdits(), not insertText/applyEdits, for the same undo-integration reason every other
   // real edit in this file uses it.

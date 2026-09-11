@@ -153,7 +153,7 @@
 
       exportBtn.addEventListener("click", startExport);
 
-      // Relayed by contributeIframePopup's forwardEvents (see primitives.js) — a raw
+      // Relayed by contributeIframePopup's forwardEvents (see primitives.js): a raw
       // window.__TAURI__.event.listen() here would be untested territory for a document loaded
       // inside an iframe, unlike this postMessage relay, which is the same proven mechanism the
       // popup-header tab/button relay already uses.
@@ -179,7 +179,7 @@
 
       (() => {
         initTooltips();
-        // A reasonable starting name, not a locked-in one — the project folder's own name, since
+        // A reasonable starting name, not a locked-in one: the project folder's own name, since
         // there's nowhere else to source a default app name from yet.
         const segments = projectDir.split(/[\\/]/).filter(Boolean);
         if (segments.length) nameInput.value = segments[segments.length - 1];

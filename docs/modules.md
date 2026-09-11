@@ -8,7 +8,7 @@
 The manifest itself is small and clear. What's obscure is what `requires` *means*, because it
 currently means three different things at once:
 
-- **this module must exist** — the resolver fails or skips without it
+- **this module must exist**: the resolver fails or skips without it
 - **run me after it** — `order_by_requires` sorts the run by this list
 - **let me read what it publishes** — `ProcessModule::frame` filters the run-wide `shared` map down
   to exactly the ids in this list
@@ -25,7 +25,7 @@ That has consequences nobody chose:
   `vector-canvas` no matter what it publishes, because it publishes under `node-graph-runtime`.
 - Nothing anywhere says what a director is supposed to publish. `vector-canvas` expects
   `shared.director.draw` — an ordered list of immediate-mode draw ops. `audio-playback` expects
-  `shared.director.play` — a declarative list of what should be sounding right now. Different
+  `shared.director.play`: a declarative list of what should be sounding right now. Different
   shapes, different philosophies, same key, and each one documented only in its own consumer's
   header comment.
 
@@ -69,12 +69,12 @@ describing what flows under it.
 - **`kind: "contract"`** is what tells the resolver this is a definition, not something to run. It
   takes part in dependency resolution and version checking, and is never spawned.
 A contract always has **many** possible providers. There is no cardinality field, because no
-contract has yet wanted one — a surface gathers, and if some future contract genuinely needs
+contract has yet wanted one: a surface gathers, and if some future contract genuinely needs
 exactly one provider, that constraint can be added when something asks for it rather than
 speculatively now.
 
 Gathering is the whole point. The surface doesn't take a frame from one privileged module and
-comply with it — every module that draws publishes its own list of ops, and the canvas concatenates
+comply with it: every module that draws publishes its own list of ops, and the canvas concatenates
 them in run order, which is already deterministic (a provider always runs before its consumers, so
 ordering falls out of the existing requires-rank sort). Draw order is list order, so run order
 becomes z-order.
@@ -107,7 +107,7 @@ so a producer can target the vocabulary without depending on the binary that con
 ### Contracts don't replace modules
 
 A contract is a definition, not an implementation. Adding `draw-commands` doesn't retire, merge or
-change what `vector-canvas` does — the module keeps its code, its window, its femtovg renderer and
+change what `vector-canvas` does: the module keeps its code, its window, its femtovg renderer and
 its name. It gains one line saying which vocabulary it speaks. Same for every other module here.
 
 ## The manifest
@@ -172,7 +172,7 @@ property already exists and doesn't change.
 
 Nothing in the manifest says "director" any more, and nothing in the engine looks for it.
 
-"Director" is what we *call* the module that drives a run — the one holding the state, deciding what
+"Director" is what we *call* the module that drives a run: the one holding the state, deciding what
 happens this frame, and telling the surfaces about it. It's a description of a job, the way "the
 renderer" or "the physics module" is. What's formal is the contracts it speaks: a director is simply
 a module that provides `draw-commands`, or `audio-cues`, or both, or neither if it drives something
@@ -223,14 +223,14 @@ The stack has no name here on purpose. Naming it is a product decision.
 
 ## The layer above: engines
 
-A **stack** is a set of modules. An **engine** is a set of modules *and plugins* — a whole shape for
+A **stack** is a set of modules. An **engine** is a set of modules *and plugins*: a whole shape for
 LowArc, runtime and IDE together. Downloading an engine reconfigures what the app is: which
 surfaces exist, which panels appear, which file types have editors, what Run means.
 
 **Both live in name only.** Neither is a folder layout, an install format or a container: a stack
 or an engine is a name plus a list of references, recorded in a manifest. Nothing on disk moves to
 join one, and a module can belong to several without being copied anywhere. That keeps this layer
-free — it can be designed later without any of the work below having to anticipate it.
+free. It can be designed later without any of the work below having to anticipate it.
 
 That's a bigger idea than this document covers, and it's mostly unbuilt: nothing in the app today
 says "stack" or "engine" anywhere. Two structural notes worth recording now, since they constrain
@@ -239,13 +239,13 @@ the manifest work above:
 - **An engine is what a person chooses; modules and plugins become its detail.** That inverts
   today's UI, where the Modules and Plugins pages are the top level and there is nothing above them.
 - **The contract graph is the natural visualization.** Providers and consumers joined by contracts
-  is a directed graph, and the most valuable thing it can show is a *hole* — a required contract
+  is a directed graph, and the most valuable thing it can show is a *hole*: a required contract
   nothing provides. That is exactly the state that produces a window that opens and stays blank
   today, with nothing anywhere telling you why.
 
 ## Migration
 
-Deliberately additive — nothing has to change at once.
+Deliberately additive: nothing has to change at once.
 
 1. `provides` and the `contract`/`module` requirement forms are added; bare `{ "id": ... }` keeps
    meaning `module`, so every existing manifest still resolves.

@@ -1,5 +1,5 @@
 // Records what happened via a trace file named by an env var, since this runs loaded into the
-// TEST process (not spawned separately) — same technique the process-module test fixtures use,
+// TEST process (not spawned separately): same technique the process-module test fixtures use,
 // just here to prove the trace survives being called from inside NativeLoader's dlopen'd code.
 
 use std::cell::Cell;
@@ -15,7 +15,7 @@ fn trace(line: &str) {
 }
 
 // native_module_host drives exactly one module from a single thread (frame() is never called
-// concurrently with itself), so plain thread_locals are enough state here — no synchronization
+// concurrently with itself), so plain thread_locals are enough state here: no synchronization
 // needed. REQUEST_STOP holds the callback handed to start() so frame() can call it once it's seen
 // enough frames; there's no other point in this module's lifecycle that gets it.
 thread_local! {
@@ -32,7 +32,7 @@ pub extern "C" fn lowarc_module_start(_settings_json: *const c_char, request_sto
 /// Proves the inter-module wire-protocol extension's native-ABI side for real (see
 /// native_module_host.rs's own header comment for the design): reads the shared-state JSON string
 /// it was handed (this module requires nothing, so it should always be the empty object) and
-/// calls `publish` with one of its own — a crash or hang here would mean the CString/callback
+/// calls `publish` with one of its own: a crash or hang here would mean the CString/callback
 /// plumbing on the host side is actually broken, not just that it type-checks. Stops itself after
 /// a couple of frames rather than running forever.
 #[no_mangle]

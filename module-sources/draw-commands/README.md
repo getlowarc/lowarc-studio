@@ -1,6 +1,6 @@
 # Draw Commands
 
-A contract, not a module — it has no process and never runs. Installing it puts this specification
+A contract, not a module. It has no process and never runs. Installing it puts this specification
 and its version in the module store, so a module that draws and a module that renders can agree on
 a vocabulary without either depending on the other's binary.
 
@@ -20,7 +20,7 @@ Declare it, then publish a `draw` array each frame under your own id:
 ```
 
 Any number of modules may provide this at once. A renderer concatenates every provider's list **in
-run order** — a provider always runs before its consumers, so the resulting order is deterministic,
+run order**: a provider always runs before its consumers, so the resulting order is deterministic,
 and since draw order is list order, run order is z-order. Nothing is elected; a debug overlay and a
 UI layer each simply draw.
 
@@ -39,7 +39,7 @@ transform ops below explicitly push.
 ## Commands
 
 Every command is an object with an `"op"`. Coordinates are in canvas space. Colors are `#rrggbb` or
-`#rrggbbaa` strings. An unknown op is skipped with a warning rather than failing the frame — one bad
+`#rrggbbaa` strings. An unknown op is skipped with a warning rather than failing the frame: one bad
 command must not take down everything else being drawn.
 
 | Op | Fields |

@@ -1,5 +1,5 @@
 // A generic loaded shared library — LoadLibrary/GetProcAddress on Windows, dlopen/dlsym on Unix.
-// Direct port of lowarc/Bootstrap's dylib.rs — this part is fully generic (load a library, look
+// Direct port of lowarc/Bootstrap's dylib.rs: this part is fully generic (load a library, look
 // up a symbol), nothing CLR-specific about it, so it's identical here even though this crate has
 // no CLR loader at all.
 

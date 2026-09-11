@@ -1,6 +1,6 @@
 # Input State
 
-A contract, not a module — it has no process and never runs. Installing it puts this specification
+A contract, not a module. It has no process and never runs. Installing it puts this specification
 and its version in the module store.
 
 Unlike `draw-commands` and `audio-cues`, this one is owned by no single module, because two very
@@ -14,8 +14,8 @@ different things honestly provide it and neither is the authority.
 - **A device poller** (`device-input`) reports globally in **screen coordinates**, gamepads
   included, regardless of window focus.
 
-Both are input. Neither is wrong. A consumer reads `shared["input-state"]` — an array with one entry
-per provider, each tagged with `from` — and picks whichever it actually wants, rather than being
+Both are input. Neither is wrong. A consumer reads `shared["input-state"]`: an array with one entry
+per provider, each tagged with `from`, and picks whichever it actually wants, rather than being
 handed one blend of the two by something that had to guess.
 
 ## Fields

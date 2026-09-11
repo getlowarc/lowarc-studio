@@ -91,7 +91,7 @@
         btn.addEventListener("click", closeAllMenus);
       });
 
-      // ---------- Floating menu (shared overlay — see .floating-menu in primitives.css) ----------
+      // ---------- Floating menu (shared overlay; see .floating-menu in primitives.css) ----------
       // A menu rendered here is a sibling of every panel and every iframe (see the HTML above,
       // right after .shell closes), so nothing can clip it and it isn't bound to any one trigger's
       // local DOM position the way .menu-dropdown-list is — it's positioned and clamped to the real
@@ -108,7 +108,7 @@
         resolve(result === undefined ? null : result);
       }
 
-      // Every "click outside closes it" overlay this document has, called together — not just
+      // Every "click outside closes it" overlay this document has, called together: not just
       // from an actual outside click, but also (see the iframe "focus" listeners in
       // mountPanelIframe/mountFileInGroup below) whenever focus moves INTO a plugin iframe, since a
       // click that lands inside a sandboxed iframe never bubbles up to this document at all and so
@@ -131,7 +131,7 @@
         const overlay = document.getElementById("floating-menu");
         const list = document.getElementById("floating-menu-list");
 
-        // Positioned at the naive anchor first, then measured and clamped — the list has to
+        // Positioned at the naive anchor first, then measured and clamped: the list has to
         // actually exist in the DOM with real content before its own rendered size is knowable.
         list.style.left = `${anchor.x}px`;
         list.style.top = `${anchor.y}px`;
@@ -152,7 +152,7 @@
       }
 
       // items: [{label, value, disabled, checked}], a divider is {divider: true}. `checked` is
-      // optional — only present it for a genuinely checkable menu (see the Rail/Console visibility
+      // optional: only present it for a genuinely checkable menu (see the Rail/Console visibility
       // toggle below); omitting it on every item keeps an ordinary action menu (File/Edit/View, …)
       // looking exactly as it always has, no reserved checkmark gutter. Returns a Promise resolving
       // to the chosen item's value, or null if the menu was dismissed without a choice.
@@ -325,7 +325,7 @@
 
           saveBtn.addEventListener("click", async () => {
             saveBtn.disabled = true;
-            // The full preset every time, not a patch — same "the frontend always resends
+            // The full preset every time, not a patch: same "the frontend always resends
             // everything" convention set_breakpoints and plugin settings already use.
             const preset = {
               entry,
@@ -390,7 +390,7 @@
             }
 
             // A requirement whose module has since been uninstalled has no checkbox of its own, so
-            // saving would quietly drop it. It gets a row anyway — still ticked, so saving keeps it
+            // saving would quietly drop it. It gets a row anyway: still ticked, so saving keeps it
             // — and stays untickable so the stale entry can actually be removed. Showing it as
             // plain text would make it visible but unfixable, which is the worse half of both.
             const installedIds = new Set(modules.map((m) => m.id));
@@ -533,7 +533,7 @@
         },
       });
 
-      // Shared by both in-editor managers (plugin, module) — only one is ever open at a time, and
+      // Shared by both in-editor managers (plugin, module): only one is ever open at a time, and
       // each call just passes its own nounSingular/name as target, so there's no reason for two
       // near-identical contributions.
       contribute("popups", {
@@ -557,7 +557,7 @@
       });
 
       // Gates closeFile() (see the tab-bar/open-files section below) on a real confirmation
-      // whenever the file being closed is dirty — target is just { title }, resolves true/false
+      // whenever the file being closed is dirty. Target is just { title }, resolves true/false
       // like manager-remove above.
       contribute("popups", {
         id: "confirm-close-dirty",
@@ -580,7 +580,7 @@
       });
 
       // Gates the whole APP window closing (see confirmAppClose() in tabs-inspector.js and
-      // initWindowControls's beforeClose param in primitives.js) — same shape as
+      // initWindowControls's beforeClose param in primitives.js): same shape as
       // confirm-close-dirty above, just for "the window itself is about to close" rather than one
       // tab. target is { message, canSave }: canSave is false when the only unsaved work is an
       // open Draft (nothing here for a Save button to write — Commit/Revert are its resolutions,

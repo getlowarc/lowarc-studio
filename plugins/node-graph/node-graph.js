@@ -5,7 +5,7 @@
 //   { lowarcNodeGraph: 1,
 //     nodes: [{id, label, x, y, files: [path...], hasInput, hasOutput}],
 //     connections: [{from: nodeId, to: nodeId}] }
-// A node has AT MOST one input and one output (booleans, not a named/listed thing) — a "port"
+// A node has AT MOST one input and one output (booleans, not a named/listed thing): a "port"
 // here never had a type or validation anyway, so there was nothing gained by allowing several.
 // Fan-in and fan-out are both allowed: any number of wires can touch one node's single input or
 // single output. This is a pure editing surface: nothing here feeds into the runtime or a
@@ -39,7 +39,7 @@ window.lowarc.getSettings().then((settings) => {
   refreshOpenDocsForBadgeSetting();
 });
 
-// Live counterpart to the getSettings() read above — see set_plugin_setting/plugin-setting-changed
+// Live counterpart to the getSettings() read above. See set_plugin_setting/plugin-setting-changed
 // in lib.rs and its relay to lowarc:settingsChanged in split-view.js.
 window.lowarc.on("lowarc:settingsChanged", ({ key, value }) => {
   if (key !== "showBadges") return;
@@ -60,7 +60,7 @@ function newNodeId(doc) {
   return `n${doc.nextId}`;
 }
 
-// A brand-new file is never truly empty — same reasoning a new document in most tools starts with
+// A brand-new file is never truly empty: same reasoning a new document in most tools starts with
 // something rather than a blank canvas nobody can right-click their way out of confidently. This
 // is what a freshly created, still-zero-byte .lan file (e.g. from File Explorer's own "New File")
 // turns into the moment it's opened here.
@@ -68,7 +68,7 @@ function starterGraph() {
   return { nodes: [{ id: "n1", label: "New Node", x: 120, y: 80, files: [], hasInput: true, hasOutput: true }], connections: [] };
 }
 
-// Returns { graph } on success or { error } on failure — never silently substitutes an empty
+// Returns { graph } on success or { error } on failure: never silently substitutes an empty
 // graph for genuinely invalid content, since that would hide a real problem (a corrupted file, a
 // bad hand-edit) behind what looks like a normal blank file.
 function parseGraph(text) {
@@ -91,7 +91,7 @@ function parseGraph(text) {
 }
 
 function serializeGraph(graph) {
-  // Only the fields this format actually understands — never round-trips whatever else might
+  // Only the fields this format actually understands: never round-trips whatever else might
   // have been sitting in a hand-edited file's node/connection objects.
   const nodes = graph.nodes.map((n) => ({
     id: n.id,
@@ -151,7 +151,7 @@ function findNode(doc, nodeId) {
 }
 
 // The dot is a small visual circle nested inside a much larger ".ng-socket" hit area (see
-// index.html) — this returns the dot itself, since that's what socket positions are measured from
+// index.html): this returns the dot itself, since that's what socket positions are measured from
 // and what "is-connected" styling applies to; the hit area is only ever addressed for its pointer
 // events, in renderSocket() below.
 function socketDot(doc, nodeId, isOutput) {
@@ -188,7 +188,7 @@ function bezierPath(p1, p2) {
 // batch of badges exists.
 
 // A badge's visible size never changes with its content — "+99" (its widest possible value) has
-// to fit exactly as well as a single "S" does — so counts cap out visually rather than ever
+// to fit exactly as well as a single "S" does, so counts cap out visually rather than ever
 // growing the oval to fit a fourth digit.
 function capCount(n) {
   return n >= 100 ? "+99" : String(n);
@@ -205,8 +205,8 @@ function connectionCounts(doc, nodeId) {
 }
 
 // S(tart) = output only, E(nd) = input only, B(ridge) = both. No badge at all if the node has
-// neither — there's no "port type" to speak of for a node nothing can connect to. The tooltip is
-// just the letter spelled out, same as any icon-only button's tooltip elsewhere in this app — not
+// neither: there's no "port type" to speak of for a node nothing can connect to. The tooltip is
+// just the letter spelled out, same as any icon-only button's tooltip elsewhere in this app: not
 // an explanation of what the letter means.
 function portBadgeInfo(node) {
   if (node.hasInput && node.hasOutput) return { text: "B", tooltip: "Bridge" };
@@ -245,7 +245,7 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 const BADGE_W = 22;
 const BADGE_H = 15;
 
-// A connection doesn't carry any metadata of its own yet (it's just {from, to}) — this format may
+// A connection doesn't carry any metadata of its own yet (it's just {from, to}): this format may
 // never grow any, since a wire's actual meaning is entirely up to whatever module ends up
 // consuming the graph. Rather than invent a number that isn't really there, the visible glyph is
 // just a direction arrow; the genuinely useful bit (which node feeds which) is what the hover
@@ -349,7 +349,7 @@ function updateConnectedDots(doc) {
 }
 
 // The hit area (".ng-socket") spans the node's full height at that edge — much easier to grab
-// than the small visual dot alone would be — while the dot itself stays a small circle centered
+// than the small visual dot alone would be, while the dot itself stays a small circle centered
 // in it, so nothing looks different from before.
 function renderSocket(doc, node, isOutput) {
   const wrap = document.createElement("span");
@@ -430,7 +430,7 @@ function selectNode(doc, nodeId) {
   const el = doc.nodeEls.get(nodeId);
   el?.classList.add("is-selected");
   // Clicking a hover-highlighted Inspector connected-list row (see focusNode) selects this exact
-  // node AND rebuilds that list's DOM as part of re-pointing the Inspector here — which destroys
+  // node AND rebuilds that list's DOM as part of re-pointing the Inspector here, which destroys
   // the row that was still "hovered" without ever firing its mouseleave, so the lowarc:highlightNode
   // {on:false} that would normally clear this never arrives. Since a click always follows hovering
   // the row for THIS SAME node, clearing it here (selection superseding a stale hover) is exactly
@@ -554,7 +554,7 @@ function openConnectionMenu(doc, index, x, y) {
 
 // ---------- Dragging: pan / node move / connection draw ----------
 
-// A plain click always opens the Inspector on this node. An actual drag only REFOCUSES it — if
+// A plain click always opens the Inspector on this node. An actual drag only REFOCUSES it, if
 // the Inspector's already open (on this node or a different one), dragging switches it over to
 // match; if the Inspector's closed, dragging leaves it closed rather than yanking it open.
 function beginNodeDrag(doc, node, el, e) {
@@ -613,7 +613,7 @@ function beginConnectionDrag(doc, nodeId, isOutput, e) {
     window.removeEventListener("pointerup", onUp);
     dragPath.remove();
 
-    // elementFromPoint lands on ".ng-socket" (the hit area), never ".ng-socket-dot" — the dot has
+    // elementFromPoint lands on ".ng-socket" (the hit area), never ".ng-socket-dot": the dot has
     // pointer-events:none precisely so it never wins the hit test over its own wrapper (see
     // renderSocket()), which means a plain ".ng-socket-dot" check here would never match anything.
     const target = document.elementFromPoint(ev.clientX, ev.clientY);
@@ -622,7 +622,7 @@ function beginConnectionDrag(doc, nodeId, isOutput, e) {
       const targetIsOutput = targetSocket.classList.contains("ng-out");
       const targetNodeEl = targetSocket.closest(".ng-node");
       const targetNodeId = targetNodeEl && targetNodeEl.dataset.nodeId;
-      // Fan-in and fan-out are both fine — the only real rules are "opposite kinds" (an output
+      // Fan-in and fan-out are both fine: the only real rules are "opposite kinds" (an output
       // has to feed an input, not another output) and "not the same node" (a node feeding itself
       // isn't a meaningful connection for anything this format could mean).
       if (targetNodeId && targetNodeId !== nodeId && targetIsOutput !== isOutput) {
@@ -757,7 +757,7 @@ window.lowarc.on("lowarc:getContent", (payload) => {
 });
 
 // ---------- Edits arriving from this plugin's OWN Inspector iframe ----------
-// The Inspector never touches graph data directly — it sends intents here via
+// The Inspector never touches graph data directly. It sends intents here via
 // window.lowarc.broadcastToSelf, and this (the iframe that actually owns and renders the graph)
 // applies them. path disambiguates which open doc/node the edit is about, since this one iframe
 // can hold several open .lan files at once (one per group, or several tabs in one group).
@@ -782,7 +782,7 @@ window.lowarc.on("lowarc:focusNode", (payload) => {
   focusNode(doc, node);
 });
 
-// Hovering that same row — a lighter-weight "just show me where it is", no selection/panning.
+// Hovering that same row: a lighter-weight "just show me where it is", no selection/panning.
 window.lowarc.on("lowarc:highlightNode", (payload) => {
   if (!payload || typeof payload.path !== "string" || typeof payload.nodeId !== "string") return;
   const doc = docForPath(payload.path);

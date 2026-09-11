@@ -4,7 +4,7 @@
 // export works on any machine that can build this repo.
 //
 // Same "next to the running exe, or runtime_helpers() as the installed-copy fallback" shape as
-// runtime::native_module::native_module_host_path() — see that function's own comment for why an
+// runtime::native_module::native_module_host_path(). See that function's own comment for why an
 // existence check rather than a dev/installed branch is what makes this resolve correctly no
 // matter which of those it's actually running as.
 

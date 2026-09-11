@@ -148,7 +148,7 @@
 }
 
 /* ---------- Searchbar ---------- */
-/* An input whose typed text filters into the same dropdown-menu popover — the menu only ever
+/* An input whose typed text filters into the same dropdown-menu popover: the menu only ever
    appears when the search has known options to suggest from. */
 
 .searchbar {
@@ -249,7 +249,7 @@
   opacity: 0.4;
 }
 
-/* The drop-position line — a vertical bar between horizontally-arranged tabs (.is-x) or a
+/* The drop-position line: a vertical bar between horizontally-arranged tabs (.is-x) or a
    horizontal bar between vertically-stacked ones (.is-y, the rail). align-self:stretch makes it
    span the strip's own cross-axis automatically whichever way the container's flex-direction
    runs, so the same two rules work for every reorderable strip in the app. */
@@ -309,7 +309,7 @@
 }
 
 /* ---------- Toast ---------- */
-/* Same visual language as sidebar-tab's active state — a colored 3px left bar plus a matching
+/* Same visual language as sidebar-tab's active state: a colored 3px left bar plus a matching
    icon color — reused here for the four status variants instead of inventing a second pattern. */
 
 .toast-stack {
@@ -419,7 +419,7 @@
 }
 
 /* ---------- Popup ---------- */
-/* No named sizes — width is set per instance with a plain inline style="width: …" on .popup,
+/* No named sizes. Width is set per instance with a plain inline style="width: …" on .popup,
    the same way its title, body content, and buttons are already set per instance. .popup itself
    just supplies a sane default width for a popup that doesn't bother to set one. It always stays
    centered and capped to the viewport height; when the body content is taller than that, only
@@ -450,7 +450,7 @@
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
 }
 
-/* A near-fullscreen popup instead of a small dialog — see the `large` contribution flag on
+/* A near-fullscreen popup instead of a small dialog. See the `large` contribution flag on
    showPopup()/contributeIframePopup() in primitives.js. Same box, just sized for a whole embedded
    page (Settings/Modules/Plugins) rather than a confirm/form. */
 .popup.popup-large {
@@ -460,7 +460,7 @@
   max-height: 88vh;
 }
 
-/* Opt-in via the `growToContent` contribution flag (showPopup()) — NOT the default, since most
+/* Opt-in via the `growToContent` contribution flag (showPopup()): NOT the default, since most
    popups (a confirm dialog, a short form) want their normal small/fixed width instead. Grows to
    fit whatever mount() actually renders, up to near the window's own size, then scrolls internally
    beyond that (.popup-body's flex:1/min-height:0/overflow-y:auto already does the scrolling part
@@ -548,7 +548,7 @@
   gap: 8px;
 }
 
-/* A plain label/keys reference row (see editor.html's "shortcuts" popup) — not a settings list,
+/* A plain label/keys reference row (see editor.html's "shortcuts" popup): not a settings list,
    nothing here is interactive. */
 .shortcut-row {
   display: flex;
@@ -570,7 +570,7 @@
   padding: 2px 6px;
 }
 
-/* Plain container for editor.html's Popup Base (see showPopup() there) — no layout of its own,
+/* Plain container for editor.html's Popup Base (see showPopup() there): no layout of its own,
    since each instance it holds is its own position:fixed .popup-backdrop; a stacked instance's
    z-index is set inline (POPUP_Z_FLOOR + depth) rather than here, since nesting depth is only
    known at runtime. */
@@ -627,7 +627,7 @@
   cursor: pointer;
 }
 
-/* Only present at all on an item built with a `checked` boolean (see openMenuOverlay) — an
+/* Only present at all on an item built with a `checked` boolean (see openMenuOverlay): an
    ordinary action item (the vast majority) never gets this element, so it costs nothing there. */
 .menu-dropdown-item-check {
   flex: none;
@@ -864,7 +864,7 @@
   margin-bottom: 16px;
 }
 
-/* Rendered README/CHANGELOG markdown (see renderMarkdown in primitives.js) — this is the only
+/* Rendered README/CHANGELOG markdown (see renderMarkdown in primitives.js): this is the only
    place these tags appear in host-drawn content, so styling them by bare tag name (scoped to
    .detail-tab-panel) is simpler than inventing a class per element. */
 .detail-tab-panel h1,

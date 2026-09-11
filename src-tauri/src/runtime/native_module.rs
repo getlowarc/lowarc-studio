@@ -8,8 +8,8 @@
 // take on arbitrary native code (which by definition can crash, corrupt memory, or do literally
 // anything a native process can do) in its own address space the same way. Instead this loader
 // spawns one native_module_host helper process (src-tauri/src/bin/native_module_host.rs) per
-// native-kind module — that helper is the thing that actually dlopens the library and calls the
-// ABI above — and drives it through process_module's exact same wire protocol a real process.json
+// native-kind module: that helper is the thing that actually dlopens the library and calls the
+// ABI above, and drives it through process_module's exact same wire protocol a real process.json
 // module speaks (see spawn_and_run). A crash in a native module now only takes down its own
 // helper process, never LowArc Studio itself.
 
@@ -66,8 +66,8 @@ pub(crate) fn native_module_host_path() -> Result<PathBuf, String> {
     Ok(crate::app_paths::AppPaths::runtime_helpers().join(name))
 }
 
-/// Every module gets its own isolated native_module_host process — not one process per run, but
-/// one PER MODULE — so a crash in one native module can't take a sibling native module down with
+/// Every module gets its own isolated native_module_host process: not one process per run, but
+/// one PER MODULE, so a crash in one native module can't take a sibling native module down with
 /// it either, the same isolation guarantee ProcessLoader already gives process.json modules.
 /// Matches a set where EVERY module has native.json, same reasoning as ProcessLoader.
 pub struct NativeLoader;

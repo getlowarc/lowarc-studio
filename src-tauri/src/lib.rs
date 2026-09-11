@@ -1,4 +1,4 @@
-// Public for bin/lowarc.rs, which has to resolve modules from the SAME store Studio does — the
+// Public for bin/lowarc.rs, which has to resolve modules from the SAME store Studio does: the
 // repo's own /modules/ in a source checkout, %APPDATA% in an installed copy, a distinction
 // AppPaths::user_data() already owns. A CLI carrying its own copy of that rule would be a second
 // source of truth for where modules live, and the two would drift.
@@ -31,7 +31,7 @@ use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 /// The one active dev-run, if any. A second start_dev_run while one is already running is refused
-/// rather than silently replacing it — mirrors "throw a visible error, let the user decide" rather
+/// rather than silently replacing it, mirroring "throw a visible error, let the user decide" rather
 /// than guessing what they meant.
 ///
 /// A run executes in its own process (bin/dev_run_host.rs), not on a thread inside this one, so
@@ -52,7 +52,7 @@ struct ActiveRun {
 }
 
 impl ActiveRun {
-    /// Fire-and-forget, like every command in this protocol — there's no reply to correlate, and a
+    /// Fire-and-forget, like every command in this protocol: there is no reply to correlate, and a
     /// write failing means the child is already gone, which the stdout reader thread reports on its
     /// own. Callers surface a plain error rather than trying to distinguish the two.
     fn send(&mut self, command: serde_json::Value) -> Result<(), String> {
@@ -65,7 +65,7 @@ impl ActiveRun {
 #[derive(Default)]
 struct RunState(Mutex<Option<ActiveRun>>);
 
-/// Breakpoints deliberately live independently of any one run, not inside RunState/ActiveRun —
+/// Breakpoints deliberately live independently of any one run, not inside RunState or ActiveRun.
 /// configuring them before Start is pressed has to actually take effect from frame zero (a
 /// ModuleStart breakpoint is meaningless if it can only be set after the module already started),
 /// and a real debugger's breakpoints persisting across separate runs (like VS Code's do) is the
@@ -75,7 +75,7 @@ struct RunState(Mutex<Option<ActiveRun>>);
 #[derive(Default, Clone)]
 struct BreakpointState(Arc<Mutex<Vec<runtime::runtime_loader::Breakpoint>>>);
 
-/// Whether an export is currently running — no stop flag, unlike RunState: nothing about a
+/// Whether an export is currently running. No stop flag, unlike RunState, because nothing about a
 /// cargo-build-then-copy-files export is safely cancellable mid-step, so this only guards against
 /// a second export starting while one's already in flight.
 #[derive(Default)]
@@ -112,14 +112,14 @@ fn start_dev_run(
     // run starting and a breakpoint being edited at the same moment.
     let breakpoints = breakpoint_state.0.lock().clone();
 
-    // entry_file is stored (and passed in here) relative to the project root — see
-    // ProjectPreset::entry's doc comment — so it has to be joined before it's an actually
+    // entry_file is stored, and passed in here, relative to the project root (see
+    // ProjectPreset::entry's doc comment), so it has to be joined before it is an actually
     // readable path, rather than assumed to already be one.
     let project = PathBuf::from(project_dir);
     let entry = project.join(&entry_file);
 
     // Held across the whole start, so "is one already running?" and "this one is now running" are
-    // one atomic step — two Start clicks racing must not both get to spawn a process, and this
+    // one atomic step: two Start clicks racing must not both get to spawn a process, and this
     // lock is the only thing that decides it. Dropped before the reader threads start, since they
     // take it themselves.
     let mut guard = state.0.lock();
@@ -138,7 +138,7 @@ fn start_dev_run(
     let host = dev_run_host_path()?;
 
     // spawn_piped's own working directory is the scratch dir purely so a module that resolves
-    // something relative to cwd doesn't reach into Studio's — every path in launch.json is
+    // something relative to cwd doesn't reach into Studio's. Every path in launch.json is
     // absolute, so nothing here depends on it.
     let mut child = runtime::child_process::spawn_piped(host, &[scratch.to_string_lossy().into_owned()], &scratch)
         .map_err(|e| {
@@ -166,7 +166,7 @@ fn start_dev_run(
 
 /// Writes the one file bin/dev_run_host.rs needs, into a fresh scratch folder, and returns that
 /// folder. Nothing is staged or copied: `modules` are the live folders project::resolve just
-/// returned and `source` is the real entry file, both ABSOLUTE — run_from_launch_dir joins each
+/// returned and `source` is the real entry file, both ABSOLUTE, since run_from_launch_dir joins each
 /// against the launch dir, and joining an absolute path yields it unchanged, so the export-shaped
 /// LaunchConfig doubles as a dev-run one with no changes to how it's read.
 fn write_dev_run_launch(entry: &std::path::Path, modules: &[runtime::manifest::ModuleInfo]) -> Result<PathBuf, String> {
@@ -181,7 +181,7 @@ fn write_dev_run_launch(entry: &std::path::Path, modules: &[runtime::manifest::M
         source: entry.to_string_lossy().into_owned(),
         modules: modules.iter().map(|m| m.folder.to_string_lossy().into_owned()).collect(),
         diagnostics_log: false,
-        // Per-module settings aren't sourced from anywhere real yet — that's config handed to game
+        // Per-module settings aren't sourced from anywhere real yet. That is config handed to game
         // modules at start, a separate concept from Studio's own settings.json.
         settings: serde_json::json!({}),
     };
@@ -197,7 +197,7 @@ mod dev_run_launch_tests {
     /// The whole no-staging design rests on one assumption: what this side WRITES is exactly what
     /// the run side READS, absolute paths and all. LaunchConfig::read is literally the function
     /// bin/dev_run_host.rs reaches through run_from_launch_dir, so round-tripping through it is the
-    /// real check — a serde rename drifting on either half would otherwise only ever show up as a
+    /// real check: a serde rename drifting on either half would otherwise only show up as a
     /// dev-run mysteriously failing to start.
     #[test]
     fn the_generated_launch_json_is_read_back_by_the_same_reader_the_run_uses() {
@@ -227,7 +227,7 @@ mod dev_run_launch_tests {
 }
 
 /// Same resolution order (and for the same three contexts) as
-/// native_module::native_module_host_path — next to the running exe first, since both a source
+/// native_module::native_module_host_path: next to the running exe first, since both a source
 /// checkout and an export always have it there, falling back to the installed copy's own helpers
 /// folder.
 fn dev_run_host_path() -> Result<PathBuf, String> {
@@ -241,7 +241,7 @@ fn dev_run_host_path() -> Result<PathBuf, String> {
     Ok(AppPaths::runtime_helpers().join(name))
 }
 
-/// Relays the child's output onto the same three Tauri events the frontend has always listened to —
+/// Relays the child's output onto the same three Tauri events the frontend already listens to, so
 /// what changed is only where the data comes from (parsed off a pipe rather than produced by
 /// in-process closures), never the event shapes themselves.
 fn spawn_dev_run_readers(app: AppHandle, stdout: std::process::ChildStdout, stderr: std::process::ChildStderr) {
@@ -265,7 +265,7 @@ fn spawn_dev_run_readers(app: AppHandle, stdout: std::process::ChildStdout, stde
                 let message = log.get("message").and_then(|m| m.as_str()).unwrap_or("");
                 let _ = app.emit("dev-run-log", serde_json::json!({"level": level, "message": message}));
             } else if let Some(frame) = value.get("frame") {
-                // A trace carrying a triggered breakpoint means the child just paused itself — see
+                // A trace carrying a triggered breakpoint means the child just paused itself. See
                 // ActiveRun::paused for why this process has to notice that.
                 if !frame.get("triggered").unwrap_or(&serde_json::Value::Null).is_null() {
                     if let Some(active) = app.state::<RunState>().0.lock().as_mut() {
@@ -280,14 +280,14 @@ fn spawn_dev_run_readers(app: AppHandle, stdout: std::process::ChildStdout, stde
 
         // Reached when the pipe closes, which happens whether the child ended cleanly or died
         // outright (crash, external kill, a failure to even start). Either way the run is over, so
-        // RunState has to clear and dev-run-ended has to fire — a child that never got to say
+        // RunState has to clear and dev-run-ended has to fire, since a child that never got to say
         // "ended" still can't be allowed to leave the UI believing a run is live forever. Same
         // reasoning as ProcessModule's own dead flag, one level up.
         let end_payload = ended.unwrap_or_else(|| {
             serde_json::json!({"ok": false, "errors": ["The dev-run process ended unexpectedly."]})
         });
         if let Some(mut active) = app.state::<RunState>().0.lock().take() {
-            // Reaped, not just dropped — dropping a Child detaches it, leaving a zombie behind on
+            // Reaped, not just dropped: dropping a Child detaches it, leaving a zombie behind on
             // Unix for the life of this long-running process, once per run. Its pipes are already
             // closed by the time this runs, so there's nothing left to wait on but the exit status.
             let _ = active.child.wait();
@@ -297,7 +297,7 @@ fn spawn_dev_run_readers(app: AppHandle, stdout: std::process::ChildStdout, stde
     });
 }
 
-/// Pausing also zeroes any in-flight step request — otherwise a step queued right before a manual
+/// Pausing also zeroes any in-flight step request, since otherwise a step queued right before a manual
 /// pause (unlikely from the UI, since Step is normally only enabled while already paused, but not
 /// impossible to race) would let one more tick slip through right after this call returns.
 #[tauri::command]
@@ -324,7 +324,7 @@ fn resume_dev_run(state: State<'_, RunState>) -> Result<(), String> {
     }
 }
 
-/// Only valid while already paused — stepping a freely-running loop has no well-defined meaning
+/// Only valid while already paused, since stepping a freely-running loop has no well-defined meaning
 /// (step to where, exactly, if it's already advancing on its own?), so this refuses rather than
 /// silently pausing-then-stepping on the caller's behalf.
 #[tauri::command]
@@ -340,7 +340,7 @@ fn step_dev_run(state: State<'_, RunState>, count: Option<u32>) -> Result<(), St
     }
 }
 
-/// Works with or without an active run — see BreakpointState's own doc comment for why. Replaces
+/// Works with or without an active run; see BreakpointState's own doc comment for why. Replaces
 /// the whole set rather than adding/removing one at a time, same "frontend always resends
 /// everything" convention plugin settings/commands already use.
 ///
@@ -382,7 +382,7 @@ fn set_project_preset(project_dir: String, preset: runtime::project::ProjectPres
 }
 
 /// Turns an absolute path (from the native file picker) into the project-relative form project.json
-/// stores, WITHOUT saving anything — the Run Config editor holds unsaved changes until its Save
+/// stores, WITHOUT saving anything: the Run Config editor holds unsaved changes until its Save
 /// button, so it needs the conversion on its own. set_project_entry does the same conversion and
 /// then writes; this is that function's first half, shared rather than duplicated.
 #[tauri::command]
@@ -391,7 +391,7 @@ fn project_relative_entry(project_dir: String, absolute_entry_path: String) -> R
 }
 
 /// The project-relative form of an absolute entry path. The entry must live inside the project
-/// directory — canonicalize (not a plain strip_prefix) so a case or `..` difference between the two
+/// directory. canonicalize, not a plain strip_prefix, so a case or `..` difference between the two
 /// paths doesn't produce a false "outside the project" rejection.
 fn relative_entry_for(project_dir: &Path, absolute_entry_path: &str) -> Result<String, String> {
     let canonical_project = project_dir.canonicalize().map_err(|e| format!("Invalid project directory: {e}"))?;
@@ -448,7 +448,7 @@ fn validate_file_path(path: &str) -> Result<PathBuf, String> {
 }
 
 /// Reads an open file's contents so the host can push them into whichever viewer plugin claimed
-/// that extension — a viewer's own sandboxed iframe has no filesystem access of its own, on
+/// that extension, since a viewer's own sandboxed iframe has no filesystem access of its own, on
 /// purpose, so this has to happen host-side rather than the plugin reading the file itself.
 #[tauri::command]
 fn read_text_file(path: String) -> Result<String, String> {
@@ -456,7 +456,7 @@ fn read_text_file(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|e| format!("Could not read {}: {e}", path.display()))
 }
 
-/// The other half of read_text_file — invoked host-side in response to a viewer plugin's
+/// The other half of read_text_file, invoked host-side in response to a viewer plugin's
 /// `window.lowarc.saveFile(path, contents)`, same reasoning as read: a sandboxed viewer iframe
 /// has no filesystem access of its own.
 ///
@@ -479,8 +479,8 @@ fn write_text_file(app: AppHandle, path: String, contents: String) -> Result<(),
 }
 
 /// read_text_file's counterpart for a viewer whose plugin.json marks its `viewers` entry
-/// `"binary": true` (images, video — anything read_to_string would corrupt by forcing a UTF-8
-/// decode on bytes that were never text). Base64, not a raw byte array — directly usable as a
+/// `"binary": true` (images, video, anything read_to_string would corrupt by forcing a UTF-8
+/// decode on bytes that were never text). Base64, not a raw byte array, so it is directly usable as a
 /// data: URI on the plugin side (`data:${mime};base64,${content}`) with no further decoding, and
 /// far more compact over postMessage/JSON than Tauri's default array-of-numbers serialization for
 /// Vec<u8> would be.
@@ -530,7 +530,7 @@ mod file_path_tests {
 }
 
 /// Lets editor.html (the host page, not a plugin's own iframe) read one of a plugin's static
-/// assets — e.g. a rail icon — as text, over IPC rather than a network request of any kind.
+/// assets, a rail icon for instance, as text, over IPC rather than a network request of any kind.
 /// Not strictly required now that plugin assets are served over real HTTP (fetch() would work
 /// too), but kept as-is: it already works, and rail icons need the raw SVG text to sanitize and
 /// inline, not a URL to fetch.
@@ -542,7 +542,7 @@ fn read_plugin_asset(plugin_id: String, rel_path: String) -> Result<String, Stri
 }
 
 /// The port editor.html should use to build plugin panel/viewer iframe URLs as
-/// `http://127.0.0.1:<port>/<plugin_id>/<rel_path>` — see plugin_asset_server.rs.
+/// `http://127.0.0.1:<port>/<plugin_id>/<rel_path>`; see plugin_asset_server.rs.
 #[tauri::command]
 fn plugin_asset_port() -> u16 {
     plugin_asset_server::port()
@@ -651,7 +651,7 @@ fn delete_theme_preset(name: String) -> Result<(), String> {
     theme::delete_preset(&name)
 }
 
-/// Asks the run to end itself, rather than killing the process outright — the child's own loop
+/// Asks the run to end itself, rather than killing the process outright, so the child's own loop
 /// still has to unwind (every module gets its "stop" phase, its process is waited on) exactly as it
 /// did when the run lived in this process. RunState clears when the child's pipes actually close,
 /// not here; see spawn_dev_run_readers.
@@ -663,7 +663,7 @@ fn stop_dev_run(state: State<'_, RunState>) -> Result<(), String> {
     }
 }
 
-/// Folder-mode export only for now — see export::export_folder's own header for why a folder is a
+/// Folder-mode export only for now; see export::export_folder's own header for why a folder is a
 /// real, complete output shape rather than a stopgap. Runs on its own thread (copying modules and
 /// the runtime is real, if brief, disk I/O) and reports progress the same way dev-run does:
 /// `export-log` events while it runs, one `export-ended` event when it's done either way.
@@ -677,8 +677,8 @@ fn start_export(app: AppHandle, state: State<'_, ExportState>, project_dir: Stri
         *guard = true;
     }
 
-    // export_folder's own log(...) calls are 5 fixed, known stages announced in a fixed order —
-    // resolve_runtime() locates an already-built binary and never logs at all — so a plain
+    // export_folder's own log(...) calls are 5 fixed, known stages announced in a fixed order, and
+    // resolve_runtime() locates an already-built binary and never logs at all, so a plain
     // running count against that fixed total is a real (if coarse) progress fraction, not a
     // guess. Keep EXPORT_TOTAL_STEPS in sync if export_folder's own count of log(...) calls
     // changes.
@@ -750,7 +750,7 @@ fn list_installed_plugins() -> Vec<PluginListItem> {
     installs::list_plugins(&AppPaths::plugins(), &disabled)
 }
 
-/// Backs the Modules/Plugins manage pages' Overview/Changelog tabs and their optional `icon` —
+/// Backs the Modules/Plugins manage pages' Overview and Changelog tabs and their optional `icon`.
 /// one generic "read a file out of an already-installed item's own folder" command instead of
 /// three narrower ones. `folder` is whatever `ModuleListItem.folder`/`PluginListItem.folder`
 /// already handed the frontend. Returns None (not an error) for anything missing/unreadable — see
@@ -817,7 +817,7 @@ fn start_plugin_session(app: AppHandle, id: String, session_id: String, shell: O
     sessions.start(&app, &folder, &desc, &id, &session_id)
 }
 
-/// Fire-and-forget write to a running session's stdin — see window.lowarc.session.send() in
+/// Fire-and-forget write to a running session's stdin. See window.lowarc.session.send() in
 /// plugin_assets.rs. Whatever the session has to say back arrives separately, as a
 /// lowarc:sessionOutput emit (plugin_session.rs), not as this call's return value. `id` is the
 /// calling plugin's own id (from the host's windowToPlugin, same as start_plugin_session) —
@@ -860,17 +860,17 @@ fn set_plugin_enabled(id: String, enabled: bool) -> Result<(), String> {
 /// see window.lowarc.getSettings() in plugin_assets.rs, the harness call this backs. Empty map for
 /// a plugin with no saved values yet (including one that's never declared any settings at all);
 /// the schema itself lives in plugin.json, not here, so there's nothing to validate a key against
-/// on this side — a plugin only ever asks for its own values back, never another plugin's.
+/// on this side: a plugin only ever asks for its own values back, never another plugin's.
 #[tauri::command]
 fn get_plugin_settings(id: String) -> std::collections::HashMap<String, String> {
     settings::load().plugin_settings.get(&id).cloned().unwrap_or_default()
 }
 
-/// Sets one (id, key) -> value in Settings.plugin_settings, leaving every other plugin's — and
+/// Sets one (id, key) -> value in Settings.plugin_settings, leaving every other plugin's, and
 /// this plugin's own other fields' — values untouched. Called from the Settings UI, not from a
 /// plugin itself (a plugin only ever reads its own settings, never writes them for itself).
 /// Emits "plugin-setting-changed" so an already-mounted instance of that plugin can pick the new
-/// value up live instead of needing a refresh — see split-view.js's relay of it to
+/// value up live instead of needing a refresh. See split-view.js's relay of it to
 /// lowarc:settingsChanged, same shape as file-about-to-save/plugin-emit above.
 #[tauri::command]
 fn set_plugin_setting(app: AppHandle, id: String, key: String, value: String) -> Result<(), String> {
@@ -888,7 +888,7 @@ pub fn run() {
   plugin_asset_server::start();
 
   // window-state must be registered here, before .run() creates the config-declared "main"
-  // window, not inside .setup() — its on_window_ready hook only fires for windows created after
+  // window, not inside .setup(): its on_window_ready hook only fires for windows created after
   // the plugin is registered, and by the time setup() runs, "main" already exists.
   let builder = tauri::Builder::default()
     .manage(RunState::default())
@@ -898,14 +898,14 @@ pub fn run() {
   #[cfg(desktop)]
   let builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
   // The updater plugin is deliberately NOT registered yet. It refuses to initialize without a
-  // `plugins.updater` block in tauri.conf.json — not at check() time, at STARTUP:
+  // `plugins.updater` block in tauri.conf.json: not at check() time, at STARTUP:
   //
   //   PluginInitialization("updater", "Error deserializing 'plugins.updater' ...
   //    invalid type: null, expected struct Config")
   //
   // which takes the whole app down rather than leaving one feature unavailable. Registering it
   // before the config exists therefore isn't a harmless head start, it's a broken build, and it
-  // compiles and passes tests either way — only launching the app catches it. Add this line back in
+  // compiles and passes tests either way: only launching the app catches it. Add this line back in
   // the same change that adds the pubkey and endpoints; see docs/updating.md.
 
   builder
@@ -966,7 +966,7 @@ pub fn run() {
       }
 
       AppPaths::ensure_directories()?;
-      // Non-fatal on purpose, unlike ensure_directories() above — a failed copy here (e.g. the
+      // Non-fatal on purpose, unlike ensure_directories() above: a failed copy here (e.g. the
       // binary is locked by another running instance) should still let the app start with
       // whatever plugin binary was already in place, not crash outright; the affected plugin
       // just surfaces its own "couldn't start" error later, the same as any other missing/broken
@@ -974,7 +974,7 @@ pub fn run() {
       if let Err(err) = AppPaths::ensure_builtin_plugin_binaries() {
         log::warn!("couldn't refresh a built-in plugin's backend binary: {err}");
       }
-      // The installed-copy counterpart to the dev-only copy above — no-ops entirely for a source
+      // The installed-copy counterpart to the dev-only copy above: no-ops entirely for a source
       // checkout (AppPaths::dev_root().is_some()), same as ensure_builtin_plugin_binaries() does
       // in reverse. resource_dir() can itself fail on some platforms/configurations; that's not
       // fatal either, for the same "don't crash the whole app over an asset problem" reasoning —

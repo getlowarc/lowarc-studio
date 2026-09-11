@@ -45,7 +45,7 @@ impl Module {
         Self { child, stdin, stdout, stderr }
     }
 
-    /// Whatever the module wrote to stderr before dying — its panic message, in practice.
+    /// Whatever the module wrote to stderr before dying: its panic message, in practice.
     fn drain_stderr(&mut self) -> String {
         let Some(mut err) = self.stderr.take() else { return "<stderr already taken>".into() };
         let mut buf = String::new();
@@ -82,7 +82,7 @@ impl Module {
     }
 
     /// Returns the start reply, since whether it carries a `degraded` marker is itself part of the
-    /// contract — see the degraded-marker assertion in the first test.
+    /// contract. See the degraded-marker assertion in the first test.
     fn compile_and_start(&mut self, settings: Value) -> Value {
         self.send(serde_json::json!({"phase": "compile", "sourceCode": "", "sourcePath": "project/main.txt"}));
         assert_eq!(self.reply().get("ok").and_then(Value::as_bool), Some(true), "compile should succeed");
@@ -93,7 +93,7 @@ impl Module {
     }
 
     /// One frame carrying `draw` as a single provider's contribution to the draw-commands
-    /// contract — the gathered array shape the canvas reads now that any number of modules may
+    /// contract: the gathered array shape the canvas reads now that any number of modules may
     /// draw (see module-sources/draw-commands/README.md).
     fn frame(&mut self, draw: Value) -> Value {
         self.send(serde_json::json!({"phase": "frame", "delta": 0.016, "shared": {"draw-commands": [{"from": "test-director", "draw": draw}]}}));
@@ -133,7 +133,7 @@ fn it_answers_every_phase_and_publishes_a_surface_a_director_can_read() {
     );
 
     // The degraded marker has to agree with reality, and this holds on BOTH kinds of machine
-    // without the test needing to know which it is on — a developer box reports a real window and
+    // without the test needing to know which it is on: a developer box reports a real window and
     // no marker, a display-less CI runner reports neither and must say so. Pinning the pair is what
     // makes "it degrades" a checked claim rather than an intention.
     let width = published.get("width").and_then(Value::as_u64).unwrap_or(0);
@@ -182,7 +182,7 @@ fn one_bad_command_does_not_take_down_the_frame_around_it() {
 #[test]
 fn a_frame_with_no_director_at_all_is_a_normal_empty_frame() {
     // The state on first run: the canvas installed, nothing publishing draw commands yet. It has to
-    // be a quiet no-op, not an error — otherwise every run would fail until a director exists.
+    // be a quiet no-op, not an error. Otherwise every run would fail until a director exists.
     let mut module = Module::start();
     module.compile_and_start(serde_json::json!({"width": 320, "height": 240, "vsync": false}));
 

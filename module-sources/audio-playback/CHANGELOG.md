@@ -42,6 +42,6 @@ Initial release.
 - Real cross-platform audio playback (rodio/cpal), broad format support via Symphonia.
 - Declarative per-frame playback list (`shared.director.play`), reconciled idempotently — live
   volume/pause changes, gapless looping, `justFinished` reporting.
-- Optional `director` role dependency — works with any module willing to fill it, no hardcoded
+- Optional `director` role dependency. Works with any module willing to fill it, no hardcoded
   coupling.
 - Graceful degradation on a device-less environment.

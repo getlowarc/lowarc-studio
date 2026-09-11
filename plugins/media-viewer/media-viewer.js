@@ -33,7 +33,7 @@ const MIME_BY_EXT = {
 const VIDEO_EXTS = new Set([".mp4", ".webm", ".ogv"]);
 const AUDIO_EXTS = new Set([".mp3", ".wav", ".flac", ".m4a", ".aac", ".opus", ".ogg"]);
 
-// A simple two-note glyph shown behind the visualizer — audio has no picture of its own the way
+// A simple two-note glyph shown behind the visualizer. Audio has no picture of its own the way
 // video has a first frame, so this is what fills that same visual space instead of a blank pane.
 const AUDIO_ICON_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">' +
@@ -81,7 +81,7 @@ function readAsciiRun(bytes, offset, length) {
 // encoding — encoding 0 (ISO-8859-1) and 3 (UTF-8) terminate on a single 0x00 byte; 1 (UTF-16
 // with BOM) and 2 (UTF-16BE) terminate on a 0x00 0x00 PAIR, since a lone 0x00 is a perfectly valid
 // byte inside a UTF-16 code unit. Getting this wrong walks straight into the middle of the image
-// bytes that follow, corrupting everything after it — this is the one part of APIC parsing that's
+// bytes that follow, corrupting everything after it: this is the one part of APIC parsing that's
 // actually easy to get subtly wrong.
 function findStringEnd(bytes, offset, textEncoding) {
   const wide = textEncoding === 1 || textEncoding === 2;
@@ -151,7 +151,7 @@ window.lowarc.on("lowarc:openFile", (payload) => {
   if (!payload || typeof payload.path !== "string" || docs.has(payload.path)) return;
   const ext = extOf(payload.path);
   const mime = MIME_BY_EXT[ext] || "application/octet-stream";
-  // payload.contents is already base64 (read_binary_file, host-side) — a data: URI is the
+  // payload.contents is already base64 (read_binary_file, host-side): a data: URI is the
   // simplest way to hand it to <img>/<video>/<audio> with no further decoding on this end. Fine
   // at the scale of "a person's own project assets"; a truly huge file would be better served as
   // a blob: object URL instead, not attempted here since nothing's shown that need yet.
@@ -177,7 +177,7 @@ window.lowarc.on("lowarc:openFile", (payload) => {
     canvas.className = "audio-canvas";
     visual.appendChild(canvas);
 
-    // Cheap and safe to always attempt — parseId3v2AlbumArt returns null immediately for anything
+    // Cheap and safe to always attempt. ParseId3v2AlbumArt returns null immediately for anything
     // that doesn't start with an ID3v2 tag at all, not just files that happen to be .mp3.
     const art = parseId3v2AlbumArt(base64ToBytes(payload.contents));
     if (art) {
@@ -290,7 +290,7 @@ document.getElementById("zoom-fit").addEventListener("click", () => {
 
 // Ctrl+wheel to zoom, the same modifier convention every other app uses (a plain wheel already
 // means "scroll the image" once it's bigger than the viewport, so zoom needs its own modifier to
-// not fight that) — the browser's own page-zoom shortcut is Ctrl+wheel too, hence preventDefault.
+// not fight that): the browser's own page-zoom shortcut is Ctrl+wheel too, hence preventDefault.
 container.addEventListener(
   "wheel",
   (e) => {
@@ -346,7 +346,7 @@ function initDrag(doc) {
 // open here, not just skip the visual.
 //
 // Only actually drawing (the rAF loop) while this doc is both the active tab AND actually
-// playing — an audio view sitting in a background tab, or one that's paused, has no reason to
+// playing: an audio view sitting in a background tab, or one that's paused, has no reason to
 // keep spending CPU on a canvas nobody's looking at. Switching tabs away does NOT pause playback
 // itself (same as video already doesn't), only the drawing.
 function initVisualizer(doc) {

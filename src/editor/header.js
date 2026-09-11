@@ -22,15 +22,15 @@
         { id: "settings", label: "Settings" },
       ];
 
-      // Command Palette registry, half of it anyway — the host-owned half. Every ENABLED item in
+      // Command Palette registry, half of it anyway: the host-owned half. Every ENABLED item in
       // the File/Edit/View/Run/Help menu bar is already a real DOM element with a label and a
       // click handler; scanning it rather than hand-maintaining a second list is what keeps this
       // from drifting out of sync with the actual menu the moment someone adds an item and forgets
       // the palette entry. Disabled placeholders (Save, Undo, Command Palette's own menu label
-      // wouldn't be one of these anyway) are skipped — nothing to run yet.
+      // wouldn't be one of these anyway) are skipped: nothing to run yet.
       function buildHostMenuCommands() {
         const commands = [
-          // Settings has no menu-bar item of its own to scan below — it only lives in the
+          // Settings has no menu-bar item of its own to scan below. It only lives in the
           // gear icon's own dynamically-built floating menu (openMenuFromTrigger, not a real
           // .menu-dropdown-item at any point), so it's added by hand here instead.
           { id: "command:host:settings", label: "Settings", category: "commands", kind: "command", run: () => showPopup("settings", { url: "settings.html" }) },
@@ -46,7 +46,7 @@
 
       // The other half — plugin-declared. A sandboxed plugin's content can't be introspected the
       // way the host's own menu bar can, so it has to say what it offers itself, via plugin.json's
-      // `commands` array (same shape/spirit as `settings` — see PluginCommand in protocol.rs).
+      // `commands` array (same shape/spirit as `settings`; see PluginCommand in protocol.rs).
       async function buildPluginCommands() {
         let plugins = [];
         try {
@@ -99,8 +99,8 @@
         return Promise.resolve(null);
       }
 
-      // A viewer plugin (Monaco, so far) can have several iframes mounted at once — one per open
-      // file, possibly across both split groups — so "the" mounted instance a panel/console-tab
+      // A viewer plugin (Monaco, so far) can have several iframes mounted at once: one per open
+      // file, possibly across both split groups, so "the" mounted instance a panel/console-tab
       // plugin has doesn't apply; its commands mean "run this in the file I'm currently looking
       // at." The active file's own iframe is tried first (only really matches a viewer); anything
       // else (Debug, Terminal, file explorer) has no open-file iframe of its own, so this falls
@@ -127,7 +127,7 @@
       // array, instead of a separate .map()'d copy that would silently stop tracking it.
       const commandCenterEntries = [];
 
-      // The dynamic counterpart to buildPluginCommands() below — see window.lowarc.setCommands() in
+      // The dynamic counterpart to buildPluginCommands() below. See window.lowarc.setCommands() in
       // plugin_assets.rs. Re-registering (Monaco does this on every editor mount) replaces this
       // plugin's previous set rather than piling up duplicates.
       function setDynamicPluginCommands(pluginId, commands) {
@@ -170,7 +170,7 @@
 
       // ---------- Notification bell ----------
       // Reads the exact same history every showToast() call (host chrome's own, and any plugin's
-      // via window.lowarc.notify()) already feeds — see primitives.js's toast/notification-history
+      // via window.lowarc.notify()) already feeds. See primitives.js's toast/notification-history
       // section. This panel is read-only history, not an action menu, so it bypasses
       // openMenuOverlay's items/resolve-a-value shape entirely and builds #floating-menu-list's
       // content by hand instead, reusing only the low-level positioning (showFloatingOverlay).
@@ -260,7 +260,7 @@
         closeFloatingMenu();
         const list = document.getElementById("floating-menu-list");
         list.classList.add("notif-panel-list");
-        // Not a menu — a read-only list with per-row dismiss buttons, not a set of actions the
+        // Not a menu: a read-only list with per-row dismiss buttons, not a set of actions the
         // overlay itself resolves a choice from (see floatingMenuResolve below).
         list.setAttribute("role", "region");
         list.setAttribute("aria-label", "Notifications");
@@ -288,7 +288,7 @@
         if (e.target.id === "floating-menu") closeFloatingMenu();
       });
 
-      // Finds the <iframe> a given window belongs to — lets showMenu() (see the message listener
+      // Finds the <iframe> a given window belongs to. Lets showMenu() (see the message listener
       // below) translate a plugin's own local click coordinates into host/screen coordinates. Every
       // plugin-hosted iframe (sidebar/inspector/console-tab panels AND open-file viewers, in either
       // editor group) carries this same class, so one query covers all of them without a second map

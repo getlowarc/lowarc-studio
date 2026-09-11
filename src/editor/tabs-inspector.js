@@ -1,17 +1,17 @@
-      // ---------- Tab bar / open files (one or two editor groups — see toggleSplit below) ----------
+      // ---------- Tab bar / open files (one or two editor groups; see toggleSplit below) ----------
       // openFiles: absolute path -> { title, dirty, missing, hasErrors, pluginId, iframe, groupId }.
-      // ONE iframe per (editor group, viewer plugin) pair, not one per open file — a "multi-document
+      // ONE iframe per (editor group, viewer plugin) pair, not one per open file: a "multi-document
       // viewer" plugin (Monaco, today) manages several open files inside that one instance itself
       // (see the lowarc:openFile/activateFile/closeFile/getContent contract in plugin_assets.rs),
       // the same shape a "session": true plugin like Terminal already uses for multiple terminal
-      // tabs inside one iframe — the host never needs to know a plugin has "instances," only which
+      // tabs inside one iframe: the host never needs to know a plugin has "instances," only which
       // path is currently active. Per-file scroll position/undo history survive a tab switch
       // because the PLUGIN itself saves/restores view state around each activateFile, the same way
       // VS Code's own editor does. The iframe does now outlive its files (see
       // unmountFileFromGroup), but that is about not paying to rebuild an editor, not about how
       // view state survives; the save/restore would be needed either way.
       // Unlike VS Code, a file isn't shared across groups here — there's no way to share a model
-      // between two separate sandboxed iframes (two different JS realms) to split — so a path can
+      // between two separate sandboxed iframes (two different JS realms) to split, so a path can
       // only be open in ONE group at a time; opening an already-open file just activates it
       // wherever it already is, and moving it to the other group asks the source instance for its
       // current content (see requestPluginContent below) rather than re-reading the file from disk,
@@ -26,7 +26,7 @@
       let draftDiffCounts = {};
       // iframe.contentWindow -> Set<path> this iframe is currently responsible for. A plugin's own
       // markDirty/markErrors/requestClose/saveFile calls all carry an explicit path now (see
-      // plugin_assets.rs) — this Set is what validates that path actually belongs to the iframe
+      // plugin_assets.rs): this Set is what validates that path actually belongs to the iframe
       // claiming it, the same trust role a single Map<Window, path> played before multiple files
       // could share one iframe.
       const windowToFilePaths = new Map();
@@ -100,7 +100,7 @@
       let activeInspectorKey = null;
 
       // onlyIfOpen: skip entirely (don't switch content, don't open the panel) unless the panel is
-      // already open — see window.lowarc.openInspector()'s own comment in plugin_assets.rs for why.
+      // already open. See window.lowarc.openInspector()'s own comment in plugin_assets.rs for why.
       function showInspector(contributionId, context, onlyIfOpen) {
         if (onlyIfOpen && !PANELS.right.open) return;
         const contribution = getSlot("inspector").find((c) => c.id === contributionId);
@@ -114,7 +114,7 @@
         }
       }
 
-      // "The inspector's iframe" is just whichever contribution is currently showing, if any — no
+      // "The inspector's iframe" is just whichever contribution is currently showing, if any: no
       // installed inspector plugin at all, or one that's simply never been claimed yet, is a
       // legitimate, common state, not an error.
       function inspectorIframe() {
@@ -144,7 +144,7 @@
       }
 
       // Pushed to every currently-mounted plugin iframe (sidebar/inspector panels *and* open-file
-      // viewers, in either group) whenever anything about openFiles changes — the file explorer is
+      // viewers, in either group) whenever anything about openFiles changes: the file explorer is
       // the reason this exists (so it can decorate its own tree rows with the same dirty/error
       // status the tab bar shows), but it's not addressed to any one plugin, since anything
       // sidebar-hosted might reasonably want it later. Sent as a full snapshot rather than a
@@ -158,7 +158,7 @@
         for (const entry of pluginPanels.values()) {
           if (entry.iframe) entry.iframe.contentWindow.postMessage(payload, "*");
         }
-        // A Set, not a direct iteration over openFiles — several open files can now share one
+        // A Set, not a direct iteration over openFiles. Several open files can now share one
         // iframe (see groupViewerIframes above), and that instance only needs this once, not once
         // per file it happens to have open.
         const notified = new Set();
@@ -209,7 +209,7 @@
         });
       }
 
-      // Right-click on the tab bar's own empty space (not a specific tab) — no per-file actions,
+      // Right-click on the tab bar's own empty space (not a specific tab): no per-file actions,
       // just the group-wide ones, plus the same Split Editor toggle the View menu already has, for
       // discoverability right where a split would actually appear.
       function showTabBarContextMenu(groupId, x, y) {
@@ -286,7 +286,7 @@
       const viewerIframeReady = new Map();
 
       // Gets-or-creates the one iframe for (groupId, viewer.pluginId), pushes this path's content
-      // into it, and resolves once it's genuinely ready — either immediately (an already-mounted
+      // into it, and resolves once it's genuinely ready: either immediately (an already-mounted
       // instance already has a load-complete script running) or after a freshly-created iframe's
       // own load event fires. Doesn't touch openFiles/contribute/groupActiveFilePath/rendering —
       // callers (openFile, moveFileToGroup) own that, since what happens around a mount differs
@@ -308,7 +308,7 @@
           iframe.className = "plugin-panel-frame";
           iframe.dataset.pluginId = viewer.pluginId; // lets a command look up this plugin's own mounted iframe by id, see runCommand()
           iframe.setAttribute("sandbox", "allow-scripts");
-          // No per-file path in the URL anymore — this instance can outlive any one file, so which
+          // No per-file path in the URL anymore: this instance can outlive any one file, so which
           // file(s) it's showing arrives entirely through lowarc:openFile/activateFile/closeFile
           // messages over its lifetime, not something baked into how it was loaded.
           iframe.src = await pluginAssetUrl(viewer.pluginId, viewer.viewer.entry);
@@ -402,7 +402,7 @@
         updateStatusBarDiff();
       }
 
-      // Writes every dirty file back to its own path — same read-current-content-then-write flow
+      // Writes every dirty file back to its own path: same read-current-content-then-write flow
       // Save As already uses (requestPluginContent + write_text_file), just without the "pick a
       // new destination" step, since every open file already has a real one. No "new project"/
       // unsaved-buffer case exists to send through Save As instead: files only ever get into
@@ -437,7 +437,7 @@
       // represent real work that'd otherwise be silently lost, so this is the one gate standing
       // between "click the X" (or Alt+F4) and losing either. Resolves true to let the close
       // proceed, false to cancel it. draftDiffCounts having any entries at all is exactly "a Draft
-      // is open with something actually captured" — an open-but-untouched Draft has nothing to
+      // is open with something actually captured": an open-but-untouched Draft has nothing to
       // lose by closing, same reasoning it shows no diff anywhere else either. A Draft itself has
       // no "save" — Commit/Revert are its only resolutions, and both live in the sidebar, not here.
       async function confirmAppClose() {
@@ -479,7 +479,7 @@
         // Only actually matters for the group the user is currently focused on —
         // updateInspectorForActiveFile re-derives from activeGroupId itself, so calling it here
         // even when `groupId` is the OTHER (unfocused) group's own file switch is harmless, just
-        // a no-op recompute of the same answer as before — same reasoning updateStatusBarDiff's
+        // a no-op recompute of the same answer as before: same reasoning updateStatusBarDiff's
         // own call here follows.
         if (groupId === activeGroupId) {
           updateInspectorForActiveFile();
@@ -500,7 +500,7 @@
       // Closing isn't a primitive-mediated user click on a tab — it's host logic deciding what
       // the next active tab should be, so this sets groupActiveFilePath directly rather than
       // simulating a click on whatever's chosen. Async because a dirty file gates on the popup
-      // below — every caller (the close button, requestClose) already treats this as fire-and-
+      // below: every caller (the close button, requestClose) already treats this as fire-and-
       // forget, so nothing needed to change at the call sites for that.
       async function closeFile(path) {
         const file = openFiles.get(path);
@@ -509,7 +509,7 @@
         if (file.dirty) {
           const confirmed = await showPopup("confirm-close-dirty", { title: file.title });
           if (!confirmed) return;
-          // The confirm popup is itself async — the file could have been closed some other way
+          // The confirm popup is itself async: the file could have been closed some other way
           // (e.g. its own plugin calling requestClose after a successful save) while it was open.
           if (!openFiles.has(path)) return;
         }
@@ -529,7 +529,7 @@
         broadcastFileStatus();
       }
 
-      // Shared by the tab/tab-bar context menus' "Close Others"/"Close All" — one file at a time,
+      // Shared by the tab/tab-bar context menus' "Close Others"/"Close All": one file at a time,
       // through the same closeFile() every other close path uses (dirty confirmation included),
       // rather than a bulk short-circuit that would skip it. exceptPath omitted closes everything
       // in the group; passed, it's the one tab that survives ("Close Others").
@@ -565,7 +565,7 @@
         const viewer = viewersByExtension.get(fileExtension(path));
         if (!viewer) return; // the plugin that opened this got uninstalled out from under it
 
-        // A binary viewer (images, video) is read-only — no unsaved-edit concept to preserve, so
+        // A binary viewer (images, video) is read-only: no unsaved-edit concept to preserve, so
         // re-reading from disk is exactly as correct as asking the plugin and means a binary
         // viewer never has to implement lowarc:getContent at all, unlike a real editable one.
         const contents = viewer.viewer.binary
@@ -606,7 +606,7 @@
       }
 
       // opts.openInSplit: true forces this file into group 1, opening the split first if it isn't
-      // already — the file-explorer's "Open in Split View" context-menu item (see window.lowarc.
+      // already: the file-explorer's "Open in Split View" context-menu item (see window.lowarc.
       // openFile()'s new second argument in plugin_assets.rs) and, later, a cross-group tab drag
       // land here too, moving an already-open file rather than re-opening it.
       async function openFile(path, opts = {}) {
@@ -634,7 +634,7 @@
         let contents;
         try {
           // A viewer whose plugin.json marks itself "binary": true (images, video) gets its
-          // content read+base64'd by read_binary_file instead — read_text_file would force a
+          // content read+base64'd by read_binary_file instead. Read_text_file would force a
           // UTF-8 decode on bytes that were never text, corrupting them.
           contents = await invoke(viewer.viewer.binary ? "read_binary_file" : "read_text_file", { path });
         } catch (err) {
@@ -676,7 +676,7 @@
           file.iframe.contentWindow.postMessage({ type: "emit", event: "lowarc:refreshFile", payload: { path, contents } }, "*");
         } catch (err) {
           // Revert can also delete a path outright (one that didn't exist before the Draft
-          // touched it) — same "missing" state a file deleted out from under an open tab any
+          // touched it): same "missing" state a file deleted out from under an open tab any
           // other way already gets, not a hard error.
           file.missing = true;
         }

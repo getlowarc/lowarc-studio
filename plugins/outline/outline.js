@@ -1,14 +1,14 @@
-// Lightweight, per-language PATTERN MATCHING against raw source lines — not a real parser, and
+// Lightweight, per-language PATTERN MATCHING against raw source lines: not a real parser, and
 // deliberately not one: this app supports ~30 languages via Monaco, and only 4 of those get a
 // real AST from Monaco's own rich language services (see the session note on why this plugin
 // can't reach those anyway — cross-iframe, a separate Monaco instance's worker state isn't
 // reachable). A regex can't tell a real declaration from one that's inside a string or a comment,
-// and it can't see scope — this is genuinely best-effort, not exhaustive, and every result should
+// and it can't see scope: this is genuinely best-effort, not exhaustive, and every result should
 // be read that way. Every language not explicitly listed below falls back to GENERIC_PATTERNS, a
 // handful of common declaration keywords across many C-like/scripting languages — better than
 // nothing, not a promise of coverage.
 
-// Short words, not single letters — a bare "V" read as a chevron/checkmark glyph at this size in
+// Short words, not single letters: a bare "V" read as a chevron/checkmark glyph at this size in
 // practice (reasonable mistake, arrow-like shapes and single capital letters aren't that
 // different at 10px), which is actively misleading since these aren't buttons and don't expand
 // anything. A short word can't be mistaken for an icon.
@@ -21,7 +21,7 @@ const GENERIC_PATTERNS = [
 ];
 
 // name -> kind for a plain `NAME = value` line with no declaration keyword at all (Python,
-// shell-ish languages) — ALL_CAPS reads as a constant by convention in those languages even
+// shell-ish languages). ALL_CAPS reads as a constant by convention in those languages even
 // though nothing in the syntax itself distinguishes it, the same convention a human reader uses.
 function kindForBareAssignment(name) {
   return /^[A-Z][A-Z0-9_]*$/.test(name) ? "constant" : "variable";
@@ -157,7 +157,7 @@ function buildEditedLine(line, valueInfo, newValue) {
   return line.slice(0, valueInfo.start) + literal + line.slice(valueInfo.end);
 }
 
-// Only these three kinds can meaningfully have a "value" the way this feature means it — a
+// Only these three kinds can meaningfully have a "value" the way this feature means it: a
 // function/class name is an identifier, not a value slot, so there's nothing to extract for those.
 const VALUE_KINDS = new Set(["variable", "constant", "property"]);
 
@@ -184,7 +184,7 @@ function extractSymbols(path, contents) {
 
 const emptyEl = document.getElementById("empty");
 const listEl = document.getElementById("list");
-// Same chevron the file explorer draws for its own expand/collapse rows — a real one this time,
+// Same chevron the file explorer draws for its own expand/collapse rows: a real one this time,
 // not a kind-letter that happened to resemble one.
 const CHEVRON_SVG = '<svg viewBox="0 0 10 10" fill="none"><path d="M3 1l4 4-4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
@@ -200,7 +200,7 @@ function symbolKey(symbol) {
 }
 
 // Pushes an edited value into the file that's actually open, then updates this symbol's own
-// cached lineText/value in place — not a full re-extract-and-rerender, so a second edit to the
+// cached lineText/value in place: not a full re-extract-and-rerender, so a second edit to the
 // same line before the next natural refresh (see updateInspectorForActiveFile's own trigger
 // points in editor.html: file focus changes and saves, not every keystroke) still targets the
 // right offsets, and the control doesn't visually snap back to a stale value in the meantime.
@@ -211,7 +211,7 @@ function commitEdit(symbol, newValue) {
   symbol.value = extractValue(newLine) || symbol.value;
 }
 
-// Every value type EXCEPT boolean can be anything — a dropdown only makes sense when the full set
+// Every value type EXCEPT boolean can be anything: a dropdown only makes sense when the full set
 // of valid options is actually known ahead of time, which is only ever true here for true/false.
 // Numbers and strings stay a plain input for exactly that reason, not because a dropdown wouldn't
 // look nicer.
@@ -281,7 +281,7 @@ function render(path, symbols) {
     row.className = "outline-row" + (expanded ? " is-open" : "");
     row.title = `Line ${symbol.line}`;
 
-    // Only a symbol with an editable value actually expands into anything — a function/class row
+    // Only a symbol with an editable value actually expands into anything: a function/class row
     // gets the same reserved-but-invisible chevron space file explorer gives a leaf row, so names
     // still line up in a column instead of editable and non-editable rows drifting out of sync.
     const chevronEl = document.createElement("span");

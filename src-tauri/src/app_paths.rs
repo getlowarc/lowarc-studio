@@ -1,4 +1,4 @@
-// Where LowArc Studio's own files live — the Rust equivalent of lowarc/Core/AppPaths.cs, same
+// Where LowArc Studio's own files live: the Rust equivalent of lowarc/Core/AppPaths.cs, same
 // two-root split for the same reason: a source checkout keeps everything inside the repo (so dev
 // testing doesn't scatter state into a hidden per-user folder), an installed copy uses the
 // platform's real application-data location instead.
@@ -26,7 +26,7 @@ impl AppPaths {
     }
 
     /// The repo root when running from a source checkout (found by walking up from `install()`
-    /// looking for rust-toolchain.toml), or None for an installed copy — never assumed from
+    /// looking for rust-toolchain.toml), or None for an installed copy: never assumed from
     /// directory depth, same reasoning as AppPaths: an installed copy has no source tree above it.
     pub fn dev_root() -> Option<PathBuf> {
         Self::dev_root_from(&Self::install())
@@ -51,7 +51,7 @@ impl AppPaths {
     }
 
     /// Split out from `user_data()` so the installed-copy path is directly testable without
-    /// needing to fake the filesystem walk — same reason AppPaths exposes UserDataFor(devRoot).
+    /// needing to fake the filesystem walk: same reason AppPaths exposes UserDataFor(devRoot).
     pub fn user_data_for(dev_root: Option<&Path>) -> PathBuf {
         match dev_root {
             Some(root) => root.to_path_buf(),
@@ -78,7 +78,7 @@ impl AppPaths {
     pub fn settings_file() -> PathBuf {
         Self::user_data().join("settings.json")
     }
-    /// A JSON array of `{ path, pinned }` entries — see projects.rs for why this isn't a bare
+    /// A JSON array of `{ path, pinned }` entries. See projects.rs for why this isn't a bare
     /// path-per-line list (pinning needs somewhere to put per-entry state).
     pub fn recent_projects_file() -> PathBuf {
         Self::user_data().join("recent.json")
@@ -306,7 +306,7 @@ mod tests {
         std::fs::write(&dest, b"v1").unwrap();
         assert!(!needs_copy(&src, &dest).unwrap(), "dest is already at least as new as src");
 
-        // Force a real, filesystem-visible mtime gap — some filesystems only have 1-2s resolution,
+        // Force a real, filesystem-visible mtime gap. Some filesystems only have 1-2s resolution,
         // so a same-tick write here wouldn't reliably register as "newer" otherwise.
         std::thread::sleep(std::time::Duration::from_millis(1100));
         std::fs::write(&src, b"v2").unwrap();

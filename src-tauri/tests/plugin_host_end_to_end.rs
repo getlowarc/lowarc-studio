@@ -80,7 +80,7 @@ fn a_plugin_that_never_replies_times_out_instead_of_hanging() {
         r#"{"command":"powershell","args":["-NoProfile","-ExecutionPolicy","Bypass","-File","plugin.ps1"],"timeoutMs":300}"#,
     )
     .unwrap();
-    // Reads the request, then just sits there — never writes a reply. The host has to notice on
+    // Reads the request, then just sits there: never writes a reply. The host has to notice on
     // its own via the timeout, not by anything the plugin says.
     std::fs::write(dir.join("plugin.ps1"), "$line = [Console]::In.ReadLine()\nStart-Sleep -Seconds 30\n").unwrap();
 

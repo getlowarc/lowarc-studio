@@ -22,7 +22,7 @@
   #list { flex: 1; min-height: 0; overflow-y: auto; display: none; }
   #list.is-visible { display: block; }
 
-  /* Taller than a typical list row, with real padding, on purpose — this was cramped (24px,
+  /* Taller than a typical list row, with real padding, on purpose: this was cramped (24px,
      no padding) before, and once a field/dropdown lives inline on the same row (see .is-open
      below) it needs the extra height to not look squeezed. */
   .outline-row {
@@ -53,7 +53,7 @@
     text-overflow: ellipsis;
     font-family: var(--font-mono, monospace);
   }
-  /* Expanded (a value control is showing inline, same row) — the name stops claiming all the
+  /* Expanded (a value control is showing inline, same row): the name stops claiming all the
      leftover space so the control actually has room next to it, rather than being squeezed into
      whatever's left after a full-width name. */
   .outline-row.is-open .outline-name {

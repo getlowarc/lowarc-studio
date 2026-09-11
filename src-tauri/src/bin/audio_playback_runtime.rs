@@ -21,8 +21,8 @@
 // needing any other way to poll for it.
 //
 // `file` is resolved relative to the PROJECT root, captured from the "compile" phase's own
-// sourcePath — every module gets that on compile, not just whichever one is actually driving the
-// project's entry file (see runtime::process_module's request-building) — so this needs nothing
+// sourcePath: every module gets that on compile, not just whichever one is actually driving the
+// project's entry file (see runtime::process_module's request-building), so this needs nothing
 // project-specific hardcoded to find it.
 //
 // Cross-platform via rodio (Windows/macOS/Linux, itself built on cpal). A platform or environment
@@ -78,7 +78,7 @@ fn default_volume() -> f32 {
 struct ActiveSound {
     player: Player,
     looped: bool,
-    // The exact request that started this sound — so a later frame can tell "this handle's
+    // The exact request that started this sound, so a later frame can tell "this handle's
     // request is unchanged" (nothing to do) apart from "only volume/paused changed" (update in
     // place) apart from "the file/loop changed" (only volume/paused are adjustable live; anything
     // else means restarting the sound fresh, since rodio has no way to swap a Player's source
@@ -152,7 +152,7 @@ fn main() {
             }
             "frame" => {
                 // Gathered across every provider of the contract, in run order, rather than read
-                // from one privileged module's key — see the audio-cues README. Several modules
+                // from one privileged module's key. See the audio-cues README. Several modules
                 // can ask for sound at once without one of them being elected to speak for the
                 // others; the lists simply concatenate.
                 let requested: Vec<PlayRequest> = msg
@@ -175,7 +175,7 @@ fn main() {
                 if let Some(mixer) = mixer {
                     for req in &requested {
                         match active.get_mut(&req.handle) {
-                            // Same file/loop as before — volume and paused can both change live,
+                            // Same file/loop as before. Volume and paused can both change live,
                             // in either direction, without restarting the sound (position is kept
                             // exactly as rodio's Player already does internally).
                             Some(sound) if sound.request.file == req.file && sound.request.looped == req.looped => {
@@ -202,7 +202,7 @@ fn main() {
                                     active.insert(req.handle.clone(), ActiveSound { player, looped: req.looped, request: req.clone() });
                                 }
                                 Err(e) => {
-                                    // Not fatal to the module — one bad file shouldn't take down
+                                    // Not fatal to the module: one bad file shouldn't take down
                                     // every other sound already playing.
                                     reply_err(&e);
                                 }

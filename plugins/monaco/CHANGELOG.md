@@ -8,7 +8,7 @@ All notable changes to the Monaco Editor plugin are documented here. Format loos
 ### Added
 
 - Support for reloading an already-open file's content in place (`lowarc:refreshFile`), for when
-  something else changes a file on disk out from under the editor — the File Explorer's Draft
+  something else changes a file on disk out from under the editor: the File Explorer's Draft
   Tool is the first thing to use it, for Revert.
 
 ## 0.1.0 — 2026-08-28

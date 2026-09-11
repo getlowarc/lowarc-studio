@@ -1,7 +1,7 @@
 # Monaco Editor
 
 Code editor for opened files, powered by [Monaco](https://microsoft.github.io/monaco-editor/)
-(vendored from the `monaco-editor` npm package — see `LICENSE.md`).
+(vendored from the `monaco-editor` npm package; see `LICENSE.md`).
 
 ## Features
 
@@ -16,7 +16,7 @@ Code editor for opened files, powered by [Monaco](https://microsoft.github.io/mo
   the host's own Command Palette rather than a second, competing command surface.
 - The host's Edit menu (Undo/Redo/Cut/Copy/Find/Replace) and paste all route through here.
 - Reloads an already-open file's content in place when something else changes it on disk (e.g.
-  the File Explorer's Draft Tool reverting a file) — a distinct signal from opening a file for the
+  the File Explorer's Draft Tool reverting a file): a distinct signal from opening a file for the
   first time, so a normal open never clobbers in-progress edits.
 
 ## Settings

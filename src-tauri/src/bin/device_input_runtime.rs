@@ -1,10 +1,10 @@
-// A process module providing real OS keyboard/mouse/gamepad state — the input capability every
+// A process module providing real OS keyboard/mouse/gamepad state: the input capability every
 // game needs, with nothing project-specific about it (same "generic, reusable module" reasoning
 // as node_graph_runtime). Publishes, every frame:
 //   {"keyboard": {"keysDown": [...]},
 //    "mouse": {"x": .., "y": .., "buttonsDown": [1, 2, ...]},
 //    "gamepads": [{"id": .., "name": .., "buttonsDown": [...], "axes": {"LeftStickX": 0.5, ...}}]}
-// A project's OWN entry file/logic decides what any of that MEANS (which key does what) — this
+// A project's OWN entry file/logic decides what any of that MEANS (which key does what): this
 // module only ever reports what's physically true right now, the same "position/state only, no
 // interpretation" split node_graph_runtime already draws around what a node's files mean.
 //
@@ -20,7 +20,7 @@
 // meaningfully different, bigger piece of work than what's here, not a small addition to it.
 //
 // Platform coverage, honestly: keyboard/mouse polling (device_query) works on Windows, macOS, and
-// Linux/X11 specifically — NOT Linux/Wayland, for the same "no global input outside a window"
+// Linux/X11 specifically: NOT Linux/Wayland, for the same "no global input outside a window"
 // reason as tablets above. Gamepad polling (gilrs) covers Windows, macOS, Linux/BSD, and Wasm —
 // broader, since gamepads are read through a dedicated HID/joystick subsystem on every platform
 // rather than through the windowing server itself.
@@ -53,7 +53,7 @@ fn reply_err(error: &str) {
 fn poll_keyboard_and_mouse(device_state: &DeviceState) -> Map<String, Value> {
     let keys = device_state.get_keys();
     let mouse = device_state.get_mouse();
-    // button_pressed is 1-based (index 0 is always false, not a real button) — see MouseState's
+    // button_pressed is 1-based (index 0 is always false, not a real button). See MouseState's
     // own doc comment in device_query.
     let buttons_down: Vec<Value> = mouse.button_pressed.iter().enumerate().skip(1).filter(|(_, &down)| down).map(|(i, _)| Value::from(i)).collect();
 

@@ -20,7 +20,7 @@ All notable changes to the Vector Canvas module are documented here. Format loos
 
 ## 0.1.0 — 2026-09-07
 
-Initial release — the first module that gives a LowArc run a window.
+Initial release: the first module that gives a LowArc run a window.
 
 ### Added
 

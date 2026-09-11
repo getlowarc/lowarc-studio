@@ -27,7 +27,7 @@ pub const HARNESS_JS: &str = r#"(function () {
   try { delete window.__TAURI__; } catch (e) {}
   try { delete window.__TAURI_INTERNALS__; } catch (e) {}
 
-  // No system right-click menu anywhere a plugin doesn't build its own — a plugin that wants a
+  // No system right-click menu anywhere a plugin doesn't build its own: a plugin that wants a
   // context menu calls showMenu() below, whose own listener calls preventDefault() itself before
   // this ever runs, so that path is unaffected. Anything without one just gets no menu at all.
   window.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -58,7 +58,7 @@ pub const HARNESS_JS: &str = r#"(function () {
       // __lowarc.css wants this, and none of them should have to write code to stay in step with
       // the IDE's theme. __lowarc-theme.css already themed this document at load; this is only for
       // a theme CHANGED while the plugin is open, which a sandboxed iframe cannot otherwise notice
-      // without being reloaded — and reloading would throw away whatever the plugin was showing.
+      // without being reloaded, and reloading would throw away whatever the plugin was showing.
       // Custom properties only, so a malformed payload can't set arbitrary styles.
       const vars = data.vars && typeof data.vars === "object" ? data.vars : {};
       for (const [name, value] of Object.entries(vars)) {
@@ -67,7 +67,7 @@ pub const HARNESS_JS: &str = r#"(function () {
         }
       }
       // Applied above AND announced here, because a plugin whose colors don't all come from CSS has
-      // real work to do — Monaco owns its own theme system and would otherwise keep rendering the
+      // real work to do. Monaco owns its own theme system and would otherwise keep rendering the
       // editor surface in whatever theme it was told about at startup, however the page around it
       // restyles. Listeners run after the properties are set, so on("lowarc:theme") can just read
       // the ones it needs off documentElement.
@@ -109,14 +109,14 @@ pub const HARNESS_JS: &str = r#"(function () {
     markDirty(path, dirty) {
       window.parent.postMessage({ type: "host", action: "markDirty", path, dirty: Boolean(dirty) }, "*");
     },
-    // Same shape and reasoning as markDirty — a viewer with its own diagnostics (Monaco's marker
+    // Same shape and reasoning as markDirty: a viewer with its own diagnostics (Monaco's marker
     // list, today) tells the host whenever that set of errors becomes empty/non-empty, not what
     // the errors actually are; the host only needs a boolean to decorate a tab or file row with.
     markErrors(path, hasErrors) {
       window.parent.postMessage({ type: "host", action: "markErrors", path, hasErrors: Boolean(hasErrors) }, "*");
     },
     // Registers (replacing any previous set from this same plugin) this plugin's own Command
-    // Palette entries — the dynamic counterpart to plugin.json's static `commands` array (see
+    // Palette entries: the dynamic counterpart to plugin.json's static `commands` array (see
     // PluginCommand in protocol.rs). For a plugin whose available commands can't be known ahead of
     // time at manifest-authoring time (Monaco's own built-in editor actions, which vary by what's
     // actually registered at runtime) this is how it tells the host what to list instead. commands
@@ -136,7 +136,7 @@ pub const HARNESS_JS: &str = r#"(function () {
     editFile(path, line, text) {
       window.parent.postMessage({ type: "host", action: "editFile", path, line, text }, "*");
     },
-    // Any plugin can raise a toast/notification through the host's own system — see showToast()
+    // Any plugin can raise a toast/notification through the host's own system. See showToast()
     // in primitives.js, which is the SAME pipe host chrome's own errors/confirmations already go
     // through, not a separate plugin-only notification channel. Fire-and-forget: a plugin has
     // nothing to wait on here, same reasoning as markDirty/requestClose. variant is "info" |
@@ -145,13 +145,13 @@ pub const HARNESS_JS: &str = r#"(function () {
     notify(variant, message) {
       window.parent.postMessage({ type: "host", action: "notify", variant, message }, "*");
     },
-    // Opens (or activates, if already open) a file in the host's own tab bar — the open-files
+    // Opens (or activates, if already open) a file in the host's own tab bar: the open-files
     // list is core IDE state, not something any one plugin owns, so a file explorer (or anything
     // else that wants to open something) just asks the host to add to it rather than managing
     // its own separate notion of "what's open". Same direct-to-host channel as markDirty/
     // requestClose, for the same reason: nothing for this plugin's own backend to decide here.
     // opts.openInSplit: true opens (or moves an already-open file) into the second editor group,
-    // opening the split first if it isn't already — see the file explorer's "Open in Split View".
+    // opening the split first if it isn't already. See the file explorer's "Open in Split View".
     openFile(path, opts) {
       window.parent.postMessage({ type: "host", action: "openFile", path, openInSplit: Boolean(opts && opts.openInSplit) }, "*");
     },
@@ -164,17 +164,17 @@ pub const HARNESS_JS: &str = r#"(function () {
       window.parent.postMessage({ type: "host", action: "refreshFile", path }, "*");
     },
     // Pushes a { "<path>": {added, removed} } map into the status bar's per-active-file diff
-    // display — the File Explorer's Draft Tool is the only caller today, whenever its own
+    // display: the File Explorer's Draft Tool is the only caller today, whenever its own
     // diffCounts changes (a capture, a revert, a commit). Fire-and-forget, same reasoning as
     // markDirty: nothing for the caller to wait on, and the host re-renders reactively off
     // whichever file is actually active right now, not off this call's own timing.
     setDiffStatus(diffCounts) {
       window.parent.postMessage({ type: "host", action: "setDiffStatus", diffCounts: diffCounts || {} }, "*");
     },
-    // Generic "let the user pick a file for me to open" — a plugin has no filesystem access of
+    // Generic "let the user pick a file for me to open": a plugin has no filesystem access of
     // its own to browse with, so this asks the host to show its real native file picker instead
     // (options passed straight through to Tauri's dialog.open(), e.g. {filters: [{name, extensions}]}).
-    // Resolves to the picked absolute path, or null if cancelled — never rejects, same reasoning
+    // Resolves to the picked absolute path, or null if cancelled: never rejects, same reasoning
     // showMenu() gives for its own reject-into-null. Opening the result is a separate step
     // (openFile() above) rather than automatic, since a caller might want the path itself for
     // something else (e.g. remembering it, or reading it back through call()).
@@ -185,11 +185,11 @@ pub const HARNESS_JS: &str = r#"(function () {
         window.parent.postMessage({ type: "host", action: "pickOpenFile", id, opts: opts || {} }, "*");
       });
     },
-    // Generic "let the user pick where a brand-new file goes, then write it for me" — the
+    // Generic "let the user pick where a brand-new file goes, then write it for me": the
     // complement to pickOpenFile, for a plugin that wants a "New…" button of its own without ever
     // needing raw filesystem write access itself (opts.contents is what actually gets written,
     // "" if omitted). Resolves to the new file's absolute path, or null if the save dialog was
-    // cancelled — never rejects.
+    // cancelled: never rejects.
     createFile(opts) {
       return new Promise((resolve) => {
         const id = nextId++;
@@ -217,7 +217,7 @@ pub const HARNESS_JS: &str = r#"(function () {
     broadcastToSelf(event, payload) {
       window.parent.postMessage({ type: "host", action: "broadcastToSelf", event, payload: payload ?? null }, "*");
     },
-    // Fire-and-forget, same reasoning as markDirty/requestClose/openFile — a file explorer (or
+    // Fire-and-forget, same reasoning as markDirty/requestClose/openFile: a file explorer (or
     // anything else that mutates the filesystem) tells the host a path is gone or moved so the
     // host can flag that path's own tab as missing, if it happens to be open. Nothing for the
     // caller to wait on; the host doesn't own a reply for these the way saveFile needs one.
@@ -243,7 +243,7 @@ pub const HARNESS_JS: &str = r#"(function () {
         window.parent.postMessage({ type: "host", action: "stopSession", sessionId }, "*");
       },
     },
-    // Unlike markDirty/requestClose/openFile, this one needs a real answer — a write can fail
+    // Unlike markDirty/requestClose/openFile, this one needs a real answer: a write can fail
     // (disk full, permissions, the file having been deleted from under it), and the caller needs
     // to know before it clears its own "unsaved changes" state. Reuses the exact same id/pending/
     // "reply" plumbing as call() rather than inventing a second request/response mechanism; the
@@ -395,7 +395,7 @@ pub const HARNESS_JS: &str = r#"(function () {
 pub const CSP: &str = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; media-src 'self' data:; worker-src 'self' blob:; connect-src 'none'";
 
 /// The host's own base stylesheet (root color-token variables, plus reset/scrollbar/titlebar
-/// rules) — the literal same file every host page (editor.html, settings.html, etc.) already
+/// rules): the literal same file every host page (editor.html, settings.html, etc.) already
 /// links, via `include_str!` so this can never drift from it. Served at `__lowarc.css`.
 ///
 /// Opt-in: a plugin links it itself, nothing forces it. The `:root` block here is the DEFAULT
@@ -425,7 +425,7 @@ pub const SHARED_ICONS_JS: &str = include_str!("../../src/vendor/seti-icons/icon
 pub const SHARED_ICONS_WOFF: &[u8] = include_bytes!("../../src/vendor/seti-icons/seti.woff");
 
 /// A single-select dropdown matching the real IDE look (the CSS moved to primitives-shared.css
-/// for this specifically) with its own small standalone behavior — see dropdown-shared.js's own
+/// for this specifically) with its own small standalone behavior. See dropdown-shared.js's own
 /// header for why this isn't just reusing the host's fuller-featured one. Served at
 /// __lowarc-dropdown.js; exposes one function, `createLowarcDropdown(options, value, onChange)`.
 pub const SHARED_DROPDOWN_JS: &str = include_str!("../../src/dropdown-shared.js");

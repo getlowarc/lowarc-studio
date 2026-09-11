@@ -646,7 +646,7 @@
   min-width: 0;
 }
 
-/* A checkbox row's control IS its own label — nothing to duplicate on the right, so the whole row
+/* A checkbox row's control IS its own label: nothing to duplicate on the right, so the whole row
    collapses to just the control column plus the description growing to fill the rest. */
 .setting-row-control .checkbox-row {
   width: fit-content;

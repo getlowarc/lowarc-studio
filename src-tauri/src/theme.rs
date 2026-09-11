@@ -64,7 +64,7 @@ fn list_presets_in(dir: &Path) -> Vec<ThemePreset> {
     presets
 }
 
-/// Creating and overwriting both go through here — a preset is identified by its (slugified) name,
+/// Creating and overwriting both go through here: a preset is identified by its (slugified) name,
 /// so saving again under the same name is how a user updates one, not a separate operation.
 pub fn save_preset(preset: &ThemePreset) -> Result<(), String> {
     save_preset_in(&AppPaths::themes(), preset)
@@ -99,7 +99,7 @@ fn preset_path(dir: &Path, name: &str) -> PathBuf {
 
 // ---------- Theme resolution for plugins (see plugin_asset_server.rs's __lowarc-theme.css) ----------
 // theme.js does this same resolution client-side for the host's own pages, but it calls Tauri
-// commands (get_settings, list_theme_presets) a sandboxed plugin has no access to — this is the
+// commands (get_settings, list_theme_presets) a sandboxed plugin has no access to: this is the
 // server-side equivalent, computed fresh per request so a freshly-mounted/reloaded plugin panel
 // always reflects whatever's currently active. Values below are copied verbatim from theme.js's own
 // DARK_THEME/LIGHT_THEME constants — kept as functions, not `const`, since ThemeColors' fields are
@@ -304,7 +304,7 @@ mod tests {
         assert!(css.contains("@media (prefers-color-scheme: light)"));
         assert!(css.contains("--bg:#f5f5f7;"), "light values should appear inside the override");
         // The override has to come AFTER the plain block for the cascade to actually favor it when
-        // the media condition is true — same specificity either way, so source order decides.
+        // the media condition is true: same specificity either way, so source order decides.
         assert!(css.find("@media").unwrap() > css.find(":root").unwrap());
     }
 

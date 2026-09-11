@@ -1,5 +1,5 @@
 // Drives the real dev_run_host binary the way Studio does — spawn it on a launch.json, read its
-// stdout, write commands to its stdin — and proves the protocol both directions actually works.
+// stdout, write commands to its stdin, and proves the protocol both directions actually works.
 //
 // This is the load-bearing safety property of moving dev-run out of Studio's process: if the
 // control channel silently didn't work, a run would be unstoppable and undebuggable from the IDE
@@ -23,7 +23,7 @@ fn temp_dir(name: &str) -> PathBuf {
 // catch one that has WEDGED, and 30s still does that while tolerating a slow, contended start.
 
 /// Built by the same `cargo test` invocation that builds this test (both are targets of this one
-/// package), so it always lands beside the test executable's own directory's parent — the standard
+/// package), so it always lands beside the test executable's own directory's parent: the standard
 /// layout for a bin target's output.
 fn dev_run_host_bin() -> PathBuf {
     let mut dir = std::env::current_exe().expect("test executable path");
@@ -32,7 +32,7 @@ fn dev_run_host_bin() -> PathBuf {
     dir.join(if cfg!(windows) { "dev_run_host.exe" } else { "dev_run_host" })
 }
 
-/// Logs one line per frame and never stops on its own — so the run can only ever end because the
+/// Logs one line per frame and never stops on its own, so the run can only ever end because the
 /// test told it to, which is exactly what's being verified.
 fn write_ticking_module(dir: &Path) {
     std::fs::create_dir_all(dir).unwrap();
@@ -179,7 +179,7 @@ fn a_frame_count_breakpoint_set_over_the_wire_actually_pauses_and_reports_a_trac
     let mut stdin = child.stdin.take().expect("piped stdin");
     let stdout = BufReader::new(child.stdout.take().expect("piped stdout"));
 
-    // Sent the same way Studio sends it at spawn — if this doesn't cross the process boundary, no
+    // Sent the same way Studio sends it at spawn, if this doesn't cross the process boundary, no
     // frame trace can ever appear, since a freely-running loop never emits one.
     writeln!(stdin, "{}", serde_json::json!({"cmd": "setBreakpoints", "breakpoints": [{"kind": "frameCount", "count": 2}]})).unwrap();
     stdin.flush().unwrap();
@@ -215,7 +215,7 @@ fn a_frame_count_breakpoint_set_over_the_wire_actually_pauses_and_reports_a_trac
 fn a_module_that_starts_degraded_says_so_and_keeps_running() {
     // The gap this closes: a module missing something it needed (an audio device, a display) used
     // to run to completion doing nothing, indistinguishable from one that had nothing to do. Both
-    // halves matter — the reason has to surface, AND the module has to carry on, since degrading is
+    // halves matter: the reason has to surface, AND the module has to carry on, since degrading is
     // the intended behaviour rather than a failure.
     let root = temp_dir("degraded");
     let module_dir = root.join("ticker");
@@ -241,7 +241,7 @@ fn a_module_that_starts_degraded_says_so_and_keeps_running() {
     let mut sent_stop = false;
     // Kept so a failure can say what DID arrive. Without it the panic is just "expected line
     // missing", which on a machine you cannot reproduce on costs a whole CI round trip to learn
-    // nothing — the same gap that made the canvas's own failure opaque.
+    // nothing: the same gap that made the canvas's own failure opaque.
     let mut seen: Vec<String> = Vec::new();
 
     for line in stdout.lines().map_while(Result::ok) {

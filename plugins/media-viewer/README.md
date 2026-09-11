@@ -1,6 +1,6 @@
 # Media Viewer
 
-Views images, video, and audio in formats the browser already renders natively — no bundled
+Views images, video, and audio in formats the browser already renders natively: no bundled
 decoder, unlike Monaco/xterm. Exotic formats (RAW, PSD, HEIC, TIFF) aren't supported yet.
 
 ## Features
@@ -13,5 +13,5 @@ decoder, unlike Monaco/xterm. Exotic formats (RAW, PSD, HEIC, TIFF) aren't suppo
 
 ## Notes
 
-Runs fully offline in a sandboxed iframe with no network access — embedded art comes only from
+Runs fully offline in a sandboxed iframe with no network access. Embedded art comes only from
 what's already inside the audio file itself.

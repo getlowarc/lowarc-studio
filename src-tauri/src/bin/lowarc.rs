@@ -11,9 +11,9 @@
 // nothing to clean up. What is left is argument parsing, a log callback, and one call.
 //
 // Distinct from the other two run entry points on purpose:
-//   bin/lowarc_runtime.rs   the EXPORTED runtime — reads launch.json from its own directory, ships
+//   bin/lowarc_runtime.rs   the EXPORTED runtime. Reads launch.json from its own directory, ships
 //                           inside an exported game, knows nothing about a module store.
-//   bin/dev_run_host.rs     Studio's child — same run, plus a control protocol on stdin/stdout for
+//   bin/dev_run_host.rs     Studio's child: same run, plus a control protocol on stdin/stdout for
 //                           breakpoints, pause/step and stop.
 //   this                    a terminal, a project directory, and no IDE.
 
@@ -52,7 +52,7 @@ struct RunArgs {
     fps: u32,
 }
 
-/// Hand-rolled rather than pulling in an argument-parsing crate — this is one subcommand and two
+/// Hand-rolled rather than pulling in an argument-parsing crate: this is one subcommand and two
 /// options, and the error messages matter more than the machinery.
 fn parse_run_args(rest: &[String]) -> Result<RunArgs, String> {
     let mut project: Option<PathBuf> = None;
@@ -127,7 +127,7 @@ fn run(args: RunArgs) -> ! {
     let stop_flag = Arc::new(AtomicBool::new(false));
     // Ctrl+C sets the flag rather than killing the process, so the run ends through its normal path
     // and spawn_and_run still gets to send every module its `stop` phase. Without this a module
-    // never cleans up — see this crate's Cargo.toml note on the dependency. A failure to install the
+    // never cleans up. See this crate's Cargo.toml note on the dependency. A failure to install the
     // handler is not worth refusing to run over; it only costs a graceful Ctrl+C.
     let flag_for_handler = stop_flag.clone();
     if ctrlc::set_handler(move || flag_for_handler.store(true, Ordering::SeqCst)).is_err() {

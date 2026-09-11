@@ -33,7 +33,7 @@ pub fn resolve_command(folder: &Path, command: &str) -> PathBuf {
     PathBuf::from(command)
 }
 
-/// Spawns `exe` with `args`, working directory `folder`, stdin/stdout/stderr all piped — the one
+/// Spawns `exe` with `args`, working directory `folder`, stdin/stdout/stderr all piped: the one
 /// shape every caller here needs, since each reads/writes those pipes itself. Hides the console
 /// window Windows would otherwise pop up for a spawned CLI process (CREATE_NO_WINDOW); a no-op on
 /// every other platform.

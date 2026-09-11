@@ -1,9 +1,9 @@
 // List/install/remove for the two things a user installs into LowArc Studio: modules (game-side,
 // see runtime::project) and plugins (editor-side, see plugin_host). Kept separate from both of
 // those — they stay focused on resolving a project's requires and on starting/talking to running
-// plugin processes respectively — this is purely the "what's on disk, and manage it" concern
+// plugin processes respectively: this is purely the "what's on disk, and manage it" concern
 // behind the Modules/Plugins pages. "Disabled" is state this module doesn't own (it's persisted in
-// Settings) — every function here just takes the current disabled-id set as a parameter, same
+// Settings): every function here just takes the current disabled-id set as a parameter, same
 // dependency-injection-for-testability shape as everywhere else in this codebase.
 
 use crate::plugin_host::protocol::{Contributes, PluginCommand, PluginDescriptor, PluginSettingField};
@@ -43,16 +43,16 @@ pub struct PluginListItem {
     pub session: bool,
     pub website: Option<String>,
     pub icon: Option<String>,
-    /// What this plugin declares it provides — see plugin_host::protocol::Contributes. The
+    /// What this plugin declares it provides. See plugin_host::protocol::Contributes. The
     /// editor shell builds rail icons/console tabs from this directly. Plugins are invoked per
     /// call, not kept running, so there's no separate "is it actually running" status any more —
     /// `disabled` is the only state that matters.
     pub contributes: Contributes,
-    /// This plugin's own declared settings schema, if any — see PluginSettingField. Rendering the
+    /// This plugin's own declared settings schema, if any. See PluginSettingField. Rendering the
     /// actual fields (and reading/writing their current values) is the Settings page's job, not
     /// this list's; this is just "does this plugin have any, and what do they look like."
     pub settings: Vec<PluginSettingField>,
-    /// This plugin's own declared Command Palette entries, if any — see PluginCommand.
+    /// This plugin's own declared Command Palette entries, if any. See PluginCommand.
     pub commands: Vec<PluginCommand>,
 }
 
@@ -83,7 +83,7 @@ pub fn list_modules(modules_dir: &Path, disabled: &HashSet<String>) -> Vec<Modul
     items
 }
 
-/// Every installed plugin, read from disk — nothing to start or stop any more, plugins are
+/// Every installed plugin, read from disk: nothing to start or stop any more, plugins are
 /// invoked fresh per call (see plugin_host::protocol::invoke).
 pub fn list_plugins(plugins_dir: &Path, disabled: &HashSet<String>) -> Vec<PluginListItem> {
     let mut items = Vec::new();
@@ -121,7 +121,7 @@ pub fn list_plugins(plugins_dir: &Path, disabled: &HashSet<String>) -> Vec<Plugi
 
 /// Validates `source_dir` has a readable manifest.json with a non-empty id, refuses if that id is
 /// already installed, then copies the folder in. Returns the installed module's id. `on_progress`
-/// is called with (bytes copied so far, total bytes) as the copy proceeds — a module folder is
+/// is called with (bytes copied so far, total bytes) as the copy proceeds: a module folder is
 /// usually small enough this never even needs to be seen, but nothing enforces that, so this
 /// doesn't assume it.
 pub fn install_module(modules_dir: &Path, source_dir: &Path, on_progress: &mut dyn FnMut(u64, u64)) -> Result<String, String> {
@@ -144,7 +144,7 @@ pub fn install_module(modules_dir: &Path, source_dir: &Path, on_progress: &mut d
 }
 
 /// Validates `source_dir` has a readable plugin.json, refuses if a plugin folder with the same
-/// name is already installed (a plugin's id IS its folder name — see protocol.rs), then copies it
+/// name is already installed (a plugin's id IS its folder name; see protocol.rs), then copies it
 /// in. Returns the installed plugin's id. `on_progress`: see install_module's own note — this is
 /// the one that actually matters in practice, since a real plugin (Monaco's vendored ~24MB, say)
 /// is nowhere near instant to copy.
@@ -172,7 +172,7 @@ pub fn remove_module(modules_dir: &Path, id: &str) -> Result<(), String> {
 
 pub fn remove_plugin(plugins_dir: &Path, id: &str) -> Result<(), String> {
     // A destructive op (remove_dir_all), so this checks id itself rather than trusting a caller to
-    // only ever pass one straight from a real scanned list — same reasoning as
+    // only ever pass one straight from a real scanned list: same reasoning as
     // AppPaths::is_valid_component_id's other callers.
     if !crate::app_paths::AppPaths::is_valid_component_id(id) {
         return Err(format!("Invalid plugin id \"{id}\"."));
@@ -211,7 +211,7 @@ pub(crate) fn copy_dir_recursive(from: &Path, to: &Path) -> std::io::Result<()> 
 }
 
 /// Same copy as copy_dir_recursive, but calls `on_progress(bytes_done, total_bytes)` after every
-/// file. Byte-based, not file-count-based — a folder can be one huge file or hundreds of tiny
+/// file. Byte-based, not file-count-based: a folder can be one huge file or hundreds of tiny
 /// ones, and only bytes give a fraction that actually tracks how much work is left. total_bytes is
 /// computed once up front; nothing else should be writing into `from` mid-install, so a size
 /// changing out from under this isn't a case worth handling.

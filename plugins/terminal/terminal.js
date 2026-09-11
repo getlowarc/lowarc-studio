@@ -1,6 +1,6 @@
 // Multi-instance: this one iframe owns every open terminal tab, each a separate session (its own
-// PTY/shell process — see plugin_session.rs) identified by a sessionId this file mints itself
-// (crypto.randomUUID()). The host never knows "Terminal has instances" — it only knows session
+// PTY/shell process; see plugin_session.rs) identified by a sessionId this file mints itself
+// (crypto.randomUUID()). The host never knows "Terminal has instances". It only knows session
 // ids as opaque strings and relays lowarc:sessionOutput/lowarc:newTerminal by pluginId, same as
 // any other emit. All the instance bookkeeping (the sidebar, which one's visible, numbering) is
 // entirely this plugin's own business.
@@ -21,7 +21,7 @@ let configuredShell = null;
 let configuredFontSize = 13;
 let configuredScrollback = 1000;
 
-// Not just crypto.randomUUID() directly — this only needs to be unique within one running app
+// Not just crypto.randomUUID() directly: this only needs to be unique within one running app
 // instance, not cryptographically unguessable, and a sandboxed iframe without allow-same-origin
 // is an untested enough environment for the Web Crypto API that a fallback is worth having rather
 // than finding out live that instance creation silently breaks.
@@ -174,14 +174,14 @@ window.lowarc.on("lowarc:sessionOutput", (payload) => {
   }
 });
 
-// The host's console-header "+"/"..." controls (see editor.html), and — since Command Palette
-// entries below — the Command Palette's "Terminal: New Terminal" both ultimately call this one
+// The host's console-header "+"/"..." controls (see editor.html), and, since Command Palette
+// entries below: the Command Palette's "Terminal: New Terminal" both ultimately call this one
 // function, so there's exactly one code path for "open a terminal" regardless of which UI asked.
 window.lowarc.on("lowarc:newTerminal", (payload) => {
   createInstance(payload && payload.shell ? payload.shell : null);
 });
 
-// This plugin's own Command Palette entries (declared in plugin.json's `commands`) — the host
+// This plugin's own Command Palette entries (declared in plugin.json's `commands`): the host
 // sends every command the same generic way (an emit carrying just the id back), so this is the
 // one place that maps "new-terminal" onto what it actually means for this plugin.
 window.lowarc.on("lowarc:runCommand", (payload) => {
@@ -209,7 +209,7 @@ window.lowarc.getSettings().then((settings) => {
   createInstance(null);
 });
 
-// Live counterpart to the getSettings() read above — see set_plugin_setting/plugin-setting-changed
+// Live counterpart to the getSettings() read above. See set_plugin_setting/plugin-setting-changed
 // in lib.rs and its relay to lowarc:settingsChanged in split-view.js. shell stays "next instance
 // only" (see configuredShell's own comment above — that's existing terminal semantics, not a
 // limitation of this mechanism); fontSize/scrollback are genuinely live xterm.js options

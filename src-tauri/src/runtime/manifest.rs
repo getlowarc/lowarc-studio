@@ -1,4 +1,4 @@
-// Shared module-description types — same shape lowarc/Bootstrap already uses, and the same shape
+// Shared module-description types: same shape lowarc/Bootstrap already uses, and the same shape
 // project.json's preset list reuses (Dependency = {id, version}), so a project's "requires" and a
 // module's "requires" are literally the same schema at two different levels.
 
@@ -34,7 +34,7 @@ pub struct Dependency {
 impl Dependency {
     /// What this entry actually names in the module store. A contract requirement resolves to the
     /// contract module itself (that's what gets version-checked and installed); which modules end
-    /// up PROVIDING it is a separate, runtime question — see `providers_of` below.
+    /// up PROVIDING it is a separate, runtime question. See `providers_of` below.
     pub fn store_id(&self) -> &str {
         if self.id.is_empty() {
             &self.contract
@@ -49,7 +49,7 @@ impl Dependency {
 }
 
 /// One contract a module declares it speaks. Being listed here is the ONLY thing that makes a
-/// module eligible to fill a role — which is the whole point of the change this type exists for.
+/// module eligible to fill a role, which is the whole point of the change this type exists for.
 /// Before it, the only way to fill a role was to be NAMED the role (a module publishing under its
 /// own id meant `shared.director.draw` required a module whose id was literally "director"), so
 /// there could only ever be one of anything, and a module could not take a job without renaming
@@ -72,21 +72,21 @@ pub struct Manifest {
     /// Contracts this module speaks. See Provision.
     pub provides: Vec<Provision>,
     /// `"contract"` marks a manifest that DEFINES a vocabulary rather than implementing anything.
-    /// It resolves and version-checks like any other module — contracts are modules, which is what
-    /// lets them install and distribute through machinery that already exists — but it has no
+    /// It resolves and version-checks like any other module. Contracts are modules, which is what
+    /// lets them install and distribute through machinery that already exists, but it has no
     /// process, so the runtime never spawns it and it never publishes anything of its own. Any
     /// other value (or none) means an ordinary module.
     pub kind: Option<String>,
     /// Purely descriptive — shown in the Modules manage page, never read by resolve()'s
     /// dependency-closure logic (Dependency.version is the thing that's actually checked, and
-    /// isn't even satisfied yet — see resolve()'s own note on that gap).
+    /// isn't even satisfied yet; see resolve()'s own note on that gap).
     pub version: Option<String>,
     pub description: Option<String>,
-    /// Purely descriptive, shown in the Modules manage page's detail header — no marketplace
+    /// Purely descriptive, shown in the Modules manage page's detail header: no marketplace
     /// exists yet to link out to, but a locally-authored module can still point at its own repo.
     pub website: Option<String>,
     /// Path to an SVG/PNG within this module's own folder, read the same way a plugin's rail icon
-    /// is (see plugin_assets/loadRailIconSvg) — a missing/absent icon falls back to a generic
+    /// is (see plugin_assets/loadRailIconSvg): a missing/absent icon falls back to a generic
     /// placeholder on the frontend rather than this field being required.
     pub icon: Option<String>,
 }
@@ -174,7 +174,7 @@ pub fn requires_rank(infos: &[&ModuleInfo]) -> std::collections::HashMap<String,
                 continue;
             }
             // A contract requirement has to order this module after everything that PROVIDES the
-            // contract, not merely after the contract's own definition — the definition has no
+            // contract, not merely after the contract's own definition: the definition has no
             // process and publishes nothing, so ordering against it would guarantee nothing. This
             // is what keeps the shared/publish rule true for contracts: a consumer's frame sees
             // this tick's output from every provider, not last tick's.
@@ -228,7 +228,7 @@ mod tests {
 
     #[test]
     fn order_by_requires_puts_a_dependency_before_its_dependent_even_against_load_order() {
-        // consumer's loadOrder (1) is LOWER than producer's (2) — a naive loadOrder-only sort
+        // consumer's loadOrder (1) is LOWER than producer's (2): a naive loadOrder-only sort
         // would put consumer first, which is exactly the bug this function exists to not have:
         // spawn_and_run's whole shared/publish guarantee depends on this being requires-order, not
         // just declaration order.

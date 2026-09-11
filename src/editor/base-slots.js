@@ -45,7 +45,7 @@
 
         for (const contribution of contributions) {
           const closeable = contribution.closeable === true;
-          // A closeable tab hosts a real nested <button> (the close control) — buttons can't nest,
+          // A closeable tab hosts a real nested <button> (the close control). Buttons can't nest,
           // so it is a div standing in for one (role, tabindex, keydown-triggers-click). A
           // non-closeable tab stays a real <button>.
           const tab = document.createElement(closeable ? "div" : "button");
@@ -61,7 +61,7 @@
                 e.preventDefault();
                 tab.click();
               } else if ((e.key === "Delete" || e.key === "Backspace") && onClose) {
-                // The close button itself is deliberately NOT in the Tab order (see below) — this
+                // The close button itself is deliberately NOT in the Tab order (see below): this
                 // is the actual keyboard path to closing a tab, reachable the moment the tab
                 // itself has focus rather than requiring a second, invisible-until-hover target.
                 e.preventDefault();
@@ -161,12 +161,12 @@
         return (loadedSettings?.hiddenSlotItems?.[slot] || []).includes(id);
       }
 
-      // renderTabStrip rebuilds its buttons from scratch on every call (see its own comment) — that
+      // renderTabStrip rebuilds its buttons from scratch on every call (see its own comment): that
       // means whichever one was is-active loses that class too, since it's a fresh element with no
       // memory of it. The startup restore path (restoredSidebarActiveKey, below) already has to
       // solve this same problem once; toggling hidden state re-solves it here every time instead of
-      // only at load. A now-hidden active item legitimately has nothing to re-highlight — that's
-      // correct, not a bug — its content stays open regardless (a plugin's own tab or panel is never
+      // only at load. A now-hidden active item legitimately has nothing to re-highlight: that's
+      // correct, not a bug: its content stays open regardless (a plugin's own tab or panel is never
       // unmounted by any of this, only the tab/icon that points at it stops rendering).
       async function toggleSlotItemHidden(slot, id) {
         await updateSettings((fresh) => {
@@ -214,7 +214,7 @@
         });
       }
 
-      // Lists every contribution currently registered for `slot`, including hidden ones — the whole
+      // Lists every contribution currently registered for `slot`, including hidden ones: the whole
       // point of this menu is letting a hidden one be turned back on, so it can't just read what's
       // already shown. One click toggles that item and closes the menu (right-click again for more),
       // matching how every other menu in the app already behaves rather than inventing a
@@ -244,7 +244,7 @@
       });
 
       // extension (lowercase, dot-included) -> { pluginId, viewer }. Same "first wins, no silent
-      // override" rule showSlotTab's slot registry follows generally, for the same reason — two
+      // override" rule showSlotTab's slot registry follows generally, for the same reason: two
       // viewers silently fighting over one file type would be worse than an honest, logged
       // "already taken".
       const viewersByExtension = new Map();
@@ -333,11 +333,11 @@
         // this container also holds the maximize/close/new-terminal controls after its tabs.
         renderConsoleTabs();
 
-        // "__run" (Run) needs its one-time mount() — which reparents the static #console-run-panel
+        // "__run" (Run) needs its one-time mount(), which reparents the static #console-run-panel
         // out of console-body and into its own wrapper — to happen right now, unconditionally, not
         // just whenever a user happens to click the Run tab first. Until that reparenting happens,
         // #console-run-panel's own permanently-baked-in "is-active" class (see its static HTML)
-        // makes it render on its own regardless of any other tab's wrapper — a same-height phantom
+        // makes it render on its own regardless of any other tab's wrapper: a same-height phantom
         // sibling stacking underneath whatever tab genuinely is active, which shows up as
         // unexplained extra scroll height as soon as any other tab becomes active first. This does
         // not open the console panel, since activateConsoleTab() never does; it just establishes
@@ -345,7 +345,7 @@
         activateConsoleTab("__run");
 
         // [data-tabs] only marks .is-active in response to a real click (see initTabs() in
-        // primitives.js) — it doesn't know about restoredSidebarActiveKey, the tab that was active
+        // primitives.js). It doesn't know about restoredSidebarActiveKey, the tab that was active
         // when this layout was last saved (see savePanelLayout/loadPanelLayout). Re-activate that
         // same rail icon now that the icons actually exist, so a session that closed with a rail
         // tab selected reopens showing that same panel instead of an empty one.

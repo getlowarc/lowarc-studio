@@ -47,7 +47,7 @@
         --console-height: 0px;
       }
 
-      /* ---------- Menu Bar (also the window's caption row — see the grid-shell note above) ---- */
+      /* ---------- Menu Bar (also the window's caption row; see the grid-shell note above) ---- */
       .menu-bar {
         grid-area: menu;
         display: flex;
@@ -376,7 +376,7 @@
          script below), not a local .menu-dropdown — no positioning override needed here any more. */
 
       /* ---------- Left / right panels ---------- */
-      /* Darker than the center panel on purpose — see the background-shade section below. */
+      /* Darker than the center panel on purpose. See the background-shade section below. */
       .side-panel {
         display: flex;
         flex-direction: column;
@@ -483,7 +483,7 @@
         overflow: hidden;
       }
 
-      /* Off by default — split is a deliberate opt-in (see toggle-split), not a second pane that
+      /* Off by default. Split is a deliberate opt-in (see toggle-split), not a second pane that
          exists but happens to be empty. */
       .editor-group[data-group="1"] {
         display: none;
@@ -806,7 +806,7 @@
         padding: 6px 8px;
       }
 
-      /* The row header's enable/disable toggle — same .checkbox-row/.checkbox-box control as
+      /* The row header's enable/disable toggle: same .checkbox-row/.checkbox-box control as
          everywhere else, just sized down (12px vs. the default 16px) to sit comfortably beside a
          row's name/chevron instead of dominating the row the way a full-size one would. */
       .plugin-manager-row-toggle {
@@ -935,7 +935,7 @@
         margin-bottom: 10px;
       }
 
-      /* Just the Remove button now — the enable/disable toggle moved up into the row header itself
+      /* Just the Remove button now: the enable/disable toggle moved up into the row header itself
          (see .plugin-manager-row-toggle) — right-aligned rather than the old space-between (which
          existed to spread a checkbox label and this button apart; with one action left, flex-end
          reads better than a lone button stranded at the left edge). */

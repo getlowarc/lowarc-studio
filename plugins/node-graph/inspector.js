@@ -1,4 +1,4 @@
-// The Inspector half of this plugin — never touches graph data directly. It shows whatever the
+// The Inspector half of this plugin: never touches graph data directly. It shows whatever the
 // canvas iframe (node-graph.js) last pushed via window.lowarc.openInspector(), and sends edits
 // back the same way node-graph.js sends host actions — except there's no host action for "tell my
 // OTHER iframe something", so this uses window.lowarc.broadcastToSelf() instead, addressed by
@@ -20,7 +20,7 @@ const newNodeBtn = document.getElementById("ng-new-node-btn");
 // { path, nodeId, label, x, y, files, hasInput, hasOutput, inputs, outputs } | null — null before
 // anything's ever been selected, which is a legitimate state (the Inspector can be shown with
 // nothing to inspect yet if something else in this plugin ever calls openInspector() without a
-// node context). inputs/outputs are [{id, label}] — the OTHER nodes this node's input/output
+// node context). inputs/outputs are [{id, label}]: the OTHER nodes this node's input/output
 // connects to, a snapshot as of whenever this node was last selected (same as every other field
 // here — there's no live push back from the canvas while the Inspector stays open on one node).
 let current = null;
@@ -63,8 +63,8 @@ function renderFiles() {
   window.lowarc.initTooltips(filesList);
 }
 
-// The wiring itself only ever changes on the canvas by dragging a connection — this list is read-
-// only for THAT — but clicking a row still jumps you to the node it names (selects it, centers the
+// The wiring itself only ever changes on the canvas by dragging a connection: this list is read-
+// only for THAT, but clicking a row still jumps you to the node it names (selects it, centers the
 // canvas on it, and re-points the Inspector there), since "show me that one" is a real action even
 // when "rewire it from here" isn't. Hovering a row highlights that same node on the canvas (a
 // yellow outline, distinct from the cyan "selected" styling) so you can spot it before committing

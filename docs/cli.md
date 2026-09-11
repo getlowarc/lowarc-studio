@@ -1,4 +1,4 @@
-# `lowarc` — the command line
+# `lowarc`: the command line
 
 Runs a LowArc project without Studio.
 
@@ -28,7 +28,7 @@ be surprising in CI.
 
 ## Exit codes
 
-`0` when the run ends cleanly, `1` otherwise — a missing module, an unreadable entry file, a module
+`0` when the run ends cleanly, `1` otherwise: a missing module, an unreadable entry file, a module
 that failed to start. This is the part CI depends on, so it is covered by tests rather than assumed.
 
 ## What a run prints
@@ -47,16 +47,16 @@ Nothing ends a run on a timer. It ends when:
 
 Ctrl+C was verified by delivering a real `CTRL_C_EVENT` to a running `lowarc run` with a
 `vector-canvas` project: the CLI exits **0** — the graceful path, not the `0xC000013A` a hard
-console termination produces — and the canvas child exits with it rather than being orphaned.
+console termination produces, and the canvas child exits with it rather than being orphaned.
 
 It is checked by hand rather than in CI on purpose. Doing it requires attaching to another
 process's console (`AttachConsole` + `GenerateConsoleCtrlEvent`), which is Windows-specific and
-sensitive to the console the *test runner itself* happens to have — the same test reports a false
+sensitive to the console the *test runner itself* happens to have: the same test reports a false
 failure when its output is piped. A test that fails for reasons unrelated to the code is worse than
 no test.
 
 A project with no module that ever asks to stop will run until you interrupt it. That's correct
-behaviour, not a hang — a game loop has no natural end.
+behaviour, not a hang: a game loop has no natural end.
 
 Note that **hard-killing the process** (`taskkill /F`, a `timeout` wrapper) tears down modules
 mid-request, and the run reports `module did not respond in time` on its way out. That message at
@@ -74,7 +74,7 @@ Three binaries can run a project, deliberately kept separate:
 
 | | |
 | --- | --- |
-| `lowarc` | this — a terminal, a project directory, no IDE |
+| `lowarc` | this: a terminal, a project directory, no IDE |
 | `dev_run_host` | Studio's child process: the same run plus a control protocol for breakpoints, pause/step and stop |
 | `lowarc_runtime` | the exported runtime, shipped inside an exported game; reads `launch.json` from its own directory and knows nothing about a module store |
 
@@ -85,11 +85,11 @@ module set across a process boundary; the CLI is that process already, so it ski
 ## Not built yet
 
 - **Distribution.** The binary currently lives in `target/`. It is not on `PATH`, not bundled, and
-  not published — see `docs/updating.md` for the release story it would eventually ride along with.
+  not published. See `docs/updating.md` for the release story it would eventually ride along with.
   Options are a separate release artifact or an "install command line tools" action in Studio, the
   way VS Code installs `code`. Undecided.
 - **Per-module settings.** `lowarc` passes an empty settings object, the same gap Studio's own
-  dev-run has — nothing sources them from a project yet. This is why a canvas run currently uses its
+  dev-run has: nothing sources them from a project yet. This is why a canvas run currently uses its
   built-in defaults regardless of the project.
 - `lowarc check` (resolve without running) and `lowarc modules` (list what's installed). Both cheap
   to add; neither needed yet.

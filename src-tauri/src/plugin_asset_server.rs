@@ -3,12 +3,12 @@
 // this exists instead of a Tauri custom URI scheme (`plugin://...`): on Windows/WebView2, a
 // sub-frame navigation to a custom scheme silently never reaches the registered handler.
 //
-// Bound to an OS-assigned ephemeral port on 127.0.0.1 only — never reachable off the local
+// Bound to an OS-assigned ephemeral port on 127.0.0.1 only: never reachable off the local
 // machine. The frontend learns the port once, at startup, via the `plugin_asset_port` command
 // (lib.rs), and builds panel/viewer iframe URLs as `http://127.0.0.1:<port>/<plugin_id>/<path>`.
 //
 // Different plugin_ids all share this one origin (only the path differs), which would normally
-// let one plugin's script reach into another's iframe — but every panel/viewer iframe is
+// let one plugin's script reach into another's iframe, but every panel/viewer iframe is
 // `sandbox="allow-scripts"` with no `allow-same-origin`, so each gets its own opaque origin
 // regardless of the URL's real origin. Isolation comes from the sandbox attribute, not from this
 // server, so nothing extra is needed here for that.
@@ -47,7 +47,7 @@ fn respond(request: tiny_http::Request, status: u16, content_type: &str, body: V
 }
 
 // cacheable is what a plain `respond()` skips (a 404, or content computed fresh per-request like
-// __lowarc-theme.css) — everything a plugin actually renders with is genuinely static for the
+// __lowarc-theme.css): everything a plugin actually renders with is genuinely static for the
 // life of one running app, and Monaco alone is dozens of separate chunk files an iframe re-fetches
 // in full on every single mount otherwise — reopening a file, or opening a second instance for
 // split view, was paying that same multi-second cost again with nothing to show for it. Kept
@@ -62,7 +62,7 @@ fn respond_cacheable(request: tiny_http::Request, status: u16, content_type: &st
         .with_header(mk_header("Content-Type", content_type))
         .with_header(mk_header("Content-Security-Policy", CSP))
         // Every plugin iframe is sandbox="allow-scripts" with no allow-same-origin, so it has an
-        // opaque origin — the browser can never consider a request FROM it "same-origin" with
+        // opaque origin: the browser can never consider a request FROM it "same-origin" with
         // anything, including this literal server, no matter how the URL looks. Most resource
         // types (scripts, stylesheets, plain images) don't enforce CORS for that anyway, but
         // @font-face specifically does, so a font load from a sandboxed iframe fails with a bare
@@ -80,7 +80,7 @@ fn mk_header(name: &str, value: &str) -> tiny_http::Header {
 }
 
 fn handle(request: tiny_http::Request) {
-    // request.url() is path + query string — never the fragment (fragments are never sent to a
+    // request.url() is path + query string: never the fragment (fragments are never sent to a
     // server), which is exactly what the frontend relies on to pass project/file context without
     // it reaching this handler at all.
     let path = request.url().trim_start_matches('/').to_string();
@@ -88,7 +88,7 @@ fn handle(request: tiny_http::Request) {
     let plugin_id = parts.next().unwrap_or_default();
     let rel_path = parts.next().unwrap_or_default();
 
-    // Files the host serves itself, regardless of what's actually on disk for this plugin — the
+    // Files the host serves itself, regardless of what's actually on disk for this plugin: the
     // harness script every plugin loads unconditionally, plus two opt-in stylesheets (see
     // plugin_assets.rs's SHARED_STYLE_CSS/SHARED_PRIMITIVES_CSS) a plugin can link if it wants to
     // look like the IDE.
@@ -128,10 +128,10 @@ fn handle(request: tiny_http::Request) {
         return;
     }
     // Computed fresh every request (settings::load() reads settings.json from disk each time, not
-    // a cached value) — a plugin's iframe never re-fetches this on its own just because the user
+    // a cached value): a plugin's iframe never re-fetches this on its own just because the user
     // changed Appearance elsewhere, but at least a freshly-mounted or reloaded panel always gets
     // whatever's current, rather than whatever was active the moment the app happened to launch.
-    // NOT cacheable, unlike everything else here — the whole point is that it can change.
+    // NOT cacheable, unlike everything else here: the whole point is that it can change.
     if rel_path == "__lowarc-theme.css" {
         let css = theme::resolved_css(&settings::load().theme_mode);
         respond(request, 200, "text/css", css.into_bytes());

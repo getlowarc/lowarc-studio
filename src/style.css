@@ -29,7 +29,7 @@
   --yellow-dim: #332b00;
   --yellow-ink: #1a1600; /* text/icon color for content sitting on a yellow fill */
 
-  /* Single sharp colors, not tonal families like cyan/yellow — same reasoning for both: a status
+  /* Single sharp colors, not tonal families like cyan/yellow: same reasoning for both: a status
      color reads one way, it doesn't need a lighter/darker self to pair with. Green's hue sits at
      150° specifically to keep clear water between it and cyan's 180° — too close and a success
      accent next to an idle cyan control gets hard to tell apart at a glance. Info sits on the other
@@ -41,7 +41,7 @@
 
   --accent: var(--cyan);
 
-  /* The one monospace stack every page that shows code/paths/commands should use — was three
+  /* The one monospace stack every page that shows code/paths/commands should use. Was three
      independent copies of the same literal font-family list (primitives.css, editor.html) plus a
      fourth spot (settings.html) referencing a --font-mono that was never actually defined anywhere,
      silently falling back to the browser default instead. */
@@ -226,7 +226,7 @@ a {
 }
 
 /* ---------- Scrollbar ---------- */
-/* Global, not scoped to one container — the WebView2 host is Chromium, so ::-webkit-scrollbar is
+/* Global, not scoped to one container: the WebView2 host is Chromium, so ::-webkit-scrollbar is
    what actually renders there; scrollbar-width/scrollbar-color is the standard (Firefox) fallback
    for the same thin, borderless look. No hover-only reveal — a scrollbar that only appears on
    hover reads as "is this scrollable at all," which is worse than a visible slim one. */

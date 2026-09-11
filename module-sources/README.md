@@ -2,7 +2,7 @@
 
 Tracked source for LowArc Studio's first-party runtime modules. This is distinct from `/modules/`
 at the repo root, which is per-user runtime state (installed modules, gitignored, never
-committed) — the same relationship `/plugins/` has to a user's own installed plugins, just without
+committed): the same relationship `/plugins/` has to a user's own installed plugins, just without
 the "tracked by default" carve-out plugins get, since a module's real source lives in
 `src-tauri/src/bin/*.rs` and only its packaging (manifest, README, changelog) belongs here.
 
@@ -16,7 +16,7 @@ for built-in plugins.
 isn't actually runnable: `ProcessDescriptor::read` returns `None` and the runtime skips the module.
 A folder here that installs but won't run would be worse than no folder at all.
 
-Note that modules have no auto-install path — there is no module equivalent of
+Note that modules have no auto-install path: there is no module equivalent of
 `ensure_builtin_plugin_binaries()`, so getting a built binary next to its manifest is still a manual
 copy.
 
@@ -44,7 +44,7 @@ implementation. The runtime resolves them like any other module and never spawns
 
 A module says which contracts it speaks with `provides`, and reads one with
 `requires: [{ "contract": ... }]`. That is what replaced the old convention where filling a role
-meant being **named** the role — a module publishing under its own id meant `shared.director.draw`
+meant being **named** the role: a module publishing under its own id meant `shared.director.draw`
 could only ever come from a module whose id was literally `director`, so there could be exactly one
 of anything and no module could take a job without renaming itself into it.
 
@@ -66,7 +66,7 @@ otherwise leaves the module running, because degrading is the intended behaviour
 Use it whenever a module can't do its actual job but chooses to carry on anyway. `audio-playback`
 sends it when there's no output device, `vector-canvas` when no window could be created. Without it
 both simply did nothing for a whole run, indistinguishable from a project that never asked them to
-do anything — which is exactly how a display-less CI runner hid a real bug for a while.
+do anything, which is exactly how a display-less CI runner hid a real bug for a while.
 
 Purely additive: a module that never sends it is unaffected.
 

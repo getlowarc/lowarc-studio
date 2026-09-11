@@ -1,11 +1,11 @@
-// Pure event-driven viewer + controller — no backend of its own (no "command" in plugin.json).
+// Pure event-driven viewer + controller: no backend of its own (no "command" in plugin.json).
 // Every action here (pause/resume/step/setBreakpoints) is a generic window.lowarc method any
 // plugin could call, not something special-cased for this one; everything shown here arrives as a
 // relayed dev-run-frame/dev-run-ended Tauri event, same broadcast mechanism as lowarc:fileStatus.
 
 const DELETE_SVG = '<svg viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>';
 
-// The full, locally-held breakpoint list — always resent whole on any change (add or remove),
+// The full, locally-held breakpoint list: always resent whole on any change (add or remove),
 // matching set_breakpoints' own "replace everything" contract rather than tracking adds/removes
 // as separate operations the backend would have to reconcile.
 let breakpoints = [];
@@ -121,7 +121,7 @@ document.getElementById("bp-add-btn").addEventListener("click", () => {
   window.lowarc.debug.setBreakpoints(breakpoints);
 });
 
-// The plugin has no project access of its own (no window.__TAURI__, no filesystem) — the only way
+// The plugin has no project access of its own (no window.__TAURI__, no filesystem): the only way
 // it ever learns a real module name is by seeing one arrive in an actual frame trace. Feeding those
 // into the module-name fields' <datalist> turns "type a module name" from a guess into a pick,
 // without needing a new host capability just to ask "what modules does this project have".

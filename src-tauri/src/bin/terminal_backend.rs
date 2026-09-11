@@ -1,15 +1,15 @@
 // The Terminal plugin's backend — unlike every other plugin backend (see file_explorer_backend.rs
 // for the invoke-per-call reference), this one is a *session*-mode plugin (plugin.json's
-// "session": true — see plugin_host/protocol.rs and plugin_session.rs). It's spawned once and
-// stays running for as long as the terminal panel is open, not spawned fresh per call — a shell
+// "session": true; see plugin_host/protocol.rs and plugin_session.rs). It's spawned once and
+// stays running for as long as the terminal panel is open, not spawned fresh per call: a shell
 // genuinely needs persistent state (cwd, environment, a running foreground process) that a
 // one-shot process has nowhere to keep.
 //
 // Cross-platform by construction: `portable-pty` (the crate wezterm itself is built on) wraps
-// ConPTY on Windows and a real POSIX pty on Linux/macOS behind one uniform API — nothing in this
+// ConPTY on Windows and a real POSIX pty on Linux/macOS behind one uniform API: nothing in this
 // file is Windows-only or Unix-only, and nothing here should ever need a #[cfg(windows)]/
 // #[cfg(unix)] branch. The one shell-selection concern (Windows PowerShell vs pwsh vs bash/zsh) is
-// resolved by the *caller* (plugin_session.rs), not here — this binary just execs whatever command
+// resolved by the *caller* (plugin_session.rs), not here: this binary just execs whatever command
 // string it's given as its first argument.
 //
 // Wire protocol — JSON lines, both directions, for as long as the process lives (not one-shot):

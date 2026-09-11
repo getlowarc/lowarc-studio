@@ -2,23 +2,23 @@
 // primitives. Dropdowns, checkbox-dropdowns, and popups are driven entirely by data attributes,
 // so any page can drop in the markup from primitives.css with no per-instance wiring. A searchbar
 // needs a real data source to filter against, so it's exposed as a function (initSearchbar)
-// instead of auto-init, and a toast has no fixed markup to init — it's created on demand.
+// instead of auto-init, and a toast has no fixed markup to init, being created on demand.
 
-// The one checkmark glyph this app uses — a checkbox's own check, a menu's checked-item indicator
-// (menus.js), a manager panel's "Enabled" checkbox (plugin-hosting.js) — defined once here (loads
+// The one checkmark glyph this app uses: a checkbox's own check, a menu's checked-item indicator
+// (menus.js), a manager panel's "Enabled" checkbox (plugin-hosting.js). Defined once here (loads
 // first, see editor.html's script order) rather than hand-copied at each of those.
 const CHECKMARK_SVG = '<svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>';
 // Same X glyph plugins/terminal/terminal.js, plugins/debugger/debugger.js, and
-// plugins/node-graph/inspector.js each already declare their own copy of (as DELETE_SVG) — those
+// plugins/node-graph/inspector.js each already declare their own copy of (as DELETE_SVG). Those
 // are separate sandboxed plugin documents with no shared module system to pull this from, but a
 // host-side Remove control has no such excuse, so it lives here once.
 const DELETE_SVG = '<svg viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>';
 
-// Appends a .popup-actions row with a Cancel button plus one other action button — the shape most
+// Appends a .popup-actions row with a Cancel button plus one other action button, the shape most
 // simple popups need: a delete or discard confirmation, a create-with-validation form's
 // Cancel and Create pair. Returns the
 // confirm button so a caller needing more than a bare click listener (new-project's own async
-// validation, triggered by Enter in its input too — see menus.js) can hold onto it.
+// validation, triggered by Enter in its input too; see menus.js) can hold onto it.
 function appendConfirmActions(container, { cancelLabel = "Cancel", confirmLabel, confirmVariant = "confirm", onCancel, onConfirm } = {}) {
   const actions = document.createElement("div");
   actions.className = "popup-actions";
@@ -38,11 +38,11 @@ function appendConfirmActions(container, { cancelLabel = "Cancel", confirmLabel,
   return confirmBtn;
 }
 
-// Also matches .searchbar[data-open] (the header's command-center search — see initSearchbar
+// Also matches .searchbar[data-open] (the header's command-center search, see initSearchbar
 // below) even though it has no [data-dropdown] attribute of its own; it's a bespoke widget, not
 // one of the data-attribute-driven primitives above, but shares the same open/closed convention
-// and needs to close from the same triggers (outside click, Escape, and — see editor.html's
-// iframe focus listener — focus moving into a plugin iframe).
+// and needs to close from the same triggers: an outside click, Escape, and focus moving into a
+// plugin iframe (see editor.html's iframe focus listener).
 function closeAllDropdowns(except) {
   document.querySelectorAll('[data-dropdown][data-open="true"], .searchbar[data-open="true"]').forEach((el) => {
     if (el !== except) el.dataset.open = "false";
@@ -101,7 +101,7 @@ function initDropdowns(root = document) {
   });
 }
 
-// No system right-click menu anywhere the app doesn't build its own — a row/element with a custom
+// No system right-click menu anywhere the app doesn't build its own. A row or element with a custom
 // context menu (file-explorer's tree rows, via window.lowarc.showMenu()) calls preventDefault()
 // itself before this ever runs, so that path is unaffected; this only removes the default for
 // everything else. Plugin iframes get the equivalent listener from HARNESS_JS (plugin_assets.rs)
@@ -110,7 +110,7 @@ document.addEventListener("contextmenu", (e) => e.preventDefault());
 
 document.addEventListener("click", (e) => {
   // .searchbar is excluded from the outside-click check for the same reason closeAllDropdowns()
-  // itself now matches it (see that function's comment) — it has no [data-dropdown] attribute of
+  // itself now matches it (see that function's comment), and it has no [data-dropdown] attribute of
   // its own, so without this a click that OPENS it (via the input's own focus handler, see
   // initSearchbar) would immediately be undone by this same click bubbling here, closing it again
   // before it was ever visible. initSearchbar's own outside-click listener already excludes
@@ -151,7 +151,7 @@ function initNumericInputs(root = document) {
   });
 }
 
-// One selection behavior for both sidebar-tab and header-tab lists — they're the same "exactly
+// One selection behavior for both sidebar-tab and header-tab lists, which are the same "exactly
 // one active item" logic under different skins, driven by [data-tabs] wrapping [data-tab-value]
 // buttons.
 function initTabs(root = document) {
@@ -218,10 +218,10 @@ function initReorderable(container, { itemSelector = "[data-tab-value]", keyAttr
   }
 
   // Finds where, among the OTHER items in `targetContainer`, the pointer currently sits, and moves
-  // the (already-detached-looking, via .is-dragging) indicator there — before the first item whose
+  // the (already-detached-looking, via .is-dragging) indicator there, before the first item whose
   // midpoint the pointer has passed, or right after the last item if the pointer is past all of
   // them (never past the container's own trailing non-item children, e.g. the console's spacer/
-  // new-terminal controls — appendChild-ing straight onto the container would land the indicator
+  // new-terminal controls. appendChild-ing straight onto the container would land the indicator
   // there instead of at the actual end of the tab strip).
   function placeIndicatorIn(targetContainer, clientPos, dragging) {
     const others = itemsIn(targetContainer, dragging);
@@ -244,7 +244,7 @@ function initReorderable(container, { itemSelector = "[data-tab-value]", keyAttr
   container.addEventListener("pointerdown", (e) => {
     const item = e.target.closest(itemSelector);
     if (!item || !container.contains(item)) return;
-    // Checked against THIS item's own handle, not just any match on the page — a nested reorderable
+    // Checked against THIS item's own handle, not just any match on the page. A nested reorderable
     // would otherwise let a child's handle start a drag of its ancestor.
     if (handleSelector) {
       const handle = e.target.closest(handleSelector);
@@ -302,8 +302,8 @@ function initReorderable(container, { itemSelector = "[data-tab-value]", keyAttr
       }
     };
 
-    // A pointercancel (lost pointer capture — a system dialog, alt-tab, a touch/pen interruption)
-    // interrupts a drag the same way pointerup would, but without a real "drop" to commit — item
+    // A pointercancel, meaning lost pointer capture from a system dialog, alt-tab or a touch
+    // interruption, ends a drag the same way pointerup would but without a real drop to commit. The item
     // was never actually moved in the DOM during the drag (only the indicator was), so just
     // dropping the indicator and clearing state IS the revert; nothing to undo beyond that.
     const onCancel = (cancelEvent) => {
@@ -322,7 +322,7 @@ function initReorderable(container, { itemSelector = "[data-tab-value]", keyAttr
   });
 
   // A genuine drag still ends in a real click event on release (pointerup with no movement since
-  // the last frame doesn't prevent the browser's own click synthesis) — capture phase, same
+  // the last frame doesn't prevent the browser's own click synthesis). Capture phase, same
   // "observe and stop before the item's own click handler runs" shape as the rail's toggle-close
   // listener, so dragging a tab to reorder it doesn't also activate it as a side effect.
   container.addEventListener(
@@ -366,7 +366,7 @@ function initSearchbar(el, { options, onSelect, categories, previewLimit = 0 } =
     return button;
   };
 
-  // The chevron is always shown, not just when a group overflows previewLimit — a category with
+  // The chevron is always shown, not just when a group overflows previewLimit. A category with
   // fewer items (or none at all, e.g. Command Palette before there's a real command registry) still
   // renders its divider and chevron. The point is the section exists and is discoverable now; what
   // populates it is a separate, later concern. Expanding one with nothing to reveal is a harmless
@@ -418,11 +418,11 @@ function initSearchbar(el, { options, onSelect, categories, previewLimit = 0 } =
     shown.forEach((opt) => menu.appendChild(renderOption(opt)));
   };
 
-  // `cats`: the exact ordered category list to render — every one of them, whether or not it has
+  // `cats`: the exact ordered category list to render, every one of them, whether or not it has
   // any current matches (Command Palette shows up empty until there's a real command registry
   // behind it; that's the point, not a bug to gate around). truncatable: whether overflowing
   // groups get capped-with-a-chevron (browse view) or shown in full (a real search's actual
-  // results — nothing to truncate there, a query is already the user narrowing things down
+  // results, since there is nothing to truncate: a query is already the user narrowing things down
   // themselves).
   const renderGrouped = (matches, cats, truncatable) => {
     menu.innerHTML = "";
@@ -438,7 +438,7 @@ function initSearchbar(el, { options, onSelect, categories, previewLimit = 0 } =
   };
 
   // browsable: false (e.g. in-file search, before there's a query to search with) is the one thing
-  // that's STILL excluded here — a category with genuinely no meaning yet versus one that's simply
+  // that's STILL excluded here: a category with genuinely no meaning yet versus one that's simply
   // unpopulated are different states, and only the latter is what this update stopped hiding.
   const renderBrowse = () => {
     const browsableCats = (categories || []).filter((c) => c.browsable !== false);
@@ -492,9 +492,9 @@ function initSearchbar(el, { options, onSelect, categories, previewLimit = 0 } =
 
 // ---------- Base system: slot registry ----------
 // One shared content registry every "Base" region (sidebar, inspector, console, a center-panel
-// group, popups) reads from — replacing the copy of "plugin vs host content, open/close, active
+// group, popups) reads from, replacing the copy of "plugin vs host content, open/close, active
 // tab" logic that today lives separately in HOST_SIDEBAR_PANELS/pluginPanels/addSidebarRailIcon/
-// addConsoleTab/claimSingleSlot/openFiles (editor.html). Not a class hierarchy — one Map plus plain
+// addConsoleTab/claimSingleSlot/openFiles (editor.html). Not a class hierarchy: one Map plus plain
 // functions, same style as everything else in this file. Nothing calls contribute()/getSlot() yet;
 // each region migrates onto this one at a time (see the Base-system plan).
 const slotRegistry = new Map(); // slot id -> Contribution[]
@@ -503,7 +503,7 @@ const KNOWN_SLOTS = new Set(["sidebar", "inspector", "console", "center-0", "cen
 // contribution: { id, sourceType: "host" | "plugin", pluginId, label, icon, order, closeable,
 // when, mount }. id must be unique within this slot; mount(container) is called lazily, the first
 // time this contribution is actually shown (mirrors editor.html's mountPanelIframe "create once"
-// caching) — never eagerly, so a `when`-gated contribution that isn't currently shown never runs
+// caching), never eagerly, so a `when`-gated contribution that isn't currently shown never runs
 // whatever setup mount() does (a lesson from a related system's own regression: a hidden-but-
 // mounted section can still run background work, e.g. an interval, that a truly unmounted one
 // wouldn't).
@@ -520,7 +520,7 @@ function contribute(slot, contribution) {
 
 // Returns this slot's contributions, filtered by each contribution's own `when(ctx)` (default:
 // always shown) and sorted by declared `order` (default 0). The caller is expected to apply the
-// user's own drag-order on top of this as a final override — same two-step shape
+// user's own drag-order on top of this as a final override, the same two-step shape
 // sortByOrder()/applySavedOrder() already use in editor.html today.
 function getSlot(slot, ctx) {
   const list = slotRegistry.get(slot) || [];
@@ -586,7 +586,7 @@ function getToastStack() {
 
 // variant: "info" | "warning" | "success" | "error". duration is ms before auto-dismiss, or 0 to
 // require a manual close. source, if given, is the id of the plugin that asked for this (see
-// window.lowarc.notify() in plugin_assets.rs) — recorded in the notification history but not
+// window.lowarc.notify() in plugin_assets.rs), recorded in the notification history but not
 // shown in the toast itself, which has no room for attribution. Returns a dismiss() function so
 // the caller can close it early (e.g. once a longer operation the toast was reporting on has moved
 // past what it said).
@@ -669,7 +669,7 @@ function topPopup() {
 // plugin's cannot break anything here, since nothing calls into a plugin iframe directly.
 const FOCUSABLE_SELECTOR = "input, textarea, select, button, [tabindex]";
 
-// Every element inside `el` that's actually reachable by Tab right now — used both to pick the
+// Every element inside `el` that's actually reachable by Tab right now, used both to pick the
 // popup's initial focus target and to trap Tab at the popup's own boundary. Computed fresh on
 // every call rather than cached once, since mount()'d content (or a popup's own async rendering)
 // can add/remove focusable elements over the popup's lifetime. offsetParent === null filters out
@@ -682,7 +682,7 @@ function showPopup(id, target) {
   const contribution = getSlot("popups").find((c) => c.id === id);
   if (!contribution) return Promise.reject(new Error(`showPopup(): no popup contributed with id "${id}"`));
 
-  // Restored once this instance closes (see close() below) — without this, closing a popup whose
+  // Restored once this instance closes (see close() below). Without this, closing a popup whose
   // content focused something inside itself (see the initial-focus call at the end of this
   // function) drops focus to <body> the moment backdrop.remove() takes that element out of the
   // document, leaving a keyboard user with no idea where they are any more.
@@ -697,7 +697,7 @@ function showPopup(id, target) {
 
     const box = document.createElement("div");
     box.className = "popup" + (contribution.large ? " popup-large" : "") + (contribution.growToContent ? " popup-grow" : "");
-    // growToContent replaces the width story entirely (auto, capped near the viewport — see
+    // growToContent replaces the width story entirely (auto, capped near the viewport; see
     // .popup-grow) rather than layering on top of a fixed one, so an explicit `size` is ignored
     // when it's set; the two are different answers to the same question, not compatible together.
     if (contribution.size && !contribution.growToContent) box.style.width = `${contribution.size}px`;
@@ -735,7 +735,7 @@ function showPopup(id, target) {
       const idx = popupStack.indexOf(instance);
       if (idx !== -1) popupStack.splice(idx, 1);
       backdrop.remove();
-      // Only if it's still a real, visible part of the page — the thing that opened this popup
+      // Only if it's still a real, visible part of the page. The thing that opened this popup
       // may itself be gone by now (a manager row this popup just confirmed deleting, say), and
       // focusing a detached/hidden element either throws or silently does nothing useful.
       if (previouslyFocused && document.body.contains(previouslyFocused) && previouslyFocused.offsetParent !== null) {
@@ -751,7 +751,7 @@ function showPopup(id, target) {
 
     // Focus trap: Tab/Shift+Tab wraps at the popup's own first/last focusable element instead of
     // escaping to whatever's behind the (visually blocking, but not otherwise inert) backdrop.
-    // Only intercepts the wrap-around case — everything in between still tabs through normally.
+    // Only intercepts the wrap-around case; everything in between still tabs through normally.
     box.addEventListener("keydown", (e) => {
       if (e.key !== "Tab") return;
       const focusables = focusableIn(box);
@@ -787,7 +787,7 @@ function showPopup(id, target) {
   });
 }
 
-// Only the TOP popup reacts to Escape — closeOnBackdrop/closeOnEscape are read independently per
+// Only the TOP popup reacts to Escape, and closeOnBackdrop/closeOnEscape are read independently per
 // contribution rather than coupled, so a dialog that disables backdrop-click doesn't also lose its
 // only other way out.
 document.addEventListener("keydown", (e) => {
@@ -797,7 +797,7 @@ document.addEventListener("keydown", (e) => {
 });
 
 // ---------- Progress bar ----------
-// setProgress(el, fraction) is the only way callers should touch a .progress element — it owns
+// setProgress(el, fraction) is the only way callers should touch a .progress element, since it owns
 // both the fill width and the red->yellow->green color together, so nothing else has to re-derive
 // that color logic per caller. Reads --danger/--yellow/--success from computed style rather than
 // hard-coding their RGB values, so this automatically follows whatever theme (including a custom
@@ -808,7 +808,7 @@ function readThemeRgb(varName) {
   return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [128, 128, 128];
 }
 
-// Two segments (red->yellow, then yellow->green) rather than one gradient sampled at a point — a
+// Two segments (red->yellow, then yellow->green) rather than one gradient sampled at a point. A
 // straight three-stop RGB blend muddies through brown around the midpoint, which reads as neither
 // "warning" nor "progressing." Segmenting keeps every point along the way looking like an actual
 // traffic-light color, not an interpolated smear between them.
@@ -832,7 +832,7 @@ function setProgress(el, fraction) {
 
 // ---------- Settings registry (shared metadata for General + Plugins + search) ----------
 // Core (non-plugin) settings have no dynamic schema source the way a plugin's plugin.json does, so
-// this is the one hand-maintained list — add here as new core settings are introduced. Shape
+// this is the one hand-maintained list, so add here as new core settings are introduced. Shape
 // matches plugin_host::protocol::PluginSettingField (key/label/type/hint/placeholder/options) so
 // both flow through the exact same renderSettingRow() below; nothing downstream needs to know
 // "core" and "plugin" are different origins.
@@ -846,12 +846,12 @@ const CORE_SETTINGS_SCHEMA = [
   },
 ];
 
-// Flat list of every searchable setting — core + every installed plugin's declared fields — as
+// Flat list of every searchable setting, core plus every installed plugin's declared fields, as
 // pure metadata (id/label/hint/type/tab/source/category), no get/set. Any page with `invoke`
 // available can call this (editor.html for the header search, settings.html for its own
 // rendering); neither needs the other's document, since each layers its own value-plumbing on top
 // by id. `category: "settings"` is this list's own contribution to the header search's grouped
-// results (see initSearchbar's `categories` option) — distinct from `tab`, which is which
+// results (see initSearchbar's `categories` option), distinct from `tab`, which is which
 // settings.html tab an entry belongs to, a completely different grouping for a different UI.
 async function buildSearchableSettingsList() {
   const invoke = relayableInvoke;
@@ -896,11 +896,11 @@ async function buildSearchableSettingsList() {
 }
 
 // The one repeatable control+description row every settings surface renders (see .setting-row in
-// primitives.css) — General, Plugins, and the search view all call this, never hand-build their
+// primitives.css). General, Plugins and the search view all call this, never hand-build their
 // own field markup. `value` is the field's current string value; onCommit(newValue) fires on
-// change/blur — settings rows commit immediately, there's no separate "unsaved" state to track.
+// change/blur, since settings rows commit immediately and there is no "unsaved" state to track.
 // Callers must re-run initDropdowns()/initNumericInputs() after inserting rows with select/number
-// fields — same as any other dynamically-inserted primitive markup in this app.
+// fields, the same as any other dynamically-inserted primitive markup in this app.
 function renderSettingRow(entry, value, onCommit) {
   const row = document.createElement("div");
   row.className = "setting-row";
@@ -1060,14 +1060,14 @@ function reapplyTheme() {
 }
 
 /// Tells this document AND, when it's an iframe, its parent to re-read the theme. Called after
-/// anything that changes which theme is active — not after a mere colour preview, which is
+/// anything that changes which theme is active, but not after a mere colour preview, which is
 /// deliberately local to the Settings page until it's saved.
 function broadcastThemeChange() {
   reapplyTheme();
   if (window.parent !== window) relayCall("theme-changed").catch(() => {});
 }
 
-// Parent-side half — called from contributeIframePopup's own onMessage below, which has ALREADY
+// Parent-side half, called from contributeIframePopup's own onMessage below, which has ALREADY
 // verified e.source === this specific popup's own iframe.contentWindow before this ever runs, so
 // there's no separate trust check needed here: a plugin iframe (sandbox="allow-scripts", a
 // completely different, deliberately unprivileged trust level) is never the source of a message
@@ -1100,7 +1100,7 @@ function contributeIframePopup(id, { title, forwardEvents }) {
       iframe.src = ctx.target.url;
       container.appendChild(iframe);
 
-      // A stable closure, not rebuilt per-message — onTabClick/onButtonClick stay live across every
+      // A stable closure, not rebuilt per-message, so onTabClick and onButtonClick stay live across every
       // re-render (including the optimistic one a click itself triggers), so a second click never
       // finds itself talking to handlers a previous render nulled out.
       let latestTabs = [];
@@ -1144,7 +1144,7 @@ function contributeIframePopup(id, { title, forwardEvents }) {
   });
 }
 
-// The actual DOM-building behind contributeIframePopup's relay — a plain function (not tied to
+// The actual DOM-building behind contributeIframePopup's relay. A plain function (not tied to
 // postMessage) so it's just as usable by same-document popup content later, if anything ever wants
 // header tabs/buttons without going through an iframe. tabs: [{value, label}], buttons:
 // [{id, label, icon}]. Rebuilds from scratch on every call (cheap, and the only way to guarantee no
@@ -1178,7 +1178,7 @@ function renderPopupHeaderExtras(header, tabs, buttons, activeTab, { onTabClick,
   header.insertBefore(extras, closeBtn);
 }
 
-// Embedded-page side of the relay above — tells the parent popup (if this page is actually running
+// Embedded-page side of the relay above: tells the parent popup (if this page is actually running
 // inside one; a no-op otherwise, so the same call is safe regardless) what to render in ITS header.
 // spec: { tabs: [{value, label}], activeTab, buttons: [{id, label, icon}] }.
 function setPopupHeaderControls(spec) {
@@ -1186,7 +1186,7 @@ function setPopupHeaderControls(spec) {
   window.parent.postMessage({ type: "popup-header", ...spec }, "*");
 }
 
-// Embedded-page side — registers what happens when the parent-rendered header controls (from
+// Embedded-page side. Registers what happens when the parent-rendered header controls (from
 // setPopupHeaderControls) are actually clicked. onTabChange(value) / onButtonClick(id).
 function onPopupHeaderAction({ onTabChange, onButtonClick } = {}) {
   window.addEventListener("message", (e) => {
@@ -1247,7 +1247,7 @@ function initTooltips(root = document) {
 // editor's own rail, or these un-sandboxed Modules/Plugins popup pages — unlike a real plugin's
 // `sandbox="allow-scripts"` panel iframe, neither can treat a plugin/module-supplied icon as safe
 // by default). innerHTML already never runs an embedded <script> tag, but inline event-handler
-// attributes (onclick=, etc.) DO fire — those are the actual thing this strips.
+// attributes (onclick=, etc.) DO fire: those are the actual thing this strips.
 function sanitizeSvg(root) {
   root.querySelectorAll("script").forEach((el) => el.remove());
   root.querySelectorAll("*").forEach((el) => {
@@ -1270,7 +1270,7 @@ function parseSanitizedSvg(text) {
 }
 
 // ---------- Markdown rendering (Overview/Changelog tabs) ----------
-// Vendored marked.js (src/vendor/marked/marked.umd.js, MIT — see MARKED_LICENSE) — real CommonMark
+// Vendored marked.js (src/vendor/marked/marked.umd.js, MIT; see MARKED_LICENSE) — real CommonMark
 // support (tables, nested emphasis, the works) for ~44KB, the same vendor-a-real-library-under
 // src/vendor call this repo already makes for three.js/xterm.js/Monaco. Only modules.html/
 // plugins.html load the vendor script; everywhere else primitives.js is loaded (editor.html,
@@ -1324,7 +1324,7 @@ function renderMarkdown(text) {
 }
 
 // ---------- Item icon (Modules/Plugins detail header) ----------
-// A generic placeholder — same graceful-degradation shape as plugin-hosting.js's own
+// A generic placeholder: same graceful-degradation shape as plugin-hosting.js's own
 // FALLBACK_RAIL_ICON_SVG — for an item with no declared `icon`, or whose icon fails to load/parse.
 const FALLBACK_ITEM_ICON_SVG = '<svg viewBox="0 0 16 16" fill="none"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5" stroke="currentColor" stroke-width="1.3" /></svg>';
 
@@ -1686,7 +1686,7 @@ function createManagerPage(config) {
   }
 
   // ---------- Add ----------
-  // Progress lives in the page body, not next to the "Add …" button — that button is actually
+  // Progress lives in the page body, not next to the "Add …" button: that button is actually
   // rendered by the POPUP's own header (a different document, see contributeIframePopup/
   // setPopupHeaderControls below), so a bar can't sit beside it without extending that relay
   // protocol just for this. Still worth having: a folder like Monaco's vendored ~24MB is genuinely
@@ -1733,7 +1733,7 @@ function createManagerPage(config) {
   }
 
   // ---------- Popup header (Installed/Marketplace tabs + Add …, rendered by the popup shell
-  // itself — see setPopupHeaderControls()/onPopupHeaderAction() above) ----------
+  // itself; see setPopupHeaderControls()/onPopupHeaderAction() above) ----------
   function showOuterTab(value) {
     document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("is-active", p.id === `tab-panel-${value}`));
   }
@@ -1804,7 +1804,7 @@ async function initWindowControls(beforeClose) {
   // onCloseRequested in Tauri v2 — confirmed (tauri-apps/tauri#5288), and this app runs with
   // decorations:false, so that JS call IS the only "close" path our own X button has; gating it
   // right here, before ever calling .close(), is what actually protects it. onCloseRequested
-  // below is still worth wiring too — it DOES correctly fire for Alt+F4/a taskbar "close window",
+  // below is still worth wiring too. It DOES correctly fire for Alt+F4/a taskbar "close window",
   // the paths that don't go through our own button at all.
   async function requestClose() {
     if (beforeClose && !(await beforeClose())) return;

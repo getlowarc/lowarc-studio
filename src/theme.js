@@ -5,13 +5,13 @@
 //
 // Three theme-mode values live in Settings.themeMode: "system" (follow the OS), "light", "dark",
 // or the name of a user-saved custom preset (see theme.rs / settings.html's Appearance tab).
-// Built-in Light/Dark are plain constants here, not files — every install has them regardless of
+// Built-in Light/Dark are plain constants here, not files: every install has them regardless of
 // what's on disk.
 
 const THEME_CACHE_KEY = "lowarc-theme-cache";
 
 // Ordered schema for the whole app: camelCase key (matches theme.rs's ThemeColors/serde and what
-// Tauri commands send), the CSS custom property it drives, a human label, and a group — the
+// Tauri commands send), the CSS custom property it drives, a human label, and a group: the
 // Appearance page builds its color-editor grid straight from this instead of hand-listing fields.
 const THEME_TOKENS = [
   { key: "bg", cssVar: "--bg", label: "Background", group: "Neutrals" },
@@ -87,7 +87,7 @@ function systemPrefersDark() {
 }
 
 /// Rough perceived brightness of a #rrggbb, 0–1. Only ever used to answer "is this a light theme or
-/// a dark one", so the cheap Rec. 601 weighting is plenty — nothing here needs real colorimetry.
+/// a dark one", so the cheap Rec. 601 weighting is plenty: nothing here needs real colorimetry.
 function luminanceOf(hex) {
   const m = /^#?([0-9a-f]{6})$/i.exec((hex || "").trim());
   if (!m) return 0;
@@ -125,7 +125,7 @@ function applyThemeColors(colors) {
   try {
     localStorage.setItem(THEME_CACHE_KEY, JSON.stringify(colors));
   } catch {
-    // localStorage can throw in some restricted contexts — a failed cache write just means the
+    // localStorage can throw in some restricted contexts: a failed cache write just means the
     // next load repaints from scratch instead of instantly; not worth surfacing to the user.
   }
 }
@@ -141,7 +141,7 @@ function applyCachedThemeIfAny() {
 
 // Resolves Settings.themeMode against the OS / built-ins / saved presets and applies it. Safe to
 // call repeatedly (e.g. from the OS theme-change listener, or after saving a preset in the
-// Appearance page) — always re-reads current settings rather than assuming nothing changed.
+// Appearance page): always re-reads current settings rather than assuming nothing changed.
 async function resolveAndApplyTheme() {
   // Outside the real app (e.g. previewing a page through a plain static file server, with no
   // Tauri runtime injected) there's nowhere to read Settings.themeMode from — fall back to

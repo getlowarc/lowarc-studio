@@ -23,10 +23,10 @@ pub struct ProjectPreset {
 
 impl ProjectPreset {
     // A missing project.json is treated as an empty preset (no requires, no entry set), not an
-    // error — this app works as a plain editor over any folder, LowArc project or not, and
+    // error: this app works as a plain editor over any folder, LowArc project or not, and
     // project.json only matters once something actually needs a project-run feature (module
     // resolution, an entry file). One that exists but fails to PARSE is still a real error,
-    // though — that's a genuine problem with a file the user (or a previous run) actually wrote,
+    // though: that's a genuine problem with a file the user (or a previous run) actually wrote,
     // not an absence to quietly paper over.
     pub fn load(project_dir: &Path) -> Result<Self, String> {
         let path = project_dir.join("project.json");
@@ -57,14 +57,14 @@ pub fn resolve(preset: &ProjectPreset, modules_dir: &Path) -> Result<Vec<ModuleI
     // already been successfully resolved (and, same as before, against infinite requeueing on a
     // dependency cycle among successfully-installed modules — nothing here ever re-expands a
     // resolved module's own requires a second time). errored_ids only dedupes the ERROR MESSAGE
-    // for a given id — it does NOT prevent reprocessing the way resolved_ids does, since a missing
+    // for a given id. It does NOT prevent reprocessing the way resolved_ids does, since a missing
     // id referenced optionally by one module and mandatorily by another has to still surface as an
     // error the moment ANY mandatory reference to it shows up, however many optional references to
     // the same still-missing id came first.
     let mut resolved_ids: HashSet<String> = HashSet::new();
     let mut errored_ids: HashSet<String> = HashSet::new();
     let mut resolved: Vec<ModuleInfo> = Vec::new();
-    // (id, optional) — a project's own top-level requires is always mandatory (see Dependency's
+    // (id, optional): a project's own top-level requires is always mandatory (see Dependency's
     // own doc comment on why); only a MODULE's own manifest.requires can mark one optional.
     let mut queue: VecDeque<(String, bool)> = preset.requires.iter().map(|d| (d.store_id().to_string(), false)).collect();
 

@@ -12,11 +12,11 @@
 // a project actually installs for it.
 //
 // Advancing is deliberately NOT automatic from topology alone. A node with exactly one outgoing
-// connection does not immediately race to it — nothing here has any notion of "how long to wait",
+// connection does not immediately race to it: nothing here has any notion of "how long to wait",
 // and blasting through an entire linear sequence within the first frame would defeat the point of
 // having a sequence at all. Instead this module declares (in its own manifest.json) a fixed,
 // conventional, OPTIONAL dependency on a module with id "input" (optional so a project that never
-// installs one doesn't fail to run at all — see manifest::Dependency's own doc comment on why that
+// installs one doesn't fail to run at all; see manifest::Dependency's own doc comment on why that
 // distinction exists), and looks at shared.input.advanceTo (a node id) every frame — present and
 // directly reachable from the current node, it moves there; otherwise it stays exactly where it
 // is. No "input" module ships with this one (a real one — a player pressing a key, a timer, a
@@ -158,7 +158,7 @@ fn main() {
                     continue;
                 };
 
-                // The one input this module reads, not just publishes — see this file's own
+                // The one input this module reads, not just publishes. See this file's own
                 // header comment for why "input" is a fixed convention id rather than something
                 // configurable per project.
                 let requested = msg.pointer("/shared/input/advanceTo").and_then(|v| v.as_str());
