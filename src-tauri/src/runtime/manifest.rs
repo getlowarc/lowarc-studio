@@ -101,9 +101,8 @@ pub struct Provision {
     pub contract: String,
     /// The single concrete version of the contract this module implements ("1.0.0"), not a range.
     /// A provider states what it speaks; a consumer's Dependency::version states what it will
-    /// accept. NOT yet matched against each other: a requirement's range is checked against the
-    /// contract module's own version, but nothing yet checks that a given PROVIDER speaks a
-    /// dialect a given consumer accepts. See docs/modules.md on why that one is a design question.
+    /// accept. Matched by runtime::warn_about_contract_versions, which warns rather than refusing,
+    /// and travels on each gathered entry so a consumer can filter on it (mirror_onto_contracts).
     pub version: String,
     /// Anything in the JSON this struct has no field for. Captured rather than dropped so a
     /// misspelling ("contarct" for "contract") can be reported: silently parsing to a default is how a manifest ends

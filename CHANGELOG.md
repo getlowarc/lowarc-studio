@@ -27,6 +27,10 @@ means reading back through the commit log.
   whatever resolved to satisfy it, with real semver rather than a hand-rolled comparator. `"*"`
   still accepts anything, including a module that declares no version, since that is what a
   requirement written before ranges meant anything says.
+- Every gathered contract entry carries the `version` its provider claims to speak, alongside
+  `from`, and a provider whose version does not satisfy a consumer's range is warned about by name.
+  The entry is still gathered: one array per contract serves every consumer, so dropping it would
+  take it from consumers that were content with it.
 
 ### Changed
 

@@ -32,7 +32,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crate::runtime::child_process::{parse_log_severity, resolve_command, spawn_piped, STDERR_LOG_TRUNCATE_CHARS};
-use crate::runtime::manifest::{in_run_order, ModuleInfo};
+use crate::runtime::manifest::{in_run_order, ModuleInfo, Provision};
 use crate::runtime::runtime_loader::{self, Breakpoint, FrameModuleTrace, FrameTrace, LogFn, LogLevel, RunContext, RuntimeLoader};
 
 pub const DESCRIPTOR_NAME: &str = "process.json";
@@ -79,10 +79,11 @@ pub struct ProcessModule {
     /// state for keys in this list, never something it never declared depending on. No separate
     /// permission concept to introduce; requiring something already means "I depend on it."
     requires: Vec<String>,
-    /// Contracts this module declares it provides. Whatever it publishes is mirrored under each of
-    /// these alongside its own id, which is what lets a consumer read a ROLE without knowing which
-    /// module happens to be filling it. Empty for the overwhelming majority of modules.
-    provides: Vec<String>,
+    /// Contracts this module declares it provides, each with the version of that contract it
+    /// claims to speak. Whatever it publishes is mirrored under each of these alongside its own id,
+    /// which is what lets a consumer read a ROLE without knowing which module happens to be filling
+    /// it. Empty for the overwhelming majority of modules.
+    provides: Vec<Provision>,
     pub wants_frames: bool,
     timeout: Duration,
     stdin: Mutex<ChildStdin>,
@@ -101,7 +102,7 @@ impl ProcessModule {
         name: String,
         id: String,
         requires: Vec<String>,
-        provides: Vec<String>,
+        provides: Vec<Provision>,
         log: LogFn,
         stop_flag: Arc<AtomicBool>,
         breakpoints: Arc<Mutex<Vec<Breakpoint>>>,
@@ -336,7 +337,7 @@ pub fn spawn_and_run(descriptors: Vec<(&ModuleInfo, ProcessDescriptor)>, ctx: &R
             // exactly the key its gathered array lives under in shared, so the existing filter
             // below needs no special case for contracts at all.
             info.manifest.requires.iter().map(|d| d.store_id().to_string()).collect(),
-            info.manifest.provides.iter().map(|p| p.contract.clone()).collect(),
+            info.manifest.provides.clone(),
             ctx.log.clone(),
             ctx.stop_flag.clone(),
             ctx.debug.breakpoints.clone(),
@@ -448,17 +449,22 @@ pub struct ProcessLoader;
 /// would silently make a gathered draw list's z-order alphabetical. Entries append on first publish
 /// and update in place after, so the array is in run order, which already guarantees a provider ran
 /// before its consumers this tick.
-fn mirror_onto_contracts(shared: &mut serde_json::Map<String, Value>, id: &str, provides: &[String]) {
+fn mirror_onto_contracts(shared: &mut serde_json::Map<String, Value>, id: &str, provides: &[Provision]) {
     if provides.is_empty() {
         return;
     }
     let Some(state) = shared.get(id).cloned() else { return };
-    for contract in provides {
-        let list = shared.entry(contract.clone()).or_insert_with(|| Value::Array(Vec::new()));
+    for provision in provides {
+        let list = shared.entry(provision.contract.clone()).or_insert_with(|| Value::Array(Vec::new()));
         let Some(entries) = list.as_array_mut() else { continue };
         let mut entry = state.clone();
         if let Some(obj) = entry.as_object_mut() {
             obj.insert("from".into(), Value::String(id.to_string()));
+            // The version of the contract this provider claims to speak, so a consumer reading a
+            // gathered list can tell whose entry is which dialect. The engine warns about a
+            // mismatch (see runtime::warn_about_contract_versions) but does not drop the entry:
+            // one array serves every consumer, and consumers do not agree on what they accept.
+            obj.insert("version".into(), Value::String(provision.version.clone()));
         }
         match entries.iter().position(|e| e.get("from").and_then(|f| f.as_str()) == Some(id)) {
             Some(i) => entries[i] = entry,
@@ -505,11 +511,35 @@ impl RuntimeLoader for ProcessLoader {
 mod tests {
     use super::*;
 
+    /// Publishes as a provider speaking version 1.0.0 of each contract, which is the ordinary
+    /// case. Tests about version disagreement use publish_speaking.
     fn publish(shared: &mut serde_json::Map<String, Value>, id: &str, provides: &[&str], state: Value) {
+        let versioned: Vec<(&str, &str)> = provides.iter().map(|c| (*c, "1.0.0")).collect();
+        publish_speaking(shared, id, &versioned, state);
+    }
+
+    fn publish_speaking(shared: &mut serde_json::Map<String, Value>, id: &str, provides: &[(&str, &str)], state: Value) {
         let entry = shared.entry(id.to_string()).or_insert_with(|| Value::Object(Default::default()));
         entry.as_object_mut().unwrap().extend(state.as_object().unwrap().clone());
-        let provides: Vec<String> = provides.iter().map(|s| s.to_string()).collect();
+        let provides: Vec<Provision> = provides
+            .iter()
+            .map(|(c, v)| Provision { contract: c.to_string(), version: v.to_string(), ..Default::default() })
+            .collect();
         mirror_onto_contracts(shared, id, &provides);
+    }
+
+    #[test]
+    fn a_gathered_entry_carries_the_contract_version_its_provider_speaks() {
+        // One array serves every consumer, so the engine cannot drop a mismatched entry on one
+        // consumer's behalf. Tagging it is what lets a consumer that cares decide for itself.
+        let mut shared = serde_json::Map::new();
+        publish_speaking(&mut shared, "old", &[("draw-commands", "1.2.0")], json!({"draw": ["floor"]}));
+        publish_speaking(&mut shared, "new", &[("draw-commands", "2.0.0")], json!({"draw": ["fps"]}));
+
+        let gathered = shared["draw-commands"].as_array().unwrap();
+        assert_eq!(gathered[0]["version"], json!("1.2.0"));
+        assert_eq!(gathered[1]["version"], json!("2.0.0"));
+        assert_eq!(gathered[1]["from"], json!("new"), "and still says who it came from");
     }
 
     #[test]

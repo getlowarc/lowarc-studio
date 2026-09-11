@@ -284,11 +284,15 @@ version of whatever resolved to satisfy it, using real semver rather than a hand
 `"*"` still accepts anything, including a module that declares no version, since that is what every
 requirement written before ranges meant anything says.
 
-**What is not yet checked is the pairing that matters most for contracts**: whether a PROVIDER's
-declared contract version satisfies a CONSUMER's range. A module requiring `draw-commands ^1` is
-currently handed the commands of a provider speaking `2.0.0` without complaint. `shared` holds one
-array per contract, read by every consumer, so filtering it per consumer is a real design question
-rather than a missing `if`.
+**A provider speaking the wrong dialect is tagged and warned about, not dropped.** Every gathered
+entry carries the `version` its provider claims to speak alongside `from`, and the engine warns when
+that does not satisfy a consumer's range, naming both. The entry is still gathered: `shared` holds
+one array per contract that every consumer reads, so dropping it would take it from consumers that
+were perfectly happy with it. A consumer that cares can filter on `version` itself.
+
+That leaves the strict version unbuilt on purpose. Refusing the run would punish a module whose
+contract requirement is `optional` and which would rather see nothing, and per-consumer views of
+`shared` are a protocol change rather than a check.
 
 ## What this deliberately does not do
 

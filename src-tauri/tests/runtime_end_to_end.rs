@@ -148,6 +148,80 @@ fn a_manifest_field_nothing_reads_is_warned_about_without_stopping_the_run() {
     assert!(warned.contains("soundsFrom"), "and every unknown field, not just the first, got {warned}");
 }
 
+/// Tag-and-warn, on a real run. A provider speaking a contract version its consumer did not ask
+/// for is named out loud, and the run still happens: `shared` holds one array per contract that
+/// every consumer reads, so dropping the entry would take it from consumers that were content with
+/// it. A run that ABORTS here is the regression.
+#[test]
+fn a_provider_speaking_the_wrong_contract_version_is_warned_about_not_dropped() {
+    if !cfg!(windows) {
+        return;
+    }
+
+    let modules_dir = temp_dir("contract_version_modules");
+    write_fixture_module(&modules_dir, 3);
+    // echo consumes draw-commands ^1 ...
+    std::fs::write(
+        modules_dir.join("echo").join("manifest.json"),
+        r#"{"id":"echo","name":"Echo Module","version":"1.0.0","requires":[{"contract":"draw-commands","version":"^1","optional":true}]}"#,
+    )
+    .unwrap();
+    // ... the contract itself is at 1.0.0, so resolve() is satisfied ...
+    let contract = modules_dir.join("draw-commands");
+    std::fs::create_dir_all(&contract).unwrap();
+    std::fs::write(
+        contract.join("manifest.json"),
+        r#"{"id":"draw-commands","kind":"contract","name":"Draw Commands","version":"1.0.0","requires":[]}"#,
+    )
+    .unwrap();
+    // ... but the provider speaks 2.0.0, which is the pairing resolve() cannot see.
+    let painter = modules_dir.join("painter");
+    std::fs::create_dir_all(&painter).unwrap();
+    std::fs::write(
+        painter.join("manifest.json"),
+        r#"{"id":"painter","name":"Painter","version":"1.0.0","requires":[],"provides":[{"contract":"draw-commands","version":"2.0.0"}]}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        painter.join("process.json"),
+        r#"{"command":"powershell","args":["-NoProfile","-ExecutionPolicy","Bypass","-File","module.ps1"],"wantsFrames":true}"#,
+    )
+    .unwrap();
+    std::fs::copy(modules_dir.join("echo").join("module.ps1"), painter.join("module.ps1")).unwrap();
+
+    let project_dir = temp_dir("contract_version_project");
+    std::fs::write(
+        project_dir.join("project.json"),
+        r#"{"requires":[{"id":"echo","version":"*"},{"id":"painter","version":"*"}]}"#,
+    )
+    .unwrap();
+    let uc_dir = project_dir.join("uc");
+    std::fs::create_dir_all(&uc_dir).unwrap();
+    let entry = uc_dir.join("main.txt");
+    std::fs::write(&entry, "hello").unwrap();
+
+    let (log, messages) = collecting_logger();
+    let result = runtime::start_run(
+        &entry,
+        &project_dir,
+        &modules_dir,
+        30,
+        serde_json::json!({}),
+        Arc::new(AtomicBool::new(false)),
+        log,
+        runtime::runtime_loader::DebugHooks::disabled(),
+    );
+
+    assert!(result.is_ok(), "a version disagreement warns; it does not stop the run. Got {result:?}");
+    let messages = messages.lock();
+    let warned = messages
+        .iter()
+        .find(|m| m.contains("painter") && m.contains("draw-commands"))
+        .unwrap_or_else(|| panic!("no contract-version warning reached the console, got {messages:?}"));
+    assert!(warned.contains("2.0.0"), "say what the provider speaks, got {warned}");
+    assert!(warned.contains("^1"), "and what the consumer asked for, got {warned}");
+}
+
 #[test]
 fn an_external_stop_flag_ends_a_run_that_never_asks_to_stop_itself() {
     if !cfg!(windows) {
