@@ -12,4 +12,5 @@
 - [ ] Launched the app and used the thing that changed, if it touches the frontend (`src/` is
       compiled into the binary, so a rebuild is required before the change is even running)
 - [ ] No emoji, and no Unicode glyph standing in for an icon
-- [ ] Studio's version in `Cargo.toml` is untouched; that happens at release
+- [ ] Studio's version in `Cargo.toml` is untouched; a user-visible change is noted under
+      `## [Unreleased]` in CHANGELOG.md instead

@@ -49,8 +49,11 @@ Present tense, no trailing period, no prefix tags.
 ## Versioning
 
 Studio's version and the version of anything other people's code depends on follow different rules.
-Read [docs/versioning.md](docs/versioning.md) before bumping either. Do not bump Studio's version in
-a pull request; that happens at release.
+Read [docs/versioning.md](docs/versioning.md) before bumping either.
+
+Do not bump Studio's version in a pull request. Add a line to `## [Unreleased]` in
+[CHANGELOG.md](CHANGELOG.md) instead, if the change is one a user would notice. The number moves
+only when a release is cut, and Unreleased is what decides by how much.
 
 ## Plugins and modules
 

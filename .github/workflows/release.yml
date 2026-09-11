@@ -53,6 +53,23 @@ jobs:
           }
           Write-Host "Tag and Cargo.toml agree on $cargo"
 
+      # A release with no changelog section is a release nobody can read. Checked here because the
+      # step that gets forgotten is always the one nothing enforces: bumping Cargo.toml is required
+      # to tag at all, but moving Unreleased down is easy to skip and invisible until someone goes
+      # looking for what changed. Matches "## [x.y.z]" or "## x.y.z", both spellings being in use
+      # across this repo's changelogs.
+      - name: Check the changelog has a section for this version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}" -replace '^v', ''
+          $escaped = [regex]::Escape($tag)
+          # The trailing (\s|$) matters: without it, tag 0.5 matches a "## [0.59.0]" heading.
+          if (-not (Select-String -Path CHANGELOG.md -Pattern "^##\s+\[?$escaped\]?(\s|$)" -Quiet)) {
+            Write-Error "CHANGELOG.md has no section for $tag. Move [Unreleased] down to '## [$tag] - $(Get-Date -Format yyyy-MM-dd)' first."
+            exit 1
+          }
+          Write-Host "CHANGELOG.md documents $tag"
+
       # Everything CI already runs. A release should never be the first time these are checked, but
       # a tag can be pushed to a commit CI hasn't finished, so they run again here rather than being
       # assumed.

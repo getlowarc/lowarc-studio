@@ -17,7 +17,22 @@ derives from it:
 The major's **name** is the one thing Cargo cannot hold, so it lives in `NAMES` in
 `src-tauri/src/version.rs`. Majors get names; minors and patches do not.
 
-Bumping a release is one edit to `Cargo.toml`, then `git tag v<number>`.
+### Cutting a release
+
+1. Read `## [Unreleased]` in [CHANGELOG.md](../CHANGELOG.md). That is the list of what is going out,
+   which is why it gets written as work lands rather than reconstructed here.
+2. Pick the level: **the highest one present, incremented once.** A release holding four features
+   and nine fixes is a single minor bump, not thirteen bumps. This is the rule that makes a version
+   describe a release rather than a commit count.
+3. Edit `version` in `src-tauri/Cargo.toml`. Nothing else holds it.
+4. Move `## [Unreleased]` down to `## [x.y.z] - YYYY-MM-DD` and open a fresh empty Unreleased.
+5. Commit, then `git tag vx.y.z` and push the tag.
+
+The release workflow refuses to publish if the tag and `Cargo.toml` disagree, or if the changelog
+has no section for the version being tagged.
+
+A version moves **only** at step 3. Work lands on `main` with the number untouched, which is why
+the changelog is the thing that has to be kept current.
 
 ### What each level means
 
