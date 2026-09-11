@@ -82,11 +82,11 @@ impl RuntimeLoader for NativeLoader {
     }
 
     fn run(&self, modules: Vec<ModuleInfo>, ctx: &RunContext) -> Result<(), String> {
-        let load_order = crate::runtime::manifest::order_by_requires(modules);
+        let ordered = crate::runtime::manifest::in_run_order(modules);
         let host = native_module_host_path()?;
 
         let mut descriptors = Vec::new();
-        for info in &load_order {
+        for info in &ordered {
             if NativeDescriptor::read(&info.folder).is_none() {
                 (ctx.log)(LogLevel::Error, &format!("Module folder \"{}\" has no readable native.json — skipped.", info.folder.display()));
                 continue;

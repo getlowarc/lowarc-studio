@@ -98,6 +98,26 @@ pub fn resolve(preset: &ProjectPreset, modules_dir: &Path) -> Result<Vec<ModuleI
                     continue;
                 };
                 resolved_ids.insert(id);
+
+                // Two ways a manifest can encode the same fact twice and mean neither clearly.
+                // Both are the author's mistake, not the user's, so they say which module and
+                // which entry rather than just failing the run.
+                if manifest.is_contract() && folder.join("process.json").exists() {
+                    errors.push(format!(
+                        "Module \"{}\" is declared kind \"contract\" but ships a process.json. A contract \
+                         defines a vocabulary and never runs, so that process would be silently ignored. \
+                         Drop one of the two.",
+                        manifest.id
+                    ));
+                }
+                for dep in manifest.requires.iter().filter(|d| d.names_both()) {
+                    errors.push(format!(
+                        "Module \"{}\" requires both a module \"{}\" and a contract \"{}\" in one entry. \
+                         Those mean different things; split them into two entries.",
+                        manifest.id, dep.id, dep.contract
+                    ));
+                }
+
                 for dep in &manifest.requires {
                     // store_id(), not id: a contract requirement names the contract MODULE, which is
                     // what gets installed and version-checked. Which modules provide it is a
@@ -160,9 +180,49 @@ mod tests {
         let requires_json: Vec<String> = requires.iter().map(|r| format!(r#"{{"id":"{r}","version":"*"}}"#)).collect();
         std::fs::write(
             dir.join("manifest.json"),
-            format!(r#"{{"id":"{id}","name":"{id}","loadOrder":100,"requires":[{}]}}"#, requires_json.join(",")),
+            format!(r#"{{"id":"{id}","name":"{id}","priority":100,"requires":[{}]}}"#, requires_json.join(",")),
         )
         .unwrap();
+    }
+
+    /// Writes a manifest verbatim, for the malformed cases write_module can't express.
+    fn write_raw(modules_dir: &Path, folder_name: &str, manifest: &str, with_process: bool) {
+        let dir = modules_dir.join(folder_name);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("manifest.json"), manifest).unwrap();
+        if with_process {
+            std::fs::write(dir.join("process.json"), r#"{"command":"noop"}"#).unwrap();
+        }
+    }
+
+    #[test]
+    fn a_contract_that_also_ships_a_process_is_rejected_rather_than_half_ignored() {
+        let modules_dir = temp_dir("resolve_contract_with_process");
+        write_raw(&modules_dir, "c", r#"{"id":"a-contract","kind":"contract","name":"C","requires":[]}"#, true);
+
+        let preset = ProjectPreset { requires: vec![Dependency { id: "a-contract".into(), version: "*".into(), ..Dependency::default() }], ..Default::default() };
+        let errors = resolve(&preset, &modules_dir).expect_err("a contract with a process is a contradiction");
+
+        assert!(errors.iter().any(|e| e.contains("process.json")), "error should name the problem, got {errors:?}");
+    }
+
+    #[test]
+    fn a_requirement_naming_both_a_module_and_a_contract_is_rejected() {
+        let modules_dir = temp_dir("resolve_names_both");
+        write_raw(
+            &modules_dir,
+            "m",
+            r#"{"id":"confused","name":"Confused","requires":[{"id":"some-module","contract":"some-contract","version":"*"}]}"#,
+            false,
+        );
+
+        let preset = ProjectPreset { requires: vec![Dependency { id: "confused".into(), version: "*".into(), ..Dependency::default() }], ..Default::default() };
+        let errors = resolve(&preset, &modules_dir).expect_err("one entry cannot mean both");
+
+        assert!(
+            errors.iter().any(|e| e.contains("some-module") && e.contains("some-contract")),
+            "error should name both halves so the author can split them, got {errors:?}"
+        );
     }
 
     #[test]
@@ -204,7 +264,7 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(
             dir.join("manifest.json"),
-            format!(r#"{{"id":"{id}","name":"{id}","loadOrder":100,"requires":[{{"id":"{dep_id}","version":"*","optional":{optional}}}]}}"#),
+            format!(r#"{{"id":"{id}","name":"{id}","priority":100,"requires":[{{"id":"{dep_id}","version":"*","optional":{optional}}}]}}"#),
         )
         .unwrap();
     }

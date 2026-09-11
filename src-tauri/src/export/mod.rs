@@ -200,7 +200,7 @@ mod tests {
         let modules_dir = temp_dir("modules");
         let module_dir = modules_dir.join("echo-module");
         std::fs::create_dir_all(&module_dir).unwrap();
-        std::fs::write(module_dir.join("manifest.json"), r#"{"id":"echo","name":"Echo","loadOrder":1,"requires":[]}"#).unwrap();
+        std::fs::write(module_dir.join("manifest.json"), r#"{"id":"echo","name":"Echo","priority":1,"requires":[]}"#).unwrap();
         // Deliberately no native.json: this fixture isn't testing native_module_host bundling
         // (that has no test seam of its own yet; see export_folder's own comment on it), and
         // native_module_host_path()'s real filesystem lookups would make this flaky depending on

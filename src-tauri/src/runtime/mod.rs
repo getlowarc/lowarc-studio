@@ -99,7 +99,7 @@ pub fn run_from_launch_dir(dir: &Path, stop_flag: Arc<AtomicBool>, log: LogFn, d
         let manifest = Manifest::read(&folder).ok_or_else(|| vec![format!("{} has no readable manifest.json.", folder.display())])?;
         infos.push(ModuleInfo { folder, manifest });
     }
-    let modules = manifest::order_by_requires(infos);
+    let modules = manifest::in_run_order(infos);
 
     let loaders = runtime_loader::default_loaders();
     let loader = loaders.iter().find(|l| l.can_handle(&modules)).ok_or_else(|| {

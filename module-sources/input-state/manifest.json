@@ -4,6 +4,5 @@
   "name": "Input State",
   "version": "1.0.0",
   "description": "Pointer, keyboard and gamepad state published each frame by whatever is in a position to know it.",
-  "loadOrder": 0,
   "requires": []
 }

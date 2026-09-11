@@ -31,7 +31,7 @@ fn cli_bin() -> PathBuf {
 /// PowerShell interpreter on a contended CI runner, which has already cost this repo a red build.
 fn write_self_stopping_module(dir: &Path) {
     std::fs::create_dir_all(dir).unwrap();
-    std::fs::write(dir.join("manifest.json"), r#"{"id":"ticker","name":"Ticker","loadOrder":1,"requires":[]}"#).unwrap();
+    std::fs::write(dir.join("manifest.json"), r#"{"id":"ticker","name":"Ticker","priority":1,"requires":[]}"#).unwrap();
     std::fs::write(
         dir.join("process.json"),
         r#"{"command":"powershell","args":["-NoProfile","-ExecutionPolicy","Bypass","-File","module.ps1"],"wantsFrames":true,"timeoutMs":30000}"#,

@@ -21,7 +21,7 @@ fn temp_dir(name: &str) -> std::path::PathBuf {
 fn write_producer(modules_dir: &std::path::Path) {
     let dir = modules_dir.join("producer");
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("manifest.json"), r#"{"id":"producer","name":"Producer","loadOrder":1,"requires":[]}"#).unwrap();
+    std::fs::write(dir.join("manifest.json"), r#"{"id":"producer","name":"Producer","priority":1,"requires":[]}"#).unwrap();
     std::fs::write(
         dir.join("process.json"),
         r#"{"command":"powershell","args":["-NoProfile","-ExecutionPolicy","Bypass","-File","module.ps1"],"wantsFrames":true}"#,
@@ -61,7 +61,7 @@ fn write_consumer(modules_dir: &std::path::Path) {
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(
         dir.join("manifest.json"),
-        r#"{"id":"consumer","name":"Consumer","loadOrder":2,"requires":[{"id":"producer","version":"*"}]}"#,
+        r#"{"id":"consumer","name":"Consumer","priority":2,"requires":[{"id":"producer","version":"*"}]}"#,
     )
     .unwrap();
     std::fs::write(
@@ -107,7 +107,7 @@ while ($line = [Console]::In.ReadLine()) {
 fn write_bystander(modules_dir: &std::path::Path) {
     let dir = modules_dir.join("bystander");
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("manifest.json"), r#"{"id":"bystander","name":"Bystander","loadOrder":3,"requires":[]}"#).unwrap();
+    std::fs::write(dir.join("manifest.json"), r#"{"id":"bystander","name":"Bystander","priority":3,"requires":[]}"#).unwrap();
     std::fs::write(
         dir.join("process.json"),
         r#"{"command":"powershell","args":["-NoProfile","-ExecutionPolicy","Bypass","-File","module.ps1"],"wantsFrames":true}"#,

@@ -61,13 +61,13 @@ fn write_test_tone(path: &std::path::Path) {
 fn write_contract_module(modules_dir: &std::path::Path, id: &str) {
     let dir = modules_dir.join(id);
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("manifest.json"), format!(r#"{{"id":"{id}","kind":"contract","name":"{id}","loadOrder":0,"requires":[]}}"#)).unwrap();
+    std::fs::write(dir.join("manifest.json"), format!(r#"{{"id":"{id}","kind":"contract","name":"{id}","priority":0,"requires":[]}}"#)).unwrap();
 }
 
 fn write_audio_module(modules_dir: &std::path::Path) {
     let dir = modules_dir.join("audio-playback");
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("manifest.json"), r#"{"id":"audio-playback","name":"Audio Playback","loadOrder":1,"requires":[{"contract":"audio-cues","version":"^1","optional":true}]}"#).unwrap();
+    std::fs::write(dir.join("manifest.json"), r#"{"id":"audio-playback","name":"Audio Playback","priority":1,"requires":[{"contract":"audio-cues","version":"^1","optional":true}]}"#).unwrap();
     std::fs::write(dir.join("process.json"), r#"{"command":"audio_playback_runtime","args":[],"wantsFrames":true}"#).unwrap();
     let built_exe = std::path::PathBuf::from(env!("CARGO_BIN_EXE_audio_playback_runtime"));
     let file_name = if cfg!(windows) { "audio_playback_runtime.exe" } else { "audio_playback_runtime" };
@@ -80,7 +80,7 @@ fn write_audio_module(modules_dir: &std::path::Path) {
 fn write_director_module(modules_dir: &std::path::Path, tone_path: &std::path::Path) {
     let dir = modules_dir.join("director");
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("manifest.json"), r#"{"id":"director","name":"Test Director","loadOrder":1,"requires":[],"provides":[{"contract":"audio-cues","version":"^1"}]}"#).unwrap();
+    std::fs::write(dir.join("manifest.json"), r#"{"id":"director","name":"Test Director","priority":1,"requires":[],"provides":[{"contract":"audio-cues","version":"^1"}]}"#).unwrap();
     std::fs::write(
         dir.join("process.json"),
         r#"{"command":"powershell","args":["-NoProfile","-ExecutionPolicy","Bypass","-File","module.ps1"],"wantsFrames":true}"#,
@@ -116,7 +116,7 @@ while ($line = [Console]::In.ReadLine()) {{
 fn write_pausing_director_module(modules_dir: &std::path::Path, tone_path: &std::path::Path, paused_frames: u32) {
     let dir = modules_dir.join("director");
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("manifest.json"), r#"{"id":"director","name":"Test Director","loadOrder":1,"requires":[],"provides":[{"contract":"audio-cues","version":"^1"}]}"#).unwrap();
+    std::fs::write(dir.join("manifest.json"), r#"{"id":"director","name":"Test Director","priority":1,"requires":[],"provides":[{"contract":"audio-cues","version":"^1"}]}"#).unwrap();
     std::fs::write(
         dir.join("process.json"),
         r#"{"command":"powershell","args":["-NoProfile","-ExecutionPolicy","Bypass","-File","module.ps1"],"wantsFrames":true}"#,

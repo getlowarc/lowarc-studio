@@ -3,6 +3,5 @@
   "name": "Node Graph Runtime",
   "version": "0.1.0",
   "description": "Interprets a .lan node graph at runtime, advancing through it via optional input.",
-  "loadOrder": 1,
   "requires": [{ "id": "input", "version": "*", "optional": true }]
 }

@@ -4,6 +4,5 @@
   "name": "Audio Cues",
   "version": "1.0.0",
   "description": "A declarative list of what should be sounding right now, gathered from every module that makes sound.",
-  "loadOrder": 0,
   "requires": []
 }

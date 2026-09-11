@@ -119,12 +119,11 @@ its name. It gains one line saying which vocabulary it speaks. Same for every ot
   "id": "vector-canvas",
   "name": "Vector Canvas",
   "version": "0.2.0",
-  "loadOrder": 1,
   "requires": [
     { "contract": "draw-commands", "version": "^1", "optional": true }
   ],
   "provides": [
-    { "contract": "input-state", "version": "^1" }
+    { "contract": "input-state", "version": "1.0.0" }
   ]
 }
 ```
@@ -136,6 +135,18 @@ its name. It gains one line saying which vocabulary it speaks. Same for every ot
 - **`{ "id": ... }`** — the current form, still accepted, still meaning `module`. Existing manifests
   keep working.
 - **`provides`** is new, and it is what makes a module eligible to fill a role.
+
+Setting both `id` and `contract` on one entry means two different things at once, so `resolve()`
+rejects it and says to split them rather than silently picking one.
+
+The two `version` fields are deliberately different kinds of thing. On a **requirement** it is a
+RANGE (`^1`, `*`): what this module will accept. On a **provision** it is a single concrete
+version (`1.0.0`): what this module actually speaks. Matching one against the other is what
+version enforcement will mean, and it only works because they are not the same shape.
+
+There is no `priority` in the example because most manifests should not have one. It is a tiebreak
+between modules that nothing else orders, and `requires` always wins over it, so writing one when
+no tie exists states nothing. A contract never has one at all, since a contract never runs.
 
 `optional` keeps its current meaning exactly: nothing provides it, the module runs anyway and simply
 sees nothing under that key. That is how `vector-canvas` degrades to an empty window today, and it

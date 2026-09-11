@@ -72,14 +72,14 @@
         installDialogTitle: "Choose a module folder to install",
         addButtonLabel: "Add Module…",
         detailFields: (item) => [
-          { label: "Load order", value: String(item.loadOrder) },
+          { label: "Priority", value: item.priority === null ? "Unset. Ordered by what it requires." : String(item.priority) },
           { label: "Requires", value: item.requires.length ? item.requires.join(", ") : "Nothing." },
         ],
         // What VSCode's "Feature Contributions" tab conveys, for a module: what it plugs into the
         // load/requires graph with: same data as detailFields above, surfaced here too rather
         // than fetching anything new.
         contributionFields: (item) => [
-          { label: "Load order", value: String(item.loadOrder) },
+          { label: "Priority", value: item.priority === null ? "Unset. Ordered by what it requires." : String(item.priority) },
           { label: "Requires", value: item.requires.length ? item.requires.join(", ") : "Nothing." },
         ],
       });

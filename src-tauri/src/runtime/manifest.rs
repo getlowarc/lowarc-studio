@@ -5,6 +5,10 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
+/// Where a module with no stated priority sorts. Middling on purpose, so an unset module can be
+/// pushed either side of by one that does state a priority.
+pub const DEFAULT_PRIORITY: i32 = 100;
+
 #[derive(Debug, Default, Deserialize, Serialize, Clone)]
 #[serde(default)]
 pub struct Dependency {
@@ -19,8 +23,15 @@ pub struct Dependency {
     /// modules (kind: "contract"), so this resolves through the same store and the same version
     /// check; what differs is that the consumer then reads the published state of every module
     /// that PROVIDES it, not the contract's own (a contract publishes nothing — it has no process).
-    /// Mutually exclusive with `id` in practice; `id` wins if a manifest somehow sets both.
+    /// Mutually exclusive with `id`; setting both is rejected by project::resolve rather than
+    /// silently resolving one of them.
     pub contract: String,
+    /// A RANGE, not a version, despite the name: "^1", ">=2.1", "*". Called `version` because that
+    /// is what a dependency's range is called in every manifest format anyone has used before this
+    /// one (Cargo's `serde = { version = "1.0" }` is the same range-called-version). Compare with
+    /// Manifest::version and Provision::version, both of which are single concrete versions.
+    ///
+    /// Not enforced yet; see project::resolve's own note.
     pub version: String,
     /// False (the default): project::resolve() fails the run if this is not installed. True: a
     /// module that cooperates with another IF present, reading its published state, but has no
@@ -43,8 +54,17 @@ impl Dependency {
         }
     }
 
-    pub fn is_contract(&self) -> bool {
+    /// Whether this requirement NAMES a contract, as opposed to naming a module. Deliberately not
+    /// called is_contract: Manifest::is_contract means "I am a contract", and a requirement is
+    /// never one of those, it only points at one.
+    pub fn names_contract(&self) -> bool {
         self.id.is_empty() && !self.contract.is_empty()
+    }
+
+    /// A manifest that sets both `id` and `contract` means two different things at once, and there
+    /// is no reading of it that is obviously right. Reported rather than resolved.
+    pub fn names_both(&self) -> bool {
+        !self.id.is_empty() && !self.contract.is_empty()
     }
 }
 
@@ -58,6 +78,10 @@ impl Dependency {
 #[serde(default)]
 pub struct Provision {
     pub contract: String,
+    /// The single concrete version of the contract this module implements ("1.0.0"), not a range.
+    /// A provider states what it speaks; a consumer's Dependency::version states what it will
+    /// accept. Matching one against the other is what version enforcement will mean when it
+    /// arrives, and it only works if these two are different kinds of thing.
     pub version: String,
 }
 
@@ -66,8 +90,11 @@ pub struct Provision {
 pub struct Manifest {
     pub id: String,
     pub name: String,
-    #[serde(rename = "loadOrder")]
-    pub load_order: i32,
+    /// Tiebreak among modules that no `requires` relationship orders against each other, low
+    /// first. Not an order in its own right: `requires` always wins, so this only decides between
+    /// modules where nothing else has an opinion (see run_order). Unset means no opinion, which is
+    /// the honest answer for most modules and for every contract, since a contract never runs.
+    pub priority: Option<i32>,
     pub requires: Vec<Dependency>,
     /// Contracts this module speaks. See Provision.
     pub provides: Vec<Provision>,
@@ -96,7 +123,7 @@ impl Default for Manifest {
         Self {
             id: String::new(),
             name: "Unnamed Module".into(),
-            load_order: 100,
+            priority: None,
             requires: Vec::new(),
             provides: Vec::new(),
             kind: None,
@@ -140,16 +167,16 @@ pub struct ModuleInfo {
 /// Post-order DFS over Requires, seeded by LoadOrder, as each id's RANK in that walk (0 = runs
 /// first) rather than a reordered Vec: for a caller that only has borrowed ModuleInfos to work
 /// with (process_module::spawn_and_run, which doesn't own the list it was handed, so it can't
-/// consume-and-rebuild it the way order_by_requires below does; takes `&[&ModuleInfo]`, not
+/// consume-and-rebuild it the way in_run_order below does; takes `&[&ModuleInfo]`, not
 /// `&[ModuleInfo]`, specifically so that caller can pass borrowed references straight through).
-/// Both share this exact same walk; order_by_requires is just the by-value convenience on top of
+/// Both share this exact same walk; in_run_order is just the by-value convenience on top of
 /// it for a caller that does own its Vec. Identical to Bootstrap's launch_config::order_by_requires:
 /// a module loads after everything it requires, tolerant of cycles and missing ids.
-pub fn requires_rank(infos: &[&ModuleInfo]) -> std::collections::HashMap<String, usize> {
-    let mut load_order_seed: Vec<usize> = (0..infos.len()).collect();
-    load_order_seed.sort_by_key(|&i| infos[i].manifest.load_order);
+pub fn run_order(infos: &[&ModuleInfo]) -> std::collections::HashMap<String, usize> {
+    let mut priority_seed: Vec<usize> = (0..infos.len()).collect();
+    priority_seed.sort_by_key(|&i| infos[i].manifest.priority.unwrap_or(DEFAULT_PRIORITY));
 
-    let by_id: std::collections::HashMap<String, usize> = load_order_seed
+    let by_id: std::collections::HashMap<String, usize> = priority_seed
         .iter()
         .filter(|&&i| !infos[i].manifest.id.is_empty())
         .map(|&i| (infos[i].manifest.id.clone(), i))
@@ -178,7 +205,7 @@ pub fn requires_rank(infos: &[&ModuleInfo]) -> std::collections::HashMap<String,
             // process and publishes nothing, so ordering against it would guarantee nothing. This
             // is what keeps the shared/publish rule true for contracts: a consumer's frame sees
             // this tick's output from every provider, not last tick's.
-            if req.is_contract() {
+            if req.names_contract() {
                 for (dep_idx, info) in infos.iter().enumerate() {
                     if dep_idx != idx && info.manifest.provides_contract(&req.contract) {
                         visit(dep_idx, infos, by_id, seen, order);
@@ -194,18 +221,18 @@ pub fn requires_rank(infos: &[&ModuleInfo]) -> std::collections::HashMap<String,
         order.push(idx);
     }
 
-    for &idx in &load_order_seed {
+    for &idx in &priority_seed {
         visit(idx, infos, &by_id, &mut seen, &mut order);
     }
 
     order.into_iter().enumerate().map(|(rank, idx)| (infos[idx].manifest.id.clone(), rank)).collect()
 }
 
-/// By-value convenience over requires_rank, for a caller that owns its Vec and wants it physically
+/// By-value convenience over run_order, for a caller that owns its Vec and wants it physically
 /// reordered rather than just ranked.
-pub fn order_by_requires(mut infos: Vec<ModuleInfo>) -> Vec<ModuleInfo> {
+pub fn in_run_order(mut infos: Vec<ModuleInfo>) -> Vec<ModuleInfo> {
     let refs: Vec<&ModuleInfo> = infos.iter().collect();
-    let rank = requires_rank(&refs);
+    let rank = run_order(&refs);
     infos.sort_by_key(|i| rank.get(&i.manifest.id).copied().unwrap_or(usize::MAX));
     infos
 }
@@ -214,12 +241,12 @@ pub fn order_by_requires(mut infos: Vec<ModuleInfo>) -> Vec<ModuleInfo> {
 mod tests {
     use super::*;
 
-    fn info(id: &str, load_order: i32, requires: &[&str]) -> ModuleInfo {
+    fn info(id: &str, priority: i32, requires: &[&str]) -> ModuleInfo {
         ModuleInfo {
             folder: PathBuf::from(id),
             manifest: Manifest {
                 id: id.to_string(),
-                load_order,
+                priority: Some(priority),
                 requires: requires.iter().map(|r| Dependency { id: r.to_string(), ..Dependency::default() }).collect(),
                 ..Manifest::default()
             },
@@ -227,42 +254,42 @@ mod tests {
     }
 
     #[test]
-    fn order_by_requires_puts_a_dependency_before_its_dependent_even_against_load_order() {
-        // consumer's loadOrder (1) is LOWER than producer's (2): a naive loadOrder-only sort
+    fn in_run_order_puts_a_dependency_before_its_dependent_even_against_priority() {
+        // consumer's priority (1) is LOWER than producer's (2): a naive priority-only sort
         // would put consumer first, which is exactly the bug this function exists to not have:
         // spawn_and_run's whole shared/publish guarantee depends on this being requires-order, not
         // just declaration order.
         let infos = vec![info("consumer", 1, &["producer"]), info("producer", 2, &[])];
-        let ordered = order_by_requires(infos);
+        let ordered = in_run_order(infos);
         let ids: Vec<&str> = ordered.iter().map(|i| i.manifest.id.as_str()).collect();
         assert_eq!(ids, vec!["producer", "consumer"]);
     }
 
     #[test]
-    fn order_by_requires_is_tolerant_of_a_cycle_and_a_missing_id() {
+    fn in_run_order_is_tolerant_of_a_cycle_and_a_missing_id() {
         let infos = vec![info("a", 1, &["b"]), info("b", 2, &["a", "missing"])];
-        let ordered = order_by_requires(infos);
+        let ordered = in_run_order(infos);
         assert_eq!(ordered.len(), 2, "a cycle or a dangling requires id should never drop or duplicate a module");
     }
 
-    fn contract_consumer(id: &str, load_order: i32, contract: &str) -> ModuleInfo {
+    fn contract_consumer(id: &str, priority: i32, contract: &str) -> ModuleInfo {
         ModuleInfo {
             folder: PathBuf::from(id),
             manifest: Manifest {
                 id: id.to_string(),
-                load_order,
+                priority: Some(priority),
                 requires: vec![Dependency { contract: contract.to_string(), ..Dependency::default() }],
                 ..Manifest::default()
             },
         }
     }
 
-    fn contract_provider(id: &str, load_order: i32, contract: &str) -> ModuleInfo {
+    fn contract_provider(id: &str, priority: i32, contract: &str) -> ModuleInfo {
         ModuleInfo {
             folder: PathBuf::from(id),
             manifest: Manifest {
                 id: id.to_string(),
-                load_order,
+                priority: Some(priority),
                 provides: vec![Provision { contract: contract.to_string(), ..Provision::default() }],
                 ..Manifest::default()
             },
@@ -275,7 +302,7 @@ mod tests {
         // that indirection is the entire point, and it's exactly what a naive id-only walk misses.
         // Load order is set against the desired result so only the contract link can produce it.
         let infos = vec![contract_consumer("canvas", 1, "draw-commands"), contract_provider("some-director", 2, "draw-commands")];
-        let ordered = order_by_requires(infos);
+        let ordered = in_run_order(infos);
         let ids: Vec<&str> = ordered.iter().map(|i| i.manifest.id.as_str()).collect();
         assert_eq!(ids, vec!["some-director", "canvas"], "a provider must run before its consumer, or shared state is a tick stale");
     }
@@ -287,7 +314,7 @@ mod tests {
             contract_provider("world", 2, "draw-commands"),
             contract_provider("overlay", 3, "draw-commands"),
         ];
-        let ordered = order_by_requires(infos);
+        let ordered = in_run_order(infos);
         let ids: Vec<&str> = ordered.iter().map(|i| i.manifest.id.as_str()).collect();
         assert_eq!(ids.last(), Some(&"canvas"), "the consumer gathers from all of them, so it goes last: {ids:?}");
     }
@@ -297,7 +324,7 @@ mod tests {
         // The optional case, and the normal one for a project that hasn't written its director yet:
         // the canvas still runs, and simply draws nothing.
         let infos = vec![contract_consumer("canvas", 1, "draw-commands")];
-        let ordered = order_by_requires(infos);
+        let ordered = in_run_order(infos);
         assert_eq!(ordered.len(), 1);
     }
 
@@ -311,20 +338,20 @@ mod tests {
         // resolving to exactly what it always did.
         assert_eq!(module.store_id(), "vector-canvas");
         assert_eq!(bare.store_id(), "vector-canvas");
-        assert!(!module.is_contract() && !bare.is_contract());
+        assert!(!module.names_contract() && !bare.names_contract());
 
         // A contract resolves through the same store (contracts are modules), but is read from
         // the gathered key rather than from one module's own published state.
         assert_eq!(contract.store_id(), "draw-commands");
-        assert!(contract.is_contract());
+        assert!(contract.names_contract());
     }
 
     #[test]
-    fn requires_rank_agrees_with_order_by_requires() {
+    fn run_order_agrees_with_in_run_order() {
         let a = info("consumer", 1, &["producer"]);
         let b = info("producer", 2, &[]);
         let refs = vec![&a, &b];
-        let rank = requires_rank(&refs);
+        let rank = run_order(&refs);
         assert!(rank["producer"] < rank["consumer"], "producer should rank before consumer, got {rank:?}");
     }
 }

@@ -3,7 +3,6 @@
   "name": "Audio Playback",
   "version": "0.3.0",
   "description": "Plays sound files, cross-platform, with pause/resume, looping and live volume.",
-  "loadOrder": 1,
   "requires": [{ "contract": "audio-cues", "version": "^1", "optional": true }],
   "provides": []
 }

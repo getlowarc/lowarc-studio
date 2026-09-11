@@ -36,7 +36,7 @@ fn write_interpreter_module(modules_dir: &std::path::Path) {
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(
         dir.join("manifest.json"),
-        r#"{"id":"node-graph-runtime","name":"Node Graph Runtime","loadOrder":1,"requires":[{"id":"input","version":"*","optional":true}]}"#,
+        r#"{"id":"node-graph-runtime","name":"Node Graph Runtime","priority":1,"requires":[{"id":"input","version":"*","optional":true}]}"#,
     )
     .unwrap();
     std::fs::write(dir.join("process.json"), r#"{"command":"node_graph_runtime","args":[],"wantsFrames":true}"#).unwrap();
@@ -45,13 +45,13 @@ fn write_interpreter_module(modules_dir: &std::path::Path) {
     std::fs::copy(&built_exe, dir.join(file_name)).unwrap();
 }
 
-// Publishes {"advanceTo": "n2"} starting on its second frame — this module's own loadOrder (2,
+// Publishes {"advanceTo": "n2"} starting on its second frame — this module's own priority (2,
 // after node-graph-runtime's 1) doesn't actually matter for ordering here; node-graph-runtime
 // REQUIRES "input", and that's what puts it after input in the requires-DFS regardless.
 fn write_input_module(modules_dir: &std::path::Path) {
     let dir = modules_dir.join("input");
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("manifest.json"), r#"{"id":"input","name":"Fake Input","loadOrder":2,"requires":[]}"#).unwrap();
+    std::fs::write(dir.join("manifest.json"), r#"{"id":"input","name":"Fake Input","priority":2,"requires":[]}"#).unwrap();
     std::fs::write(
         dir.join("process.json"),
         r#"{"command":"powershell","args":["-NoProfile","-ExecutionPolicy","Bypass","-File","module.ps1"],"wantsFrames":true}"#,

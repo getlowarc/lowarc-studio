@@ -33,7 +33,7 @@ fn runs_a_native_module_end_to_end_via_dlopen() {
     let modules_dir = temp_dir("modules");
     let module_dir = modules_dir.join("native-echo");
     std::fs::create_dir_all(&module_dir).unwrap();
-    std::fs::write(module_dir.join("manifest.json"), r#"{"id":"native-echo","name":"Native Echo","loadOrder":1,"requires":[]}"#).unwrap();
+    std::fs::write(module_dir.join("manifest.json"), r#"{"id":"native-echo","name":"Native Echo","priority":1,"requires":[]}"#).unwrap();
     std::fs::write(module_dir.join("native.json"), r#"{"library":"lowarc_studio_native_fixture"}"#).unwrap();
     std::fs::copy(&built_dll, module_dir.join("lowarc_studio_native_fixture.dll")).unwrap();
 

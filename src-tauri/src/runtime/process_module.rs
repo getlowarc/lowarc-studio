@@ -32,7 +32,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crate::runtime::child_process::{parse_log_severity, resolve_command, spawn_piped, STDERR_LOG_TRUNCATE_CHARS};
-use crate::runtime::manifest::{order_by_requires, ModuleInfo};
+use crate::runtime::manifest::{in_run_order, ModuleInfo};
 use crate::runtime::runtime_loader::{self, Breakpoint, FrameModuleTrace, FrameTrace, LogFn, LogLevel, RunContext, RuntimeLoader};
 
 pub const DESCRIPTOR_NAME: &str = "process.json";
@@ -74,7 +74,7 @@ pub struct ProcessModule {
     /// store_id). Either way it is a key in the shared map, which is what lets the filter below
     /// treat both kinds identically.
     ///
-    /// The same list already decides load order (see manifest::order_by_requires), doing double
+    /// The same list already decides load order (see manifest::in_run_order), doing double
     /// duty as the shared-state visibility rule: this module's frame() only ever sees published
     /// state for keys in this list, never something it never declared depending on. No separate
     /// permission concept to introduce; requiring something already means "I depend on it."
@@ -310,7 +310,7 @@ fn spawn_stderr_reader(stderr: std::process::ChildStderr, log: LogFn, name: Stri
 
 /// Spawns one ProcessModule per `(info, descriptor)` pair and drives them through
 /// compile, start, the frame loop and stop, in requires-order. That ordering must come from
-/// manifest::requires_rank rather than raw load_order: two modules can declare any loadOrder
+/// manifest::run_order rather than raw priority: two modules can declare any priority
 /// regardless of what they require, and only a requires-DFS guarantees a producer runs before its
 /// consumers, which the shared/publish design depends on for correctness.
 ///
@@ -347,17 +347,17 @@ pub fn spawn_and_run(descriptors: Vec<(&ModuleInfo, ProcessDescriptor)>, ctx: &R
         }
     }
 
-    // Requires-order, not just raw loadOrder: the same DFS manifest::order_by_requires uses,
+    // Requires-order, not just raw priority: the same DFS manifest::in_run_order uses,
     // exposed here as requires_rank() since this function only ever borrows its ModuleInfos (it
-    // doesn't own descriptors, so it can't consume-and-reorder the way order_by_requires does).
+    // doesn't own descriptors, so it can't consume-and-reorder the way in_run_order does).
     // This is what makes the "a consumer's frame() runs after its dependency's" guarantee spelled
-    // out in this function's own header comment actually hold: a plain loadOrder-only sort here
-    // would NOT have guaranteed it (two modules can declare any loadOrder numbers regardless of
-    // what they actually require), so run_from_launch_dir (which already called order_by_requires
+    // out in this function's own header comment actually hold: a plain priority-only sort here
+    // would NOT have guaranteed it (two modules can declare any priority numbers regardless of
+    // what they actually require), so run_from_launch_dir (which already called in_run_order
     // itself) and start_run (which resolves modules via project::resolve — plain BFS, not
     // requires-ordered at all) would have disagreed on something this basic.
     let module_infos: Vec<&ModuleInfo> = descriptors.iter().map(|(i, _)| *i).collect();
-    let requires_rank = crate::runtime::manifest::requires_rank(&module_infos);
+    let requires_rank = crate::runtime::manifest::run_order(&module_infos);
     spawned.sort_by_key(|m| requires_rank.get(&m.id).copied().unwrap_or(usize::MAX));
 
     if spawned.is_empty() {
@@ -484,10 +484,10 @@ impl RuntimeLoader for ProcessLoader {
     fn run(&self, modules: Vec<ModuleInfo>, ctx: &RunContext) -> Result<(), String> {
         // Ranked BEFORE contracts are dropped, so a consumer still lands after everything providing
         // what it requires: the contract entries themselves just never become processes.
-        let load_order = order_by_requires(modules);
+        let ordered = in_run_order(modules);
 
         let mut descriptors = Vec::new();
-        for info in &load_order {
+        for info in &ordered {
             if info.manifest.is_contract() {
                 continue; // a definition, not something to run. See Manifest::kind
             }

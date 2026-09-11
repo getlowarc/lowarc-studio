@@ -83,7 +83,7 @@ fn parse_graph(source: &str) -> Result<Graph, String> {
     for c in &parsed.connections {
         // A connection naming a node that doesn't exist (a hand-edited or corrupted file) is
         // simply not a real edge: silently dropped here rather than failing the whole graph over
-        // one bad entry, same "tolerant of missing ids" spirit as manifest::order_by_requires.
+        // one bad entry, same "tolerant of missing ids" spirit as manifest::in_run_order.
         if nodes.contains_key(&c.from) && nodes.contains_key(&c.to) {
             outgoing.entry(c.from.clone()).or_default().push(c.to.clone());
         }

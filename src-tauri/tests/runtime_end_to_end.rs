@@ -22,7 +22,7 @@ fn write_fixture_module(modules_dir: &std::path::Path, frames_before_stop: u32) 
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(
         dir.join("manifest.json"),
-        r#"{"id":"echo","name":"Echo Module","loadOrder":1,"requires":[]}"#,
+        r#"{"id":"echo","name":"Echo Module","priority":1,"requires":[]}"#,
     )
     .unwrap();
     std::fs::write(

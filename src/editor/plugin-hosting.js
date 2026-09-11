@@ -441,7 +441,7 @@
         pageFile: "modules.html",
         extraFields: (item) => [
           { value: item.description || "No description." },
-          { label: "Load order", value: String(item.loadOrder) },
+          { label: "Priority", value: item.priority === null ? "Unset. Ordered by what it requires." : String(item.priority) },
           { label: "Requires", value: item.requires.length ? item.requires.join(", ") : "Nothing." },
         ],
       });

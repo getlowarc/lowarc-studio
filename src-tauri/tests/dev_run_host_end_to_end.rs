@@ -36,7 +36,7 @@ fn dev_run_host_bin() -> PathBuf {
 /// test told it to, which is exactly what's being verified.
 fn write_ticking_module(dir: &Path) {
     std::fs::create_dir_all(dir).unwrap();
-    std::fs::write(dir.join("manifest.json"), r#"{"id":"ticker","name":"Ticker","loadOrder":1,"requires":[]}"#).unwrap();
+    std::fs::write(dir.join("manifest.json"), r#"{"id":"ticker","name":"Ticker","priority":1,"requires":[]}"#).unwrap();
     std::fs::write(
         dir.join("process.json"),
         r#"{"command":"powershell","args":["-NoProfile","-ExecutionPolicy","Bypass","-File","module.ps1"],"wantsFrames":true,"timeoutMs":30000}"#,
@@ -64,7 +64,7 @@ while ($line = [Console]::In.ReadLine()) {
 /// be treated as failing.
 fn write_degraded_module(dir: &Path) {
     std::fs::create_dir_all(dir).unwrap();
-    std::fs::write(dir.join("manifest.json"), r#"{"id":"ticker","name":"Ticker","loadOrder":1,"requires":[]}"#).unwrap();
+    std::fs::write(dir.join("manifest.json"), r#"{"id":"ticker","name":"Ticker","priority":1,"requires":[]}"#).unwrap();
     std::fs::write(
         dir.join("process.json"),
         r#"{"command":"powershell","args":["-NoProfile","-ExecutionPolicy","Bypass","-File","module.ps1"],"wantsFrames":true,"timeoutMs":30000}"#,

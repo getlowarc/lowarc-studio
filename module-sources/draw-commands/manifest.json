@@ -4,6 +4,5 @@
   "name": "Draw Commands",
   "version": "1.0.0",
   "description": "An ordered list of immediate-mode 2D drawing operations, gathered from every module that draws.",
-  "loadOrder": 0,
   "requires": []
 }

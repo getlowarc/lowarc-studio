@@ -24,7 +24,7 @@ fn a_folder_export_actually_runs_its_module_when_launched() {
     let modules_dir = temp_dir("modules");
     let module_dir = modules_dir.join("echo");
     std::fs::create_dir_all(&module_dir).unwrap();
-    std::fs::write(module_dir.join("manifest.json"), r#"{"id":"echo","name":"Echo","loadOrder":1,"requires":[]}"#).unwrap();
+    std::fs::write(module_dir.join("manifest.json"), r#"{"id":"echo","name":"Echo","priority":1,"requires":[]}"#).unwrap();
     std::fs::write(
         module_dir.join("process.json"),
         r#"{"command":"powershell","args":["-NoProfile","-ExecutionPolicy","Bypass","-File","module.ps1"],"wantsFrames":true}"#,

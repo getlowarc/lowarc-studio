@@ -3,7 +3,6 @@
   "name": "Device Input",
   "version": "0.3.0",
   "description": "Polls keyboard, mouse and gamepads at the OS level, in screen coordinates, regardless of window focus.",
-  "loadOrder": 1,
   "requires": [],
-  "provides": [{ "contract": "input-state", "version": "^1" }]
+  "provides": [{ "contract": "input-state", "version": "1.0.0" }]
 }

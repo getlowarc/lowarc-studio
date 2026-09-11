@@ -23,7 +23,7 @@ fn temp_dir(name: &str) -> std::path::PathBuf {
 fn write_input_module(modules_dir: &std::path::Path) {
     let dir = modules_dir.join("device-input");
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("manifest.json"), r#"{"id":"device-input","name":"Device Input","loadOrder":1,"requires":[]}"#).unwrap();
+    std::fs::write(dir.join("manifest.json"), r#"{"id":"device-input","name":"Device Input","priority":1,"requires":[]}"#).unwrap();
     std::fs::write(dir.join("process.json"), r#"{"command":"device_input_runtime","args":[],"wantsFrames":true}"#).unwrap();
     let built_exe = std::path::PathBuf::from(env!("CARGO_BIN_EXE_device_input_runtime"));
     let file_name = if cfg!(windows) { "device_input_runtime.exe" } else { "device_input_runtime" };
