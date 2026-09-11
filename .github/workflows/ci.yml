@@ -31,7 +31,7 @@ jobs:
       run:
         working-directory: src-tauri
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # rustup on windows-latest already reads rust-toolchain.toml at the repo root, so no
       # explicit toolchain-install step is needed — this just adds caching.
