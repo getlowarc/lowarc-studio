@@ -102,7 +102,20 @@ should land on `main`; CI enforces the same three. See [CONTRIBUTING.md](CONTRIB
 you start on anything large, and [SECURITY.md](SECURITY.md) if you found a vulnerability rather
 than a bug.
 
+## Contact
+
+- **Bugs and features**: [open an issue](https://github.com/getlowarc/lowarc-studio/issues).
+- **Questions and help**: <support@lowarc.com>.
+- **Security**: <security@lowarc.com>, or GitHub's private reporting. See [SECURITY.md](SECURITY.md).
+- **Conduct**: <report@lowarc.com>. See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+- **Licensing, trademark, anything legal**: <legal@lowarc.com>.
+- **Anything else**: <info@lowarc.com>.
+
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE), and [NOTICE](NOTICE) for the third-party code LowArc Studio
 bundles.
+
+The licence covers the code, not the name: Apache-2.0 grants no trademark rights (section 6), so
+"LowArc" and the bolt mark are not yours to use by having forked this. Ask <legal@lowarc.com> if
+you need to.

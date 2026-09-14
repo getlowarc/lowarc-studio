@@ -2,9 +2,11 @@
 
 ## Reporting a vulnerability
 
-Report it privately, not as a public issue. Use GitHub's
-[private vulnerability reporting](https://github.com/getlowarc/lowarc-studio/security/advisories/new)
-on this repository.
+Report it privately, not as a public issue. Either of these reaches us:
+
+- GitHub's [private vulnerability reporting](https://github.com/getlowarc/lowarc-studio/security/advisories/new)
+  on this repository, which keeps the report, the discussion and the fix in one place.
+- <security@lowarc.com>, if you would rather not go through GitHub, or do not have an account.
 
 Include what you need to make the case: the version (Help, then About, or `lowarc --version`), the
 platform, what an attacker gets, and the smallest project or module that shows it. A working repro

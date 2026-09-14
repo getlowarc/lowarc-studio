@@ -6,6 +6,11 @@ with work already in flight, and it is cheaper to find that out first.
 
 Small fixes need no preamble. Send them.
 
+Taking part here means following the [Code of Conduct](CODE_OF_CONDUCT.md). Concerns about someone's
+behaviour go to <report@lowarc.com>, not into a public issue. A security vulnerability goes to
+<security@lowarc.com> or GitHub's private reporting, never into a public issue either; see
+[SECURITY.md](SECURITY.md).
+
 ## Before you push
 
 These three must pass. CI runs the same three on every push and pull request.
