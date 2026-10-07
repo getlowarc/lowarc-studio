@@ -103,22 +103,43 @@ are done. One piece is not.
       not match from a provider speaking the wrong dialect. Four distinct things a graph could draw,
       and nothing draws them.
 
-## Winding
+## Winding, if anything
 
 [winding](https://github.com/nolanbaxter/winding) is a dependency-free WebGPU renderer for the
-browser, already at 1.5.0. LowArc's only output surface today is `vector-canvas`, which is 2D.
+browser, in 3D and 2D, at 1.5.0. It shares an author with LowArc and nothing else, so far.
 
-**What is undecided is what "port" means**, and the answer depends on the pipeline question rather
-than on effort:
+**Nothing has been decided, including whether the answer is "nothing".** Three facts about winding
+constrain the options more than effort does:
 
-- As a **plugin**, winding is a 3D viewport inside Studio, running in the WebView that plugins
-  already run in. Nearly free, and the smallest useful version.
-- As an **output module**, winding would need a native WebGPU host rather than a browser, which is
-  a rewrite rather than a port.
-- As an **engine** in LowArc's sense, winding sits behind a `scene` contract the way `vector-canvas`
-  sits behind `draw-commands`, and user code describes a scene without naming the renderer.
+- It wants a **browser**: `Winding.create(canvas)` needs a DOM canvas and `navigator.gpu`. LowArc
+  modules are native processes, and `vector-canvas` opens a real OS window through femtovg.
+- It **owns the frame loop**: `engine.run(scene, camera, { frame })` drives rendering itself, where
+  LowArc's runtime ticks every module through a `frame` phase. Two loops, both expecting to lead.
+- It is **retained-mode**: a scene is built and then mutated. `draw-commands` is immediate-mode, a
+  fresh list of ops every frame gathered from every provider. Not two flavours of one idea.
 
-- [ ] Decide which of those it is, and say why, before writing any of it.
+So the shapes worth weighing, cheapest first:
+
+- [ ] **A viewer plugin.** A 3D viewport inside Studio. Needs no adaptation at all: plugins already
+      run in a browser context with a canvas, and this machine's WebView2 is well past the Chromium
+      release that shipped WebGPU. A viewer never joins the run loop, so none of the three problems
+      above apply. Worth doing on its own merits whatever happens to the rest: the current
+      `3d-viewer` vendors 2.3MB of three.js, reads only `.glb` and `.obj`, and cannot resolve a
+      loose `.gltf` that points at separate `.bin` and texture files. It is also the cheapest way to
+      learn how winding feels inside Studio before committing to anything larger.
+- [ ] **An output module.** Needs a native WebGPU host for JavaScript, or winding rewritten against
+      wgpu. That is a second engine rather than a port, and it buys something `vector-canvas`
+      already partly does.
+- [ ] **An engine behind a `scene` contract**, the way `vector-canvas` sits behind `draw-commands`.
+      Coherent, and retained-mode suits a contract built for it, but it needs the output module to
+      exist first.
+- [ ] **LowArc targets the browser, and winding is what draws there.** The only shape where winding
+      is not adapted at all: user code runs in a browser, winding renders, and LowArc builds and
+      ships the project. This is a product decision rather than an engineering one, and it is the
+      same decision as the open question at the bottom of this file, since a browser is a runtime
+      and running code in its own runtime was always the first model.
+- [ ] **Nothing.** Two projects, one author. Winding has its own audience, its own npm package and
+      its own release line. This stays a real answer until something makes it a worse one.
 
 ## Smaller things worth not forgetting
 
