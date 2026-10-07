@@ -102,6 +102,10 @@ should land on `main`; CI enforces the same three. See [CONTRIBUTING.md](CONTRIB
 you start on anything large, and [SECURITY.md](SECURITY.md) if you found a vulnerability rather
 than a bug.
 
+## Roadmap
+
+What is being worked towards and in what order: [ROADMAP.md](ROADMAP.md).
+
 ## Contact
 
 - **Bugs and features**: [open an issue](https://github.com/getlowarc/lowarc-studio/issues).
