@@ -105,7 +105,7 @@ are done. One piece is not.
 
 ## Winding, if anything
 
-[winding](https://github.com/nolanbaxter/winding) is a dependency-free WebGPU renderer for the
+[winding](https://github.com/getlowarc/winding) is a dependency-free WebGPU renderer for the
 browser, in 3D and 2D, at 1.5.0. It shares an author with LowArc and nothing else, so far.
 
 **Nothing has been decided, including whether the answer is "nothing".** Three facts about winding
